@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="src/assets/bb21610d5fa0b1d8a65b7ce9827d83c61bf7a2c5.png">
+  <title>Đăng nhập - FLIC</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 50%, #e2e8f0 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .login-wrap {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      align-items: center;
+      gap: 64px;
+    }
+
+    .login-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-logo-wrap {
+      position: relative;
+    }
+
+    .login-logo-glow {
+      position: absolute;
+      inset: -20px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .login-logo {
+      width: 280px;
+      height: 280px;
+      object-fit: contain;
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-badge {
+      margin-top: 24px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #bae6fd;
+      border-radius: 999px;
+      padding: 14px 32px;
+      max-width: 340px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .login-badge p {
+      color: #0284c7;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    .login-right {
+      flex: 1;
+      max-width: 440px;
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+      padding: 40px;
+    }
+
+    .login-title {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0284c7;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .login-subtitle {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--orange);
+      text-align: center;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .login-desc {
+      font-size: 13px;
+      color: var(--gray-500);
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .login-footer-txt {
+      margin-top: 24px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--gray-400);
+    }
+
+    .forgot-link {
+      color: var(--sky);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .forgot-link:hover {
+      text-decoration: underline;
+    }
+
+    .spinner {
+      display: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .login-wrap {
+        flex-direction: column;
+      }
+
+      .login-left {
+        display: none;
+      }
+    }
+
+    #screen-forgot {
+      display: none;
+    }
+
+    .forgot-back {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--sky);
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 24px;
+    }
+
+    .forgot-back:hover {
+      opacity: 0.75;
+    }
+
+    .forgot-info-box {
+      background: #f0f8ff;
+      border: 1px solid #bae6fd;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 22px;
+      font-size: 13.5px;
+      color: var(--gray-600);
+      line-height: 1.6;
+    }
+
+    .email-sent-icon {
+      width: 72px;
+      height: 72px;
+      background: #dcfce7;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="screen-login" style="width: 100%; min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+    <div class="login-wrap">
+      <div class="login-left">
+        <div class="login-logo-wrap">
+          <div class="login-logo-glow"></div>
+          <img
+            src="src/assets/bb21610d5fa0b1d8a65b7ce9827d83c61bf7a2c5.png"
+            alt="FLIC Logo"
+            class="login-logo"
+          />
+        </div>
+        <div class="login-badge">
+          <p>Chỉ dành cho nhân viên nội bộ của<br />Trung Tâm Ngoại Ngữ - Tin Học</p>
+        </div>
+      </div>
+
+      <div class="login-right">
+        <div class="login-card">
+          <div class="login-title">ĐĂNG NHẬP</div>
+          <div class="login-subtitle">TRUNG TÂM NGOẠI NGỮ - TIN HỌC</div>
+          <div class="login-desc">Foreign Languages - Informatics Centre</div>
+
+          <form id="login-form">
+            <div class="form-group">
+              <div class="input-wrap">
+                <div class="input-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  id="inp-user"
+                  class="input"
+                  placeholder="Tên đăng nhập"
+                  autocomplete="username"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <div class="input-wrap">
+                <div class="input-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                    <path d="M7 11V7a5 5 0 0110 0v4"></path>
+                  </svg>
+                </div>
+                <input
+                  type="password"
+                  id="inp-pass"
+                  class="input"
+                  placeholder="Mật khẩu"
+                  autocomplete="current-password"
+                />
+                <button type="button" class="input-icon-right" onclick="togglePw()">
+                  <svg id="pw-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gray-700);">
+              <input
+                type="checkbox"
+                id="remember"
+                checked
+                style="width: 16px; height: 16px; accent-color: var(--sky);"
+              />
+              <label for="remember">Ghi nhớ đăng nhập</label>
+            </div>
+
+            <button type="submit" class="btn btn-orange btn-full btn-lg" id="login-btn">
+              <span class="spinner" id="spinner"></span>
+              <span id="btn-text">ĐĂNG NHẬP</span>
+            </button>
+          </form>
+
+          <div style="margin-top: 20px; text-align: center;">
+            <span class="forgot-link" onclick="showForgot()">Quên mật khẩu?</span>
+          </div>
+        </div>
+
+        <div class="login-footer-txt">Phiên bản 2.0.1 – © 2026 Trình Tạo Biểu Mẫu</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-forgot" style="width: 100%; min-height: 100vh; display: none; align-items: center; justify-content: center;">
+    <div class="login-wrap">
+      <div class="login-left">
+        <div class="login-logo-wrap">
+          <div class="login-logo-glow"></div>
+          <img
+            src="src/assets/bb21610d5fa0b1d8a65b7ce9827d83c61bf7a2c5.png"
+            alt="FLIC Logo"
+            class="login-logo"
+          />
+        </div>
+        <div class="login-badge">
+          <p>Chỉ dành cho nhân viên nội bộ của<br />Trung Tâm Ngoại Ngữ - Tin Học</p>
+        </div>
+      </div>
+
+      <div class="login-right">
+        <div id="forgot-form-card" class="login-card">
+          <div class="forgot-back" onclick="hideForgot()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            Quay lại đăng nhập
+          </div>
+
+          <div class="login-title" style="font-size: 26px;">QUÊN MẬT KHẨU</div>
+          <div class="login-subtitle">Khôi Phục Tài Khoản</div>
+          <div class="login-desc">Khôi Phục Tài Khoản</div>
+
+          <div class="forgot-info-box">
+            Nhập địa chỉ email của bạn và chúng tôi sẽ gửi hướng dẫn để đặt lại mật khẩu.
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email đăng ký</label>
+            <div class="input-wrap">
+              <div class="input-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                  <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+              </div>
+              <input id="forgot-email" type="email" class="input" placeholder="example@flic.edu.vn" />
+            </div>
+          </div>
+
+          <button class="btn btn-orange btn-full btn-lg" onclick="submitForgot()">GỬI EMAIL KHÔI PHỤC</button>
+
+          <div style="margin-top: 20px; text-align: center; font-size: 13px; color: var(--gray-500);">
+            Bạn cần hỗ trợ?
+            <span class="forgot-link" onclick="alert('Liên hệ IT Support: it@flic.edu.vn')">Liên hệ IT Support</span>
+          </div>
+        </div>
+
+        <div id="forgot-sent-card" class="login-card" style="display: none; text-align: center;">
+          <div class="email-sent-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" width="36" height="36">
+              <path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </div>
+
+          <div style="font-size: 22px; font-weight: 800; margin-bottom: 12px;">Email đã được gửi!</div>
+
+          <p style="font-size: 14px; color: var(--gray-600); margin-bottom: 16px;">
+            Chúng tôi đã gửi hướng dẫn khôi phục mật khẩu đến email
+            <strong id="sent-email"></strong>.<br />
+            Vui lòng kiểm tra hộp thư.
+          </p>
+
+          <div
+            style="
+              background: #f8f9fa;
+              border: 1px solid var(--gray-200);
+              border-radius: 10px;
+              padding: 12px;
+              font-size: 13px;
+              color: var(--gray-600);
+              margin-bottom: 20px;
+              text-align: left;
+            "
+          >
+            💡 <strong>Lưu ý:</strong> Email có thể nằm trong thư mục Spam/Junk. Link khôi phục có hiệu lực trong 24 giờ.
+          </div>
+
+          <button class="btn btn-primary btn-full" style="margin-bottom: 10px;" onclick="hideForgot()">Quay lại đăng nhập</button>
+          <button
+            class="btn btn-outline btn-full"
+            onclick="document.getElementById('forgot-sent-card').style.display='none';document.getElementById('forgot-form-card').style.display='block'"
+          >
+            Gửi lại email
+          </button>
+        </div>
+
+        <div class="login-footer-txt">Phiên bản 2.0.1 – © 2026 Trình Tạo Biểu Mẫu</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  
+  <script src="js/main.js"></script>
+
+  <script>
+    function setLoginLoading(isLoading) {
+      const btn = document.getElementById("login-btn");
+      const spinner = document.getElementById("spinner");
+      const btnText = document.getElementById("btn-text");
+
+      btn.disabled = isLoading;
+      spinner.style.display = isLoading ? "block" : "none";
+      btnText.textContent = isLoading ? "ĐANG XỬ LÝ..." : "ĐĂNG NHẬP";
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+
+      const ten_dang_nhap = document.getElementById("inp-user").value.trim();
+      const mat_khau = document.getElementById("inp-pass").value;
+
+      if (!ten_dang_nhap || !mat_khau) {
+        alert("Vui lòng nhập tên đăng nhập và mật khẩu");
+        return;
+      }
+
+      setLoginLoading(true);
+
+      try {
+        const res = await fetch("http://localhost:3000/api/auth/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ ten_dang_nhap, mat_khau })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.message || "Đăng nhập thất bại");
+          return;
+        }
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("quyen", JSON.stringify(data.quyen));
+
+        window.location.href = "pages/dashboard.html";
+      } catch (err) {
+        console.error("Lỗi đăng nhập:", err);
+        alert("Không kết nối được backend");
+      } finally {
+        setLoginLoading(false);
+      }
+    }
+
+    function togglePw() {
+      const input = document.getElementById("inp-pass");
+      const eye = document.getElementById("pw-eye");
+
+      input.type = input.type === "password" ? "text" : "password";
+
+      eye.innerHTML =
+        input.type === "text"
+          ? '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"></path><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"></path><line x1="1" y1="1" x2="23" y2="23"></line>'
+          : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+    }
+
+    function showForgot() {
+      document.getElementById("screen-login").style.display = "none";
+      document.getElementById("screen-forgot").style.display = "flex";
+    }
+
+    function hideForgot() {
+      document.getElementById("screen-forgot").style.display = "none";
+      document.getElementById("screen-login").style.display = "flex";
+      document.getElementById("forgot-sent-card").style.display = "none";
+      document.getElementById("forgot-form-card").style.display = "block";
+    }
+
+    function submitForgot() {
+      const email = document.getElementById("forgot-email").value.trim();
+
+      if (!email || !email.includes("@")) {
+        document.getElementById("forgot-email").focus();
+        return;
+      }
+
+      document.getElementById("sent-email").textContent = email;
+      document.getElementById("forgot-form-card").style.display = "none";
+      document.getElementById("forgot-sent-card").style.display = "block";
+    }
+
+    document.getElementById("login-form").addEventListener("submit", handleLogin);
+
+    document.getElementById("inp-pass").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("login-form").requestSubmit();
+      }
+    });
+  </script>
+</body>
+</html>
