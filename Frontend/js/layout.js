@@ -1,84 +1,91 @@
 // ===== PERMISSION HELPERS =====
-const getUser  = () => { try { return JSON.parse(localStorage.getItem('user'))  || null; } catch { return null; } };
-const getQuyen = () => { try { return JSON.parse(localStorage.getItem('quyen')) || {};   } catch { return {}; } };
-const isAdmin  = () => { const r = getUser()?.vai_tro; return r === 'admin' || r === 'manager'; };
-const hasPermission    = key      => isAdmin() || !!getQuyen()[key];
-const hasAnyPermission = (keys=[]) => isAdmin() || keys.some(k => !!getQuyen()[k]);
+const getUser = () => { try { return JSON.parse(localStorage.getItem('user')) || null; } catch { return null; } };
+const getQuyen = () => { try { return JSON.parse(localStorage.getItem('quyen')) || {}; } catch { return {}; } };
+const isAdmin = () => { const r = getUser()?.vai_tro; return r === 'admin' || r === 'manager'; };
+const hasPermission = key => isAdmin() || !!getQuyen()[key];
+const hasAnyPermission = (keys = []) => isAdmin() || keys.some(k => !!getQuyen()[k]);
 
 const MENU_PERMS = {
-  'form-management':         q => q.view_form||q.add_form||q.edit_form||q.delete_form,
-  'approval-management':     q => q.view_approval||q.approve||q.share_form,
-  'reports-statistics':      q => q.view_report||q.export_data,
-  'staff-management':        q => q.view_staff||q.manage_staff,
-  'notification-management': q => q.view_notif||q.send_notif,
+  'form-management': q => q.view_form || q.add_form || q.edit_form || q.delete_form,
+  'approval-management': q => q.view_approval || q.approve || q.share_form,
+  'reports-statistics': q => q.view_report || q.export_data,
+  'staff-management': q => q.view_staff || q.manage_staff,
+  'notification-management': q => q.view_notif || q.send_notif,
 };
 const canViewMenu = code => isAdmin() || code === 'dashboard' || !!(MENU_PERMS[code]?.(getQuyen()));
 
 function requireMenuAccess(menuCode) {
-  if (!canViewMenu(menuCode)) { alert('Bạn không có quyền truy cập chức năng này'); window.location.href='dashboard.html'; return false; }
+  if (!canViewMenu(menuCode)) { alert('Bạn không có quyền truy cập chức năng này'); window.location.href = 'dashboard.html'; return false; }
   return true;
 }
-function requirePagePermission(keys=[]) {
-  if (!hasAnyPermission(keys)) { alert('Bạn không có quyền truy cập chức năng này'); window.location.href='dashboard.html'; return false; }
+function requirePagePermission(keys = []) {
+  if (!hasAnyPermission(keys)) { alert('Bạn không có quyền truy cập chức năng này'); window.location.href = 'dashboard.html'; return false; }
   return true;
 }
 function applyPageQuyen(rules) {
   if (isAdmin()) return;
   const q = getQuyen();
   Object.entries(rules).forEach(([key, sel]) => {
-    if (!q[key]) document.querySelectorAll(sel).forEach(el => el.style.display='none');
+    if (!q[key]) document.querySelectorAll(sel).forEach(el => el.style.display = 'none');
   });
 }
 
 // ===== SHARED LAYOUT GENERATOR =====
 function renderLayout(pageId, pageTitle, contentHTML) {
   const logo = '../src/assets/bb21610d5fa0b1d8a65b7ce9827d83c61bf7a2c5.png';
-  const user  = getUser() || {};
-  const q     = getQuyen();
+  const user = getUser() || {};
+  const q = getQuyen();
   const isAdm = user.vai_tro === 'admin' || user.vai_tro === 'manager';
   const displayName = user.ho_ten || 'User';
-  const roleLabel   = (user.vai_tro==='admin' || user.vai_tro==='manager') ? 'Quản lý' : 'Nhân viên';
+  const roleLabel = (user.vai_tro === 'admin' || user.vai_tro === 'manager') ? 'Quản lý' : 'Nhân viên';
+  const fixedLabels = {
+    feedbackManagement: 'Qu\u1ea3n l\u00fd ph\u1ea3n h\u1ed3i',
+    staffManagement: 'Qu\u1ea3n l\u00fd nh\u00e2n vi\u00ean',
+  };
 
   const navItems = [
-    { id:'home',      label:'Trang chủ',           href:'dashboard.html', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>' },
-    { id:'favorites', label:'Danh sách yêu thích', href:'favorites.html', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>' },
+    { id: 'home', label: 'Trang chủ', href: 'dashboard.html', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>' },
+    { id: 'favorites', label: 'Danh sách yêu thích', href: 'favorites.html', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>' },
   ];
   const mgmtItems = [
-    { id:'form-management',         label:'Quản lý biểu mẫu',  href:'form-management.html',   show:()=>q.view_form||q.add_form||q.edit_form||q.delete_form, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' },
-    { id:'library',                 label:'Thư viện câu hỏi',   href:'library.html',           show:()=>q.view_form||q.add_form||isAdm, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>' },
-    { id:'approval-management',     label:'Quản lý phê duyệt', href:'approval.html',          show:()=>q.view_approval||q.approve, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>' },
-    { id:'reports-statistics',      label:'Báo cáo - thống kê',href:'reports.html',           show:()=>q.view_report||q.export_data, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>' },
-    { id:'feedback-management',     label:'Quản lý phản hồi',  href:'feedback.html',          show:()=>q.view_feedback||q.delete_feedback, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>' },
-    { id:'staff-management',        label:'Quản lý nhân viên', href:'staff.html',             show:()=>q.view_staff||q.manage_staff, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>' },
-    { id:'notification-management', label:'Quản lý thông báo', href:'notifications-mgmt.html',show:()=>q.view_notif||q.send_notif, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>' },
-    { id:'trash',                   label:'Thùng rác',          href:'trash.html',             show:()=>q.delete_form||isAdm, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V4h6v2"/></svg>' },
+    { id: 'form-management', label: 'Quản lý biểu mẫu', href: 'form-management.html', show: () => q.view_form || q.add_form || q.edit_form || q.delete_form, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' },
+    { id: 'library', label: 'Thư viện câu hỏi', href: 'library.html', show: () => q.view_form || q.add_form || isAdm, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>' },
+    { id: 'approval-management', label: 'Quản lý phê duyệt', href: 'approval.html', show: () => q.view_approval || q.approve, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>' },
+    { id: 'reports-statistics', label: 'Báo cáo - thống kê', href: 'reports.html', show: () => q.view_report || q.export_data, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>' },
+    { id: 'feedback-management', label: fixedLabels.feedbackManagement, href: 'feedback.html', show: () => q.view_feedback || q.delete_feedback, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>' },
+    { id: 'staff-management', label: fixedLabels.staffManagement, href: 'staff.html', show: () => q.view_staff || q.manage_staff, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>' },
+    { id: 'notification-management', label: 'Quản lý thông báo', href: 'notifications-mgmt.html', show: () => q.view_notif || q.send_notif, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>' },
+    { id: 'trash', label: 'Thùng rác', href: 'trash.html', show: () => q.delete_form || isAdm, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V4h6v2"/></svg>' },
   ];
 
   const visibleMgmt = mgmtItems.filter(i => isAdm || i.show());
-  const ni = i => `<a href="${i.href}" class="sidebar-item${i.id===pageId?' active':''}" data-page="${i.id}">${i.icon}<span>${i.label}</span></a>`;
+  const ni = i => `<a href="${i.href}" class="sidebar-item${i.id === pageId ? ' active' : ''}" data-page="${i.id}">${i.icon}<span>${i.label}</span></a>`;
 
   return `
   <div class="app-layout">
     <aside class="sidebar">
       <div class="sidebar-logo">
         <img src="${logo}" alt="FLIC Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-        <div style="display:none;font-size:20px;font-weight:700;color:#38bdf8">FLIC</div>
+        <div style="display:none;font-size:20px;font-weight:700;color:#fff">FLIC</div>
         <div class="sidebar-tagline">TT Ngoại ngữ - Tin học (FLIC)</div>
       </div>
-      <nav class="sidebar-nav">
-        ${navItems.map(ni).join('')}
-        ${visibleMgmt.length?'<div class="sidebar-section-label">Quản lý</div>':''}
-        ${visibleMgmt.map(ni).join('')}
-      </nav>
-      <div class="sidebar-bottom">
-        <a href="settings.html" class="sidebar-item${pageId==='settings'?' active':''}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-          <span>Cài đặt</span>
-        </a>
-        <button onclick="logout()" class="sidebar-item logout" style="width:100%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          <span>Đăng xuất</span>
-        </button>
+      <div class="sidebar-scroll">
+        <nav class="sidebar-nav">
+          ${navItems.map(ni).join('')}
+          ${visibleMgmt.length ? '<div class="sidebar-section-label">Quản lý</div>' : ''}
+          ${visibleMgmt.map(ni).join('')}
+        </nav>
+        <div class="sidebar-bottom">
+          <a href="settings.html" class="sidebar-item${pageId === 'settings' ? ' active' : ''}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <span>Cài đặt</span>
+          </a>
+          
+          <a href="audit-logs.html" class="sidebar-item${pageId === 'audit-logs' ? ' active' : ''}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Nhật ký hoạt động</span>
+          </a>
+        </div>
       </div>
     </aside>
     <div class="main-content">
@@ -145,39 +152,102 @@ function toggleUserDropdown(e) {
   if (!dd) return;
   const vis = dd.style.display === 'block';
   dd.style.display = vis ? 'none' : 'block';
-  if (!vis) setTimeout(() => document.addEventListener('click', () => { if(dd) dd.style.display='none'; }, { once: true }), 0);
+  if (!vis) setTimeout(() => document.addEventListener('click', () => { if (dd) dd.style.display = 'none'; }, { once: true }), 0);
 }
 function goToSettingsTab(tab) {
   document.getElementById('user-dropdown').style.display = 'none';
   if (window.location.pathname.endsWith('settings.html')) {
     if (typeof switchTab === 'function') { switchTab(tab); return; }
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.dataset.tabContent===tab));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.dataset.tabContent === tab));
   } else {
     window.location.href = 'settings.html?tab=' + tab;
   }
 }
 function logout() {
-  ['token','user','quyen'].forEach(k => localStorage.removeItem(k));
+  ['token', 'user', 'quyen'].forEach(k => localStorage.removeItem(k));
   window.location.href = '../index.html';
 }
 
 // ===== BELL NOTIFICATIONS =====
 const BELL_LS_NOTIFS = 'flic_notifications';
-const BELL_READ_KEY  = 'flic_bell_read_count';
+const BELL_READ_KEY = 'flic_bell_read_count';
 const _bellIcon = {
-  info:    `<svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  info: `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="18" height="18"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>`,
   success: `<svg viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" width="18" height="18"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
-  warning: `<svg viewBox="0 0 24 24" fill="none" stroke="#ca8a04" stroke-width="2" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  error:   `<svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  warning: `<svg viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  error: `<svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
 };
-const _bellBg = { info:'#dbeafe', success:'#dcfce7', warning:'#fef9c3', error:'#fee2e2' };
-const getBellNotifs = () => { try { return JSON.parse(localStorage.getItem(BELL_LS_NOTIFS))||[]; } catch { return []; } };
+const _bellBg = { info: '#00008B', success: '#dcfce7', warning: '#ffedd5', error: '#fee2e2' };
+const getBellNotifs = () => { try { return JSON.parse(localStorage.getItem(BELL_LS_NOTIFS)) || []; } catch { return []; } };
+
+function getBellApprovalDate(notif) {
+  try {
+    const approvals = JSON.parse(localStorage.getItem('flic_approvals') || '[]');
+    if (!Array.isArray(approvals) || !approvals.length) return notif?.date || '';
+
+    const formName =
+      notif?.form ||
+      notif?.formName ||
+      (String(notif?.msg || '').match(/Yêu cầu\s+"([^"]+)"/)?.[1]) ||
+      '';
+    const approvalId = String(notif?.approval_id || '');
+    const formId = String(notif?.form_id || '');
+    const statusHint = String(notif?.title || '').toLowerCase().includes('từ chối')
+      ? 'rejected'
+      : String(notif?.title || '').toLowerCase().includes('phê duyệt')
+        ? 'approved'
+        : '';
+
+    const match = approvals.find(item => {
+      const sameApproval = approvalId && String(item._dbId || item.id || '') === approvalId;
+      const sameFormId = formId && String(item.form_id || '') === formId;
+      const sameName = formName && String(item.form || '') === formName;
+      const sameStatus = !statusHint || item.status === statusHint;
+      return sameStatus && (sameApproval || sameFormId || sameName);
+    });
+
+    return match?.processedDate || match?.date || notif?.date || '';
+  } catch {
+    return notif?.date || '';
+  }
+}
+
+window.formatRelativeTime = function(dateStr) {
+  if (!dateStr || dateStr === 'Chưa gửi') return dateStr || '';
+  
+  const parts = String(dateStr).match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
+  if (!parts) return dateStr;
+  
+  const [_, d, m, y, h, min] = parts;
+  const dateObj = new Date(y, m - 1, d, h, min);
+  const now = new Date();
+  
+  if (now < dateObj) return dateStr; // scheduled for future
+  
+  const diffMs = now - dateObj;
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfDateObj = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()).getTime();
+  const diffDays = Math.round((startOfToday - startOfDateObj) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) {
+    if (diffMinutes < 1) return 'Vừa xong';
+    if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+    return `${diffHours} giờ trước`;
+  } else if (diffDays > 0 && diffDays < 30) {
+    return `${diffDays} ngày trước`;
+  } else {
+    return `${d}/${m}/${y}`;
+  }
+};
 
 function updateBellBadge() {
   const badge = document.getElementById('bell-badge');
   if (!badge) return;
-  const unread = Math.max(0, getBellNotifs().length - parseInt(localStorage.getItem(BELL_READ_KEY)||'0', 10));
+  const unread = Math.max(0, getBellNotifs().length - parseInt(localStorage.getItem(BELL_READ_KEY) || '0', 10));
   badge.textContent = unread > 99 ? '99+' : unread;
   badge.style.display = unread > 0 ? 'inline-block' : 'none';
 }
@@ -187,23 +257,80 @@ function renderBellNotifs() {
   const notifs = getBellNotifs().slice(0, 10);
   body.innerHTML = notifs.length
     ? notifs.map(n => {
-        const t = n.type || 'info';
-        return `<div class="notif-item${n._bellNew?' unread':''}">
-          <div class="notif-icon" style="background:${_bellBg[t]||'#dbeafe'}">${_bellIcon[t]||_bellIcon.info}</div>
-          <div><div class="notif-title">${n.title||''}</div><div class="notif-msg">${n.msg||''}</div><div class="notif-time">${n.date||''}</div></div>
+      const t = n.type || 'info';
+      const formattedDate = window.formatRelativeTime(getBellApprovalDate(n));
+      return `<div class="notif-item${n._bellNew ? ' unread' : ''}" onclick="openGlobalNotifDetail('${n.id}')" style="cursor:pointer">
+          <div class="notif-icon" style="background:${_bellBg[t] || '#00008B'}">${_bellIcon[t] || _bellIcon.info}</div>
+          <div><div class="notif-title">${n.title || ''}</div><div class="notif-msg">${n.msg || ''}</div><div class="notif-time">${formattedDate}</div></div>
         </div>`;
-      }).join('')
+    }).join('')
     : '<div style="text-align:center;padding:32px;color:var(--gray-400);font-size:13px">Chưa có thông báo nào</div>';
   updateBellBadge();
 }
 function markBellRead() { localStorage.setItem(BELL_READ_KEY, String(getBellNotifs().length)); updateBellBadge(); }
 
+window.openGlobalNotifDetail = function (id) {
+  let notifs = getBellNotifs();
+  const n = notifs.find(item => String(item.id) === String(id));
+  if (!n) return;
+
+  if (n._bellNew) {
+    n._bellNew = false;
+    localStorage.setItem(BELL_LS_NOTIFS, JSON.stringify(notifs));
+    renderBellNotifs();
+    if (typeof loadNotifs === 'function') loadNotifs(); // update main view if open
+  }
+
+  let modalOverlay = document.getElementById('global-view-notif-modal');
+  if (!modalOverlay) {
+    modalOverlay = document.createElement('div');
+    modalOverlay.className = 'modal-overlay';
+    modalOverlay.id = 'global-view-notif-modal';
+    modalOverlay.setAttribute('onclick', "closeModal('global-view-notif-modal')");
+    document.body.appendChild(modalOverlay);
+  }
+
+  const tBg = _bellBg[n.type] || '#00008B';
+  const tIcon = _bellIcon[n.type] || _bellIcon.info;
+
+  modalOverlay.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">Chi tiết thông báo</div>
+        <button class="icon-btn close-btn" onclick="closeModal('global-view-notif-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px">
+          <div style="width:44px;height:44px;border-radius:50%;background:\${tBg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            \${tIcon}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:18px;font-weight:700;color:var(--gray-900);margin-bottom:8px">\${n.title}</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:12px;color:var(--gray-500)">Thời gian gửi: \${n.date}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--gray-200);border-radius:12px;padding:16px;background:#fafcff;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Nội dung</div>
+          <div style="font-size:14px;line-height:1.7;color:var(--gray-800);white-space:pre-wrap">\${n.msg}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('global-view-notif-modal')">Đóng</button>
+      </div>
+    </div>
+  `;
+  openModal('global-view-notif-modal');
+};
+
 const _origOpenPanel = window.openPanel;
-window.openPanel = function(id) {
+window.openPanel = function (id) {
   _origOpenPanel?.(id);
   if (id === 'notif-panel') { renderBellNotifs(); markBellRead(); }
 };
-window.addEventListener('storage', e => { if (e.key===BELL_LS_NOTIFS) { renderBellNotifs(); updateBellBadge(); } });
+window.addEventListener('storage', e => { if (e.key === BELL_LS_NOTIFS) { renderBellNotifs(); updateBellBadge(); } });
 setInterval(updateBellBadge, 3000);
 renderBellNotifs();
 updateBellBadge();

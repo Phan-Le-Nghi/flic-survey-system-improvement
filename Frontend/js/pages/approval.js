@@ -2,8 +2,8 @@ requireMenuAccess("approval-management");
 
 // ── Permission helpers ────────────────────────────────────────────
 // getUser(), isAdmin(), hasPermission(), hasAnyPermission() — từ layout.js
-function canApproveNow()    { return isAdmin() || hasPermission("approve"); }
-function canShareFormNow()  { return isAdmin() || hasPermission("share_form"); }
+function canApproveNow() { return isAdmin() || hasPermission("approve"); }
+function canShareFormNow() { return isAdmin() || hasPermission("share_form"); }
 function canViewApprovalNow() {
   return isAdmin() || hasAnyPermission(["view_approval", "approve", "share_form"]);
 }
@@ -17,6 +17,7 @@ if (!canViewApprovalNow()) {
 const LS_APPROVALS = "flic_approvals";
 const LS_TRASH_FORMS = "flic_trash_forms";
 const LS_HIDDEN_APPROVAL_FORMS = "flic_hidden_approval_forms";
+const LS_NOTIFS = "flic_notifications";
 const DEFAULT_APPROVALS = [
   {
     id: "1",
@@ -156,25 +157,103 @@ function getAuthHeaders() {
   };
 }
 
+function padApprovalDatePart(value) {
+  return String(value).padStart(2, "0");
+}
+
+function formatApprovalDateTime(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value || "");
+  return (
+    padApprovalDatePart(date.getDate()) +
+    "/" +
+    padApprovalDatePart(date.getMonth() + 1) +
+    "/" +
+    date.getFullYear() +
+    " " +
+    padApprovalDatePart(date.getHours()) +
+    ":" +
+    padApprovalDatePart(date.getMinutes())
+  );
+}
+
+function formatApprovalDate(value) {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const match = value.trim().match(/^(\d{1,2}\/\d{1,2}\/\d{4})/);
+    if (match) return match[1];
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value || "").split(" ")[0];
+  return (
+    padApprovalDatePart(date.getDate()) +
+    "/" +
+    padApprovalDatePart(date.getMonth() + 1) +
+    "/" +
+    date.getFullYear()
+  );
+}
+
+function parseApprovalDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const viMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?/);
+    if (viMatch) {
+      const [, dd, mm, yyyy, hh = "0", mi = "0"] = viMatch;
+      const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(mi));
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getApprovalDisplayDate(a) {
+  return formatApprovalDate(a.requested_at || a.date);
+}
+
+function splitApprovalNote(rawNote = "") {
+  const text = String(rawNote || "").trim();
+  if (!text) return { note: "", urgentReason: "" };
+
+  const urgentMatch = text.match(/Lý do duyệt gấp:\s*([\s\S]*?)(?:\n\s*Hạn chót phê duyệt:|$)/i);
+  const urgentReason = urgentMatch ? urgentMatch[1].trim() : "";
+  const note = text
+    .replace(/Lý do duyệt gấp:\s*[\s\S]*?(?=\n\s*Hạn chót phê duyệt:|$)/i, "")
+    .replace(/^Hạn chót phê duyệt:.*$/gim, "")
+    .trim();
+
+  return { note, urgentReason };
+}
+
 // Map dữ liệu từ DB → format FE
 function mapDbApproval(a) {
-  const priorityMap = { high: "high", medium: "medium", low: "low" };
+  const priorityMap = { urgent: "high", high: "high", normal: "medium", medium: "medium", low: "low" };
   const statusMap = { pending: "pending", approved: "approved", rejected: "rejected" };
-  const d = a.ngay_yeu_cau ? new Date(a.ngay_yeu_cau) : new Date();
-  const dateStr =
-    d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " " +
-    d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = formatApprovalDate(a.ngay_yeu_cau || new Date());
+  const status = statusMap[a.trang_thai] || "pending";
+  const rejectReason = a.ly_do_tu_choi || (status === "rejected" ? a.ghi_chu : "") || "";
+  const noteParts = splitApprovalNote(a.ghi_chu || "");
   return {
     id: String(a.id),
     _dbId: a.id,           // id số nguyên thật từ DB
     form: a.ten_form || "",
     by: a.nguoi_gui || "",
     date: dateStr,
-    status: statusMap[a.trang_thai] || "pending",
+    status,
     cat: a.danh_muc || "Khác",
     priority: priorityMap[a.do_uu_tien] || "medium",
+    note: status === "approved" ? "" : status === "rejected" ? rejectReason : noteParts.note,
+    urgent_reason: noteParts.urgentReason,
+    reject_reason: rejectReason,
+    approval_deadline: a.han_chot_duyet || "",
     form_id: a.form_id || null,
+    requested_at: a.ngay_yeu_cau || null,
+    processed_at: a.ngay_xu_ly || null,
+    processedDate: formatApprovalDateTime(a.ngay_xu_ly),
     questions: [],
   };
 }
@@ -182,13 +261,23 @@ function mapDbApproval(a) {
 function saveApprovals(list) {
   try {
     localStorage.setItem(LS_APPROVALS, JSON.stringify(list));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function loadLocalApprovals() {
   try {
     const raw = localStorage.getItem(LS_APPROVALS);
     return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function loadLocalNotifications() {
+  try {
+    const raw = localStorage.getItem(LS_NOTIFS);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
   } catch (e) {
     return [];
   }
@@ -217,7 +306,7 @@ function loadHiddenApprovalForms() {
 function saveHiddenApprovalForms(list) {
   try {
     localStorage.setItem(LS_HIDDEN_APPROVAL_FORMS, JSON.stringify(list));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function normalizeApprovalFormName(value) {
@@ -284,6 +373,39 @@ function removeApprovalsOfTrashedForms(list) {
   );
 }
 
+function mergeApprovalNotesFromCache(mappedList, cachedList) {
+  const cachedById = new Map();
+  (Array.isArray(cachedList) ? cachedList : []).forEach((item) => {
+    cachedById.set(String(item._dbId || item.id), item);
+    if (item.form_id) cachedById.set(`form:${item.form_id}`, item);
+  });
+
+  const notifs = loadLocalNotifications();
+
+  return mappedList.map((item) => {
+    const cached = cachedById.get(String(item._dbId || item.id)) || cachedById.get(`form:${item.form_id}`);
+    if (item.note || item.reject_reason) return item;
+
+    const cachedReason = cached ? (cached.reject_reason || cached.note || "") : "";
+    if (item.status === "rejected" && cachedReason) {
+      return { ...item, note: cachedReason, reject_reason: cachedReason };
+    }
+    if (item.status === "rejected") {
+      const relatedNotif = notifs.find((notif) => {
+        const msg = String(notif.msg || notif.noi_dung || "");
+        return msg.includes(`"${item.form}"`) && msg.includes("Lý do:");
+      });
+      const notifReason = String(relatedNotif?.msg || relatedNotif?.noi_dung || "")
+        .split("Lý do:")
+        .slice(1)
+        .join("Lý do:")
+        .trim();
+      if (notifReason) return { ...item, note: notifReason, reject_reason: notifReason };
+    }
+    return item;
+  });
+}
+
 function removeApprovalById(id) {
   approvalData = approvalData.filter((a) => String(a.id) !== String(id));
   saveApprovals(approvalData);
@@ -305,7 +427,9 @@ async function loadApprovalsFromAPI() {
     const res = await fetch(API_APPROVALS, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    const mapped = removeApprovalsOfTrashedForms(data.map(mapDbApproval));
+    const mapped = removeApprovalsOfTrashedForms(
+      mergeApprovalNotesFromCache(data.map(mapDbApproval), loadLocalApprovals())
+    );
     approvalData = mapped;
     saveApprovals(mapped);   // đồng bộ cache local
     return mapped;
@@ -318,27 +442,31 @@ async function loadApprovalsFromAPI() {
 
 let approvalData = removeApprovalsOfTrashedForms(loadLocalApprovals());   // hiển thị ngay từ cache
 let currentApprovalTab = "all";
+let currentApprovalPage = 1;
+const APPROVAL_PAGE_SIZE = 10;
 
 // ── Helpers ───────────────────────────────────────────────────────
 const priorityBadge = (p) =>
   p === "high"
     ? '<span class="badge badge-red">Cao</span>'
     : p === "medium"
-    ? '<span class="badge badge-yellow">Trung bình</span>'
-    : '<span class="badge badge-gray">Thấp</span>';
+      ? '<span class="badge badge-yellow">Trung bình</span>'
+      : '<span class="badge badge-gray">Thấp</span>';
 
-const apprStatusBadge = (s) =>
+const apprStatusBadge = (s, item = null) =>
   s === "pending"
-    ? '<span class="badge badge-yellow">Chờ duyệt</span>'
+    ? isUrgentApproval(item)
+      ? '<span class="badge badge-red">Chờ duyệt</span>'
+      : '<span class="badge badge-yellow">Chờ duyệt</span>'
     : s === "approved"
-    ? '<span class="badge badge-green">Đã duyệt</span>'
-    : '<span class="badge badge-red">Từ chối</span>';
+      ? '<span class="badge badge-green">Đã duyệt</span>'
+      : '<span class="badge badge-red">Từ chối</span>';
 
 const typeLabel = (t) =>
   t === "choice" ? "Lựa chọn" : t === "rating" ? "Đánh giá" : "Văn bản";
 
 const typeBadgeColor = (t) =>
-  t === "rating" ? "#f59e0b" : t === "text" ? "#8b5cf6" : "#0ea5e9";
+  t === "rating" ? "#f59e0b" : t === "text" ? "#8b5cf6" : "#00008B";
 
 function escapeHtml(str = "") {
   return String(str)
@@ -355,6 +483,72 @@ function escapeJsString(str = "") {
     .replace(/'/g, "\\'")
     .replace(/\n/g, "\\n")
     .replace(/\r/g, "");
+}
+
+function getApprovalNote(a) {
+  if (a.status === "approved") return "";
+  if (a.status === "rejected") return a.reject_reason || a.note || "";
+  if (isUrgentApproval(a)) return a.urgent_reason || splitApprovalNote(a.note).urgentReason || "";
+  return a.note || "";
+}
+
+function renderApprovalNote(a) {
+  const note = getApprovalNote(a);
+  return note ? escapeHtml(note) : '<span style="color:var(--gray-300)">-</span>';
+}
+
+function isUrgentApproval(a) {
+  return a?.status === "pending" && (a.priority === "high" || a.priority === "urgent");
+}
+
+function getApprovalDeadlineDate(a) {
+  return parseApprovalDate(a?.approval_deadline || a?.deadline || a?.han_chot_duyet || "");
+}
+
+function renderApprovalDeadline(a) {
+  const deadline = getApprovalDeadlineDate(a);
+  if (!deadline) {
+    return isUrgentApproval(a)
+      ? '<span style="color:#b45309;font-weight:600">Chưa đặt hạn</span>'
+      : '<span style="color:var(--gray-300)">-</span>';
+  }
+
+  const now = new Date();
+  const isPast = deadline < now;
+  const isToday = deadline.toDateString() === now.toDateString();
+  const color = isPast ? "#dc2626" : isUrgentApproval(a) ? "#df2f0b" : "var(--gray-600)";
+  const bg = isPast ? "#fef2f2" : isUrgentApproval(a) ? "#fff7ed" : "#f8fafc";
+  const label = isPast ? "Quá hạn" : isToday ? "Hôm nay" : "Hạn chót";
+
+  return `
+    <div style="display:inline-flex;flex-direction:column;gap:3px;min-width:126px">
+      <span style="display:inline-flex;align-items:center;width:max-content;padding:4px 8px;border-radius:8px;background:${bg};color:${color};font-size:12px;font-weight:700">${label}</span>
+      <span style="font-size:12px;color:var(--gray-600);white-space:nowrap">${escapeHtml(formatApprovalDateTime(deadline))}</span>
+    </div>
+  `;
+}
+
+function getApprovalSortRank(a) {
+  if (isUrgentApproval(a)) return 0;
+  if (a.status === "pending") return 1;
+  if (a.status === "rejected") return 2;
+  if (a.status === "approved") return 3;
+  return 4;
+}
+
+function sortApprovalsForReview(list) {
+  return [...list].sort((a, b) => {
+    const rankDiff = getApprovalSortRank(a) - getApprovalSortRank(b);
+    if (rankDiff) return rankDiff;
+
+    const deadlineA = getApprovalDeadlineDate(a)?.getTime() || Number.POSITIVE_INFINITY;
+    const deadlineB = getApprovalDeadlineDate(b)?.getTime() || Number.POSITIVE_INFINITY;
+    if (deadlineA !== deadlineB) return deadlineA - deadlineB;
+
+    const requestedA = parseApprovalDate(a.requested_at || a.date)?.getTime() || 0;
+    const requestedB = parseApprovalDate(b.requested_at || b.date)?.getTime() || 0;
+    return requestedB - requestedA;
+  });
 }
 
 function getFilteredApprovals(tab = "all") {
@@ -377,43 +571,87 @@ function getFilteredApprovals(tab = "all") {
     });
   }
 
-
-  return list;
+  return sortApprovalsForReview(list);
 }
 
 
-function renderApproval(tab = "all") {
+function renderApproval(tab = "all", resetPage = false) {
+  if (tab !== currentApprovalTab || resetPage) {
+    currentApprovalPage = 1;
+  }
   currentApprovalTab = tab;
 
   const list = getFilteredApprovals(tab);
+  const totalPages = Math.max(1, Math.ceil(list.length / APPROVAL_PAGE_SIZE));
+  currentApprovalPage = Math.min(Math.max(currentApprovalPage, 1), totalPages);
+  const startIdx = (currentApprovalPage - 1) * APPROVAL_PAGE_SIZE;
+  const currentList = list.slice(startIdx, startIdx + APPROVAL_PAGE_SIZE);
   const tbody = document.getElementById("approval-tbody");
   if (!tbody) return;
 
   tbody.innerHTML =
     list.length === 0
-      ? `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--gray-400)">Không có dữ liệu</td></tr>`
-      : list
-          .map(
-            (a) => `
+      ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--gray-400)">Không có dữ liệu</td></tr>`
+      : currentList
+        .map(
+          (a) => `
       <tr>
         <td>
           <div style="font-weight:500;color:var(--gray-900)">${escapeHtml(a.form)}</div>
           <div style="font-size:12px;color:var(--gray-400)">${escapeHtml(a.cat)}</div>
         </td>
-        <td>${escapeHtml(a.by)}</td>
-        <td style="font-size:12px;color:var(--gray-500)">${escapeHtml(a.date)}</td>
-        <td>${apprStatusBadge(a.status)}</td>
-        <td style="font-size:12.5px;color:var(--gray-500);max-width:180px">${escapeHtml(a.note || '')}</td>
-        <td>${renderApprovalActions(a)}</td>
+        <td style="min-width:170px;white-space:nowrap">${escapeHtml(a.by)}</td>
+        <td style="font-size:12px;color:var(--gray-500)">${escapeHtml(getApprovalDisplayDate(a))}</td>
+        <td style="font-size:12px;color:var(--gray-500);min-width:150px">${renderApprovalDeadline(a)}</td>
+        <td>${apprStatusBadge(a.status, a)}</td>
+        <td style="font-size:12.5px;color:var(--gray-500);max-width:180px">${renderApprovalNote(a)}</td>
+        <td style="min-width:210px">${renderApprovalActions(a)}</td>
       </tr>
     `
-          )
-          .join("");
+        )
+        .join("");
 
   updateTabCounts();
   updateStats();
   updateActiveTabButton();
+  updateApprovalPagination(list.length, totalPages);
   syncApprovalToolbar();
+}
+
+function updateApprovalPagination(totalItems, totalPages) {
+  const pagination = document.getElementById("approval-pagination");
+  const pageInfo = document.getElementById("approval-page-info");
+  const pageButtons = document.getElementById("approval-page-buttons");
+  if (!pagination || !pageInfo || !pageButtons) return;
+
+  pagination.style.display = totalItems > APPROVAL_PAGE_SIZE ? "flex" : "none";
+  if (totalItems <= APPROVAL_PAGE_SIZE) return;
+
+  const start = (currentApprovalPage - 1) * APPROVAL_PAGE_SIZE + 1;
+  const end = Math.min(start + APPROVAL_PAGE_SIZE - 1, totalItems);
+  pageInfo.textContent = `Hiển thị ${start}-${end} / ${totalItems} yêu cầu`;
+
+  let buttons = `
+    <button class="pag-btn" onclick="changeApprovalPage(${currentApprovalPage - 1})" ${currentApprovalPage === 1 ? "disabled" : ""}>Trước</button>
+  `;
+
+  for (let page = 1; page <= totalPages; page += 1) {
+    buttons += `
+      <button class="pag-btn ${page === currentApprovalPage ? "active" : ""}" onclick="changeApprovalPage(${page})">${page}</button>
+    `;
+  }
+
+  buttons += `
+    <button class="pag-btn" onclick="changeApprovalPage(${currentApprovalPage + 1})" ${currentApprovalPage === totalPages ? "disabled" : ""}>Sau</button>
+  `;
+
+  pageButtons.innerHTML = buttons;
+}
+
+function changeApprovalPage(page) {
+  currentApprovalPage = page;
+  renderApproval(currentApprovalTab);
+  document.getElementById("approval-tbody")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function updateActiveTabButton() {
@@ -427,8 +665,13 @@ function updateActiveTabButton() {
 
 function updateTabCounts() {
   const pending = approvalData.filter((a) => a.status === "pending").length;
-  const el = document.querySelector('.tab-btn[data-tab="pending"] .badge');
-  if (el) el.textContent = pending;
+  const approved = approvalData.filter((a) => a.status === "approved").length;
+  const rejected = approvalData.filter((a) => a.status === "rejected").length;
+  const counts = { pending, approved, rejected };
+  Object.entries(counts).forEach(([tab, count]) => {
+    const el = document.querySelector(`.tab-btn[data-tab="${tab}"] .badge`);
+    if (el) el.textContent = count;
+  });
 }
 
 function updateStats() {
@@ -484,6 +727,7 @@ async function confirmApprove() {
 
   // Bắt buộc gọi API — dùng _dbId nếu có, fallback sang id
   const dbId = item._dbId || Number(id);
+  let updatedApproval = null;
   try {
     const res = await fetch(`${API_APPROVALS}/${dbId}/approve`, {
       method: "PATCH",
@@ -504,6 +748,7 @@ async function confirmApprove() {
       btn.innerHTML = btnOriginal;
       return;
     }
+    updatedApproval = data.approval || null;
   } catch (e) {
     showToast("⚠️ Không kết nối được server. Kiểm tra lại backend!", "error");
     btn.disabled = false;
@@ -513,9 +758,14 @@ async function confirmApprove() {
 
   // ✅ DB đã lưu → cập nhật cache local
   item.status = "approved";
+  item.note = "";
+  item.reject_reason = "";
+  item.urgent_reason = "";
+  item.processed_at = updatedApproval?.ngay_xu_ly || item.processed_at || null;
+  item.processedDate = formatApprovalDateTime(item.processed_at) || item.date;
   saveApprovals(approvalData);
 
-  // Gửi thông báo tự động đến người tạo form
+  // Gửi thông báo tự động đến người tạo biểu mẫu
   sendApproveNotification(item);
 
   closeModal("approve-modal");
@@ -532,20 +782,19 @@ function sendApproveNotification(item) {
     const raw = localStorage.getItem(LS_NOTIFS);
     const notifs = raw ? JSON.parse(raw) : [];
 
-    const now = new Date();
-    const dateStr =
-      now.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-      " " +
-      now.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+    const dateStr = item.processedDate || item.date || formatApprovalDateTime(new Date());
 
     const newNotif = {
       id: "approve_" + Date.now(),
-      title: "Yêu cầu tạo form đã được phê duyệt",
-      msg: `Yêu cầu "${item.form}" của bạn đã được phê duyệt. Form đã được xuất bản và có thể sử dụng ngay lập tức.`,
+      title: "Yêu cầu tạo biểu mẫu đã được phê duyệt",
+      msg: `Yêu cầu "${item.form}" của bạn đã được phê duyệt. Biểu mẫu đã được xuất bản và có thể sử dụng ngay lập tức.`,
       type: "success",
       recipients: item.by || "Người gửi",
       status: "sent",
       date: dateStr,
+      form: item.form || "",
+      form_id: item.form_id || null,
+      approval_id: item._dbId || item.id || null,
       read: 0,
       total: 1,
       _bellNew: true,
@@ -567,7 +816,7 @@ function rejectItem(id) {
   const item = approvalData.find((a) => a.id === id);
   if (!item) return;
 
-  // Hiển thị thông tin form trong modal
+  // Hiển thị thông tin biểu mẫu trong modal
   document.getElementById("reject-modal-form-name").textContent = item.form || "";
   document.getElementById("reject-modal-sender").textContent = "Người gửi: " + (item.by || "");
   document.getElementById("reject-modal-cat").textContent = item.cat || "";
@@ -609,11 +858,12 @@ async function confirmReject() {
 
   // Bắt buộc gọi API — dùng _dbId nếu có, fallback sang id
   const dbId = item._dbId || Number(id);
+  let updatedApproval = null;
   try {
     const res = await fetch(`${API_APPROVALS}/${dbId}/reject`, {
       method: "PATCH",
       headers: getAuthHeaders(),
-      body: JSON.stringify({ ly_do_tu_choi: reason }),
+      body: JSON.stringify({ ghi_chu: reason, ly_do_tu_choi: reason }),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -628,6 +878,7 @@ async function confirmReject() {
       if (btn) { btn.disabled = false; btn.innerHTML = btnOriginal; }
       return;
     }
+    updatedApproval = data.approval || null;
   } catch (e) {
     showToast("⚠️ Không kết nối được server. Kiểm tra lại backend!", "error");
     if (btn) { btn.disabled = false; btn.innerHTML = btnOriginal; }
@@ -637,9 +888,12 @@ async function confirmReject() {
   // ✅ DB đã lưu → cập nhật cache local
   item.status = "rejected";
   item.reject_reason = reason;
+  item.note = reason;
+  item.processed_at = updatedApproval?.ngay_xu_ly || item.processed_at || null;
+  item.processedDate = formatApprovalDateTime(item.processed_at) || item.date;
   saveApprovals(approvalData);
 
-  // Gửi thông báo tự động đến người tạo form
+  // Gửi thông báo tự động đến người tạo biểu mẫu
   sendRejectNotification(item, reason);
 
   closeModal("reject-modal");
@@ -653,20 +907,19 @@ function sendRejectNotification(item, reason) {
     const raw = localStorage.getItem(LS_NOTIFS);
     const notifs = raw ? JSON.parse(raw) : [];
 
-    const now = new Date();
-    const dateStr =
-      now.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-      " " +
-      now.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+    const dateStr = item.processedDate || item.date || formatApprovalDateTime(new Date());
 
     const newNotif = {
       id: "reject_" + Date.now(),
-      title: "Yêu cầu tạo form bị từ chối",
+      title: "Yêu cầu tạo biểu mẫu bị từ chối",
       msg: `Yêu cầu "${item.form}" của bạn đã bị từ chối.\nLý do: ${reason}`,
       type: "error",
       recipients: item.by || "Người gửi",
       status: "sent",
       date: dateStr,
+      form: item.form || "",
+      form_id: item.form_id || null,
+      approval_id: item._dbId || item.id || null,
       read: 0,
       total: 1,
       _bellNew: true,
@@ -683,22 +936,22 @@ function sendRejectNotification(item, reason) {
 
 // ── View questions modal ──────────────────────────────────────────
 function aprvNormType(t) {
-  if (t==='text'||t==='short_text'||t==='long_text') return 'paragraph';
-  if (t==='star_rating') return 'rating';
+  if (t === 'text' || t === 'short_text' || t === 'long_text') return 'paragraph';
+  if (t === 'star_rating') return 'rating';
   return t || 'choice';
 }
 function aprvTypeLabel(t) {
   const n = aprvNormType(t);
-  const map = {choice:'Trắc nghiệm',checkbox:'Hộp kiểm',dropdown:'Thả xuống',paragraph:'Đoạn văn',rating:'Xếp hạng',scale:'Tuyến tính',grid_radio:'Lưới trắc nghiệm',grid_checkbox:'Lưới hộp kiểm'};
+  const map = { choice: 'Trắc nghiệm', checkbox: 'Hộp kiểm', dropdown: 'Thả xuống', paragraph: 'Đoạn văn', rating: 'Xếp hạng', scale: 'Tuyến tính', grid_radio: 'Lưới trắc nghiệm', grid_checkbox: 'Lưới hộp kiểm' };
   return map[n] || t || 'Khác';
 }
 function aprvEsc(v) {
-  return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 function aprvRenderOpts(opts, kind) {
   return `<div style="display:flex;flex-direction:column;gap:0">
-    ${opts.map(o=>`<label style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#374151;cursor:default">
-      <span style="width:16px;height:16px;border:1.8px solid #9ca3af;border-radius:${kind==='checkbox'?'4px':'50%'};display:inline-block;flex-shrink:0;background:#fff"></span>
+    ${opts.map(o => `<label style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#374151;cursor:default">
+      <span style="width:16px;height:16px;border:1.8px solid #9ca3af;border-radius:${kind === 'checkbox' ? '4px' : '50%'};display:inline-block;flex-shrink:0;background:#fff"></span>
       ${aprvEsc(o)}
     </label>`).join('')}
   </div>`;
@@ -707,22 +960,22 @@ function aprvRenderQuestion(q, idx) {
   const n = aprvNormType(q.type);
   const opts = Array.isArray(q.opts) ? q.opts : [];
   let answerHtml = '';
-  if (n==='paragraph') {
+  if (n === 'paragraph') {
     answerHtml = `<textarea disabled rows="3" placeholder="Nhập câu trả lời..." style="width:100%;padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;color:#94a3b8;background:#f8fafc;resize:none;outline:none;box-sizing:border-box;margin-top:10px"></textarea>`;
-  } else if (n==='dropdown') {
+  } else if (n === 'dropdown') {
     answerHtml = `<select disabled style="margin-top:10px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;color:#64748b;background:#f8fafc;outline:none;min-width:220px">
-      <option>Chọn một mục...</option>${opts.map(o=>`<option>${aprvEsc(o)}</option>`).join('')}
+      <option>Chọn một mục...</option>${opts.map(o => `<option>${aprvEsc(o)}</option>`).join('')}
     </select>`;
   } else if (opts.length) {
-    const kind = n==='checkbox' ? 'checkbox' : 'radio';
+    const kind = n === 'checkbox' ? 'checkbox' : 'radio';
     answerHtml = `<div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff">${aprvRenderOpts(opts, kind)}</div>`;
   }
-  return `<div style="border:1px solid #bfdbfe;border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.95);box-shadow:0 6px 18px rgba(59,130,246,.07)">
+  return `<div style="border:1px solid #00008B;border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.95);box-shadow:0 6px 18px rgba(0,0,139,.07)">
     <div style="display:flex;align-items:flex-start;gap:12px">
-      <div style="width:34px;height:34px;border-radius:50%;background:#dbeafe;color:#2563eb;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${idx+1}</div>
+      <div style="width:34px;height:34px;border-radius:50%;background:#00008B;color:#fff;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${idx + 1}</div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-          <span style="padding:5px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:11.5px;font-weight:700">${aprvTypeLabel(q.type)}</span>
+          <span style="padding:5px 10px;border-radius:999px;background:#00008B;color:#fff;font-size:11.5px;font-weight:700">${aprvTypeLabel(q.type)}</span>
           ${q.required ? '<span style="padding:5px 10px;border-radius:999px;background:#fee2e2;color:#dc2626;font-size:11.5px;font-weight:700">Bắt buộc</span>' : '<span style="padding:5px 10px;border-radius:999px;background:#f8fafc;color:#64748b;font-size:11.5px;font-weight:700">Không bắt buộc</span>'}
         </div>
         <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:2px;line-height:1.4">${aprvEsc(q.text)}</div>
@@ -756,10 +1009,10 @@ async function openViewModal(id) {
           text: q.noi_dung,
           type: q.loai,
           required: q.bat_buoc,
-          opts: (q.lua_chon || []).map(o => typeof o==='string'?o:(o.noi_dung||'')),
+          opts: (q.lua_chon || []).map(o => typeof o === 'string' ? o : (o.noi_dung || '')),
         }));
       }
-    } catch(e) { console.warn('Không load được câu hỏi:', e); }
+    } catch (e) { console.warn('Không load được câu hỏi:', e); }
   }
 
   document.getElementById("view-modal-cat").textContent = `${item.cat} · ${qs.length} câu hỏi`;
@@ -771,7 +1024,7 @@ async function openViewModal(id) {
   }
 
   container.innerHTML = `
-    <div style="background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 52%,#93c5fd 100%);border-radius:20px;padding:22px 24px;margin-bottom:18px;color:#1e3a8a;box-shadow:0 16px 36px rgba(59,130,246,.13)">
+    <div style="background:linear-gradient(135deg,#00008B 0%,#00008B 52%,#00008B 100%);border-radius:20px;padding:22px 24px;margin-bottom:18px;color:#00008B;box-shadow:0 16px 36px rgba(0,0,139,.13)">
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
         <span style="font-size:12px;background:rgba(255,255,255,.55);padding:5px 12px;border-radius:999px;font-weight:700">${aprvEsc(item.cat)}</span>
         <span style="font-size:12px;background:rgba(255,255,255,.55);padding:5px 12px;border-radius:999px;font-weight:700">Tổng ${qs.length} câu hỏi</span>
@@ -780,10 +1033,10 @@ async function openViewModal(id) {
       ${item.ngay_tao ? `<div style="font-size:13px;margin-top:8px;opacity:.85">Ngày tạo: <strong>${new Date(item.ngay_tao).toLocaleDateString('vi-VN')}</strong></div>` : ''}
     </div>
     <div style="display:flex;flex-direction:column;gap:12px">
-      ${qs.map((q,i) => aprvRenderQuestion(q,i)).join('')}
+      ${qs.map((q, i) => aprvRenderQuestion(q, i)).join('')}
     </div>
     <div style="padding:20px 0 4px;text-align:center">
-      <button disabled style="padding:11px 32px;background:#3b82f6;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:not-allowed;opacity:.75">Gửi phản hồi</button>
+      <button disabled style="padding:11px 32px;background:#00008B;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:not-allowed;opacity:.75">Gửi phản hồi</button>
     </div>`;
 }
 
@@ -799,7 +1052,7 @@ function buildShortFormLink(formId) {
 }
 
 // ── Share state ───────────────────────────────────────────────
-let _shareFormId   = null;
+let _shareFormId = null;
 let _shareDbFormId = null;
 let _shareFormName = null;
 let _pendingEmails = [];   // danh sách email sẽ gửi
@@ -811,7 +1064,7 @@ async function openShareModal(id, formName) {
   }
 
   const item = approvalData.find(a => a.id === id);
-  _shareFormId   = id;
+  _shareFormId = id;
   _shareDbFormId = item ? item.form_id : null;
   _shareFormName = formName || "";
   _pendingEmails = [];
@@ -876,7 +1129,7 @@ function generateQRCode(text) {
     ctx.fillStyle = "#94a3b8";
     ctx.font = "12px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Không tải được QR", size/2, size/2);
+    ctx.fillText("Không tải được QR", size / 2, size / 2);
   };
   document.head.appendChild(script);
 }
@@ -907,7 +1160,7 @@ function _drawQR(text, canvas, size) {
       }
       document.body.removeChild(tmp);
     }, 100);
-  } catch(e) {
+  } catch (e) {
     document.body.removeChild(tmp);
   }
 }
@@ -948,11 +1201,11 @@ function _renderEmailTags() {
   const tags = document.getElementById("share-email-tags");
   if (!tags) return;
   tags.innerHTML = _pendingEmails.map((e, i) => `
-    <span style="display:inline-flex;align-items:center;gap:6px;background:#eff6ff;
-                 border:1px solid #bfdbfe;border-radius:20px;padding:4px 12px;font-size:13px;color:#1e40af">
+    <span style="display:inline-flex;align-items:center;gap:6px;background:#00008B;
+                 border:1px solid #00008B;border-radius:20px;padding:4px 12px;font-size:13px;color:#00008B">
       ${e}
-      <button onclick="_removeEmail(${i})" style="border:none;background:none;cursor:pointer;color:#60a5fa;padding:0;line-height:1;font-size:15px;display:flex;align-items:center"
-        onmouseenter="this.style.color='#1e40af'" onmouseleave="this.style.color='#60a5fa'">×</button>
+      <button onclick="_removeEmail(${i})" style="border:none;background:none;cursor:pointer;color:#00008B;padding:0;line-height:1;font-size:15px;display:flex;align-items:center"
+        onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='#00008B'">×</button>
     </span>`).join('');
 }
 
@@ -983,9 +1236,9 @@ async function sendShareEmails() {
         ...(token ? { Authorization: 'Bearer ' + token } : {}),
       },
       body: JSON.stringify({
-        emails:      _pendingEmails,
-        form_id:     _shareDbFormId,
-        form_name:   _shareFormName,
+        emails: _pendingEmails,
+        form_id: _shareDbFormId,
+        form_name: _shareFormName,
         sender_name: me.ho_ten || 'Quản trị viên',
       }),
     });
@@ -993,17 +1246,17 @@ async function sendShareEmails() {
     const data = await res.json();
 
     if (res.ok) {
-      const ok   = (data.results || []).filter(r => r.success);
+      const ok = (data.results || []).filter(r => r.success);
       const fail = (data.results || []).filter(r => !r.success);
       statusEl.style.display = 'block';
       statusEl.style.background = fail.length ? '#fffbeb' : '#f0fdf4';
       statusEl.style.border = '1px solid ' + (fail.length ? '#fde68a' : '#bbf7d0');
-      statusEl.style.color  = fail.length ? '#92400e' : '#166534';
+      statusEl.style.color = fail.length ? '#92400e' : '#166534';
       statusEl.innerHTML = `✅ Đã gửi thành công <strong>${ok.length}</strong> email.`
-        + (fail.length ? `<br>❌ Thất bại: ${fail.map(f=>f.email).join(', ')}` : '');
+        + (fail.length ? `<br>❌ Thất bại: ${fail.map(f => f.email).join(', ')}` : '');
       _pendingEmails = fail.map(f => f.email);
       _renderEmailTags();
-      if (!fail.length) showToast('Đã gửi link form cho khách hàng ✅', 'success');
+      if (!fail.length) showToast('Đã gửi link biểu mẫu cho khách hàng ✅', 'success');
     } else {
       statusEl.style.display = 'block';
       statusEl.style.background = '#fef2f2';
@@ -1012,7 +1265,7 @@ async function sendShareEmails() {
       statusEl.innerHTML = '❌ ' + (data.message || 'Gửi thất bại');
       showToast(data.message || 'Gửi email thất bại', 'error');
     }
-  } catch(e) {
+  } catch (e) {
     statusEl.style.display = 'block';
     statusEl.style.background = '#fef2f2';
     statusEl.style.border = '1px solid #fecaca';
@@ -1032,11 +1285,11 @@ async function _approvalDoShorten(url) {
   try {
     const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
     if (res.ok) { const s = await res.text(); if (s && s.startsWith('http')) return s.trim(); }
-  } catch(e) {}
+  } catch (e) { }
   try {
     const res2 = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`);
     if (res2.ok) { const s2 = await res2.text(); if (s2 && s2.startsWith('http')) return s2.trim(); }
-  } catch(e) {}
+  } catch (e) { }
   return null;
 }
 
@@ -1058,7 +1311,7 @@ async function approvalShortenLink() {
 async function aprCopyShortenedLink() {
   const val = document.getElementById('apr-shortened-input')?.value?.trim();
   if (!val) return;
-  try { await navigator.clipboard.writeText(val); } catch(e) { document.getElementById('apr-shortened-input')?.select(); document.execCommand('copy'); }
+  try { await navigator.clipboard.writeText(val); } catch (e) { document.getElementById('apr-shortened-input')?.select(); document.execCommand('copy'); }
   showToast('Đã sao chép link rút gọn!', 'success');
 }
 
@@ -1103,33 +1356,33 @@ document.getElementById("page-content").innerHTML = `
 
   <div class="grid-4" style="margin-bottom:24px">
     ${statCard(
-      "Chờ phê duyệt",
-      '<span id="stat-pending">0</span>',
-      "#f59e0b",
-      "#fef9c3",
-      '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
-    )}
+  "Chờ phê duyệt",
+  '<span id="stat-pending">0</span>',
+  "#f59e0b",
+  "#fef9c3",
+  '<path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>'
+)}
     ${statCard(
-      "Đã phê duyệt",
-      '<span id="stat-approved">0</span>',
-      "#10b981",
-      "#dcfce7",
-      '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'
-    )}
+  "Đã phê duyệt",
+  '<span id="stat-approved">0</span>',
+  "#10b981",
+  "#dcfce7",
+  '<path d="M20 6L9 17l-5-5"/>'
+)}
     ${statCard(
-      "Từ chối",
-      '<span id="stat-rejected">0</span>',
-      "#ef4444",
-      "#fee2e2",
-      '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'
-    )}
+  "Từ chối",
+  '<span id="stat-rejected">0</span>',
+  "#ef4444",
+  "#fee2e2",
+  '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'
+)}
     ${statCard(
-      "Tổng yêu cầu",
-      '<span id="stat-total">0</span>',
-      "#0ea5e9",
-      "#e0f2fe",
-      '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>'
-    )}
+  "Tổng yêu cầu",
+  '<span id="stat-total">0</span>',
+  "#1d4ed8",
+  "#c7d2fe",
+  '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>'
+)}
   </div>
 
   <div class="card card-body" style="margin-bottom:20px">
@@ -1141,7 +1394,7 @@ document.getElementById("page-content").innerHTML = `
           id="approval-search"
           class="input"
           placeholder="Tìm kiếm yêu cầu..."
-          oninput="renderApproval(currentApprovalTab)"
+          oninput="renderApproval(currentApprovalTab, true)"
         >
       </div>
     </div>
@@ -1151,8 +1404,8 @@ document.getElementById("page-content").innerHTML = `
     <div class="tabs">
       <button class="tab-btn active" data-tab="all" onclick="renderApproval('all')">Tất cả</button>
       <button class="tab-btn" data-tab="pending" onclick="renderApproval('pending')">Chờ duyệt <span class="badge badge-yellow" style="margin-left:4px">0</span></button>
-      <button class="tab-btn" data-tab="approved" onclick="renderApproval('approved')">Đã duyệt</button>
-      <button class="tab-btn" data-tab="rejected" onclick="renderApproval('rejected')">Từ chối</button>
+      <button class="tab-btn" data-tab="approved" onclick="renderApproval('approved')">Đã duyệt <span class="badge badge-green" style="margin-left:4px">0</span></button>
+      <button class="tab-btn" data-tab="rejected" onclick="renderApproval('rejected')">Từ chối <span class="badge badge-red" style="margin-left:4px">0</span></button>
     </div>
 
     <div class="card">
@@ -1161,8 +1414,9 @@ document.getElementById("page-content").innerHTML = `
           <thead>
             <tr>
               <th>Biểu mẫu</th>
-              <th>Người gửi</th>
+              <th style="min-width:170px;white-space:nowrap">Người gửi</th>
               <th>Ngày gửi</th>
+              <th>Hạn chót</th>
               <th>Trạng thái</th>
               <th>Ghi chú</th>
               <th>Thao tác</th>
@@ -1172,16 +1426,25 @@ document.getElementById("page-content").innerHTML = `
         </table>
       </div>
     </div>
+
+    <div id="approval-pagination" style="display:none;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:12px 18px;align-items:center;justify-content:space-between;margin-top:16px;box-shadow:var(--shadow-sm);gap:12px;flex-wrap:wrap">
+      <span id="approval-page-info" style="font-size:13px;color:var(--gray-500)">Hiển thị 1-10 / 10 yêu cầu</span>
+      <div id="approval-page-buttons" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="pag-btn" disabled>Trước</button>
+        <button class="pag-btn active">1</button>
+        <button class="pag-btn" disabled>Sau</button>
+      </div>
+    </div>
   </div>
 
   <div class="modal-overlay" id="view-modal" onclick="closeModal('view-modal')">
     <div class="modal" onclick="event.stopPropagation()" style="max-width:720px;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-bottom:1px solid #bfdbfe;flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#00008B,#00008B);border-bottom:1px solid #00008B;flex-shrink:0">
         <div style="min-width:0">
           <div style="font-size:16px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="view-modal-title"></div>
           <div style="font-size:12px;color:#64748b;margin-top:3px" id="view-modal-cat"></div>
         </div>
-        <button class="icon-btn close-btn" onclick="closeModal('view-modal')" style="flex-shrink:0;margin-left:12px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8">${IC.close}</button>
+        <button class="icon-btn close-btn" onclick="closeModal('view-modal')" style="flex-shrink:0;margin-left:12px;background:#00008B;border:1px solid #00008B;color:#fff">${IC.close}</button>
       </div>
       <div style="flex:1;overflow-y:auto;background:#f1f5f9;padding:20px 22px" id="view-modal-questions"></div>
       <div style="padding:14px 22px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;flex-shrink:0;background:#fff">
@@ -1224,11 +1487,11 @@ document.getElementById("page-content").innerHTML = `
           </div>
         </div>
 
-        <div style="display:flex;align-items:flex-start;gap:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius-lg);padding:12px 14px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" width="16" height="16" style="flex-shrink:0;margin-top:1px">
+        <div style="display:flex;align-items:flex-start;gap:10px;background:#00008B;border:1px solid #00008B;border-radius:var(--radius-lg);padding:12px 14px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="2" width="16" height="16" style="flex-shrink:0;margin-top:1px">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
-          <span style="font-size:13px;color:#1d4ed8;line-height:1.5">Sau khi phê duyệt, form sẽ được xuất bản và có thể sử dụng ngay lập tức.</span>
+          <span style="font-size:13px;color:#00008B;line-height:1.5">Sau khi phê duyệt, biểu mẫu sẽ được xuất bản và có thể sử dụng ngay lập tức.</span>
         </div>
       </div>
 
@@ -1404,13 +1667,13 @@ document.getElementById("page-content").innerHTML = `
         <div style="margin-top:16px;border-top:1px solid var(--gray-200);padding-top:16px">
           <button onclick="toggleShareQR()" id="qr-toggle-btn"
             style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#374151;transition:all .15s"
-            onmouseenter="this.style.borderColor='#0ea5e9';this.style.color='#0284c7'" onmouseleave="this.style.borderColor='#e2e8f0';this.style.color='#374151'">
+            onmouseenter="this.style.borderColor='#00008B';this.style.color='#00008B'" onmouseleave="this.style.borderColor='#e2e8f0';this.style.color='#374151'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="19" y="14" width="2" height="2"/><rect x="14" y="19" width="2" height="2"/><rect x="19" y="19" width="2" height="2"/></svg>
-            Hiển thị mã QR để điền form
+            Hiển thị mã QR để điền biểu mẫu
             <svg id="qr-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-left:auto;transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           <div id="qr-code-area" style="display:none;text-align:center;padding:20px 0 4px">
-            <div style="font-size:12px;color:var(--gray-400);margin-bottom:12px">Học viên quét mã QR để mở và điền form trực tiếp</div>
+            <div style="font-size:12px;color:var(--gray-400);margin-bottom:12px">Học viên quét mã QR để mở và điền biểu mẫu trực tiếp</div>
             <div id="qr-canvas-wrap" style="display:inline-block;padding:12px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
               <canvas id="qr-canvas" width="180" height="180"></canvas>
             </div>
@@ -1471,14 +1734,16 @@ function renderApprovalActions(a) {
   const canApprove = canApproveNow();
   const canShareForm = canShareFormNow();
   const safeFormName = escapeJsString(a.form || '');
-  let html = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">`;
+  const actionBtnStyle = "width:112px;justify-content:center;white-space:nowrap";
+  const iconBtnStyle = "width:34px;height:34px;min-width:34px;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap";
+  let html = `<div style="display:grid;grid-auto-flow:column;grid-auto-columns:max-content;align-items:center;justify-content:start;gap:8px;white-space:nowrap">`;
 
   if (a.status === 'pending' && canApprove) {
     html += `
-      <button class="btn btn-sm" style="background:#dcfce7;color:#166534" onclick="approveItem('${a.id}')">
+      <button class="btn btn-sm" style="background:#dcfce7;color:#166534;${actionBtnStyle}" onclick="approveItem('${a.id}')">
         ${IC.check}Duyệt
       </button>
-      <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b" onclick="rejectItem('${a.id}')">
+      <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;width:86px;justify-content:center;white-space:nowrap" onclick="rejectItem('${a.id}')">
         ${IC.reject}Từ chối
       </button>
     `;
@@ -1486,7 +1751,7 @@ function renderApprovalActions(a) {
 
   if (a.status === 'approved' && canShareForm) {
     html += `
-      <button class="btn btn-sm" style="background:#e0f2fe;color:#0284c7" onclick="openShareModal('${a.id}', '${safeFormName}')">
+      <button class="btn btn-sm" style="background:#00008B;color:#fff;${actionBtnStyle}" onclick="openShareModal('${a.id}', '${safeFormName}')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
           <circle cx="18" cy="5" r="3"/>
           <circle cx="6" cy="12" r="3"/>
@@ -1501,23 +1766,22 @@ function renderApprovalActions(a) {
 
   if (a.status === 'rejected' && a.form_id) {
     html += `
-      <button class="btn btn-sm" style="background:#eff6ff;color:#1d4ed8" onclick="editRejectedForm('${a.id}', '${a.form_id}')">
+      <button class="btn btn-sm" style="background:#00008B;color:#fff;${actionBtnStyle}" onclick="editRejectedForm('${a.id}', '${a.form_id}')">
         ${IC.edit}Chỉnh sửa
       </button>
     `;
   }
 
   html += `
-    <button class="icon-btn" title="Xem câu hỏi" onclick="openViewModal('${a.id}')">
+    <button class="icon-btn" title="Xem câu hỏi" onclick="openViewModal('${a.id}')" style="${iconBtnStyle}">
       ${IC.eye}
     </button>
-    <button class="icon-btn" title="Ẩn khỏi phê duyệt" onclick="trashApprovalItem('${a.id}')" style="color:#ef4444">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-        <line x1="10" y1="11" x2="10" y2="17"/>
-        <line x1="14" y1="11" x2="14" y2="17"/>
-        <path d="M9 6V4h6v2"/>
+    <button class="icon-btn" title="Ẩn khỏi phê duyệt" onclick="trashApprovalItem('${a.id}')" style="color:#64748b;${iconBtnStyle}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17">
+        <path d="M10.58 10.58A2 2 0 0012 14a2 2 0 001.42-.58"/>
+        <path d="M9.88 5.09A10.65 10.65 0 0112 4c5 0 9 5 9 8a9.77 9.77 0 01-2.06 3.13"/>
+        <path d="M6.61 6.61C4.46 8.13 3 10.24 3 12c0 3 4 8 9 8a9.84 9.84 0 004.22-.98"/>
+        <line x1="3" y1="3" x2="21" y2="21"/>
       </svg>
     </button>
   `;

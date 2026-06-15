@@ -26,7 +26,7 @@ function initials(name) {
 }
 
 function avatarColor(id) {
-  const colors = ['#0ea5e9','#10b981','#8b5cf6','#f59e0b','#ec4899','#ef4444','#f97316'];
+  const colors = ['#00008B','#10b981','#8b5cf6','#f59e0b','#ec4899','#ef4444','#f97316'];
   return colors[(id || 0) % colors.length];
 }
 
@@ -46,18 +46,18 @@ document.getElementById('page-content').innerHTML = `
   <!-- ── BREADCRUMB (ẩn lúc đầu, hiện khi vào form) ── -->
   <div id="fb-breadcrumb" style="display:none;align-items:center;gap:8px;margin-bottom:16px">
     <button onclick="backToFormList()"
-      style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:9px;border:1.5px solid #bfdbfe;background:#eff6ff;font-size:12.5px;color:#2563eb;cursor:pointer;font-weight:600;transition:all .15s;opacity:.75"
-      onmouseenter="this.style.opacity='1';this.style.borderColor='#2563eb'"
-      onmouseleave="this.style.opacity='.75';this.style.borderColor='#bfdbfe'">
+      style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:9px;border:1.5px solid #00008B;background:#00008B;font-size:12.5px;color:#fff;cursor:pointer;font-weight:600;transition:all .15s;opacity:.75"
+      onmouseenter="this.style.opacity='1';this.style.borderColor='#00008B'"
+      onmouseleave="this.style.opacity='.75';this.style.borderColor='#00008B'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="15 18 9 12 15 6"/></svg>
       Danh sách form
     </button>
     <svg viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2" width="13" height="13"><polyline points="9 18 15 12 9 6"/></svg>
     <span id="fb-breadcrumb-name" onclick="openFormViewModal()"
-      style="font-size:14px;font-weight:600;color:#2563eb;cursor:pointer;transition:color .15s"
-      onmouseenter="this.style.color='#1d4ed8'" onmouseleave="this.style.color='#2563eb'"
+      style="font-size:14px;font-weight:600;color:#00008B;cursor:pointer;transition:color .15s"
+      onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='#00008B'"
       title="Bấm để xem cấu trúc form"></span>
-    <span id="fb-breadcrumb-badge" style="padding:3px 10px;border-radius:999px;background:#eff6ff;color:#2563eb;font-size:12px;font-weight:600"></span>
+    <span id="fb-breadcrumb-badge" style="padding:3px 10px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:600"></span>
   </div>
 
   <!-- ── VIEW 1: DANH SÁCH FORM ── -->
@@ -182,7 +182,7 @@ document.getElementById('page-content').innerHTML = `
           <div style="font-size:16px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="fb-form-view-title"></div>
           <div style="font-size:12px;color:#64748b;margin-top:3px" id="fb-form-view-meta"></div>
         </div>
-        <button class="icon-btn close-btn" onclick="closeModal('fb-form-view-modal')" style="background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;flex-shrink:0;margin-left:12px">${IC.close}</button>
+        <button class="icon-btn close-btn" onclick="closeModal('fb-form-view-modal')" style="background:#00008B;border:1px solid #00008B;color:#fff;flex-shrink:0;margin-left:12px">${IC.close}</button>
       </div>
       <div class="modal-body" style="flex:1;overflow-y:auto;padding:20px 22px;background:#f1f5f9" id="fb-form-view-body">
         <div style="text-align:center;padding:40px;color:var(--gray-400)">Đang tải...</div>
@@ -360,10 +360,10 @@ function renderFormCards() {
   document.getElementById('fb-form-count').textContent = `${filtered.length} trong tổng số ${allForms.length}`;
   const grid = document.getElementById('fb-form-grid');
   if (!filtered.length) {
-    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Không tìm thấy form nào.</div>';
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Không tìm thấy biểu mẫu nào.</div>';
     return;
   }
-  const catColors = {'Ngoại ngữ':'#0ea5e9','Tin học':'#10b981','Đánh giá':'#8b5cf6','Phản hồi':'#f59e0b','Tư vấn':'#ec4899','Khác':'#64748b'};
+  const catColors = {'Ngoại ngữ':'#00008B','Tin học':'#10b981','Đánh giá':'#8b5cf6','Phản hồi':'#f59e0b','Tư vấn':'#ec4899','Khác':'#64748b'};
   const statusBadge = s =>
     s==='active' ? '<span class="badge badge-green">Hoạt động</span>' :
     s==='draft'  ? '<span class="badge badge-yellow">Nháp</span>' :
@@ -402,7 +402,7 @@ function renderStatBar(fbs) {
   const posCount = fbs.filter(f=>f.cam_xuc==='positive').length;
 
   const items = [
-    { label:'Tổng phản hồi',  value: total,    icon:'📋', color:'#0ea5e9' },
+    { label:'Tổng phản hồi',  value: total,    icon:'📋', color:'#00008B' },
     { label:'Điểm TB',        value: avgRating, icon:'⭐', color:'#10b981' },
     { label:'Tích cực',       value: posCount, icon:'😊', color:'#8b5cf6' },
   ];
@@ -492,7 +492,7 @@ function fbRenderQuestion(q, idx) {
     const kind = n === 'checkbox' ? 'checkbox' : 'radio';
     answerHtml = `<div style="display:flex;flex-direction:column;gap:8px">
       ${opts.map(o => `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;font-size:13px;color:#334155">
-        <span style="width:15px;height:15px;border:2px solid #93c5fd;border-radius:${kind==='checkbox'?'4px':'50%'};display:inline-block;flex-shrink:0;background:#fff"></span>
+        <span style="width:15px;height:15px;border:2px solid #00008B;border-radius:${kind==='checkbox'?'4px':'50%'};display:inline-block;flex-shrink:0;background:#fff"></span>
         ${fbEsc(o)}
       </div>`).join('')}
     </div>`;
@@ -504,11 +504,11 @@ function fbRenderQuestion(q, idx) {
   }
   return `<div style="border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.05)">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <span style="display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:11.5px;font-weight:700">${fbTypeChip(q.loai||q.type)}</span>
+      <span style="display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;background:#00008B;color:#fff;font-size:11.5px;font-weight:700">${fbTypeChip(q.loai||q.type)}</span>
       ${(q.bat_buoc||q.required) ? '<span style="display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;background:#fee2e2;color:#dc2626;font-size:11.5px;font-weight:700">Bắt buộc</span>' : ''}
     </div>
     <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px">
-      <div style="width:28px;height:28px;border-radius:50%;background:#dbeafe;color:#1d4ed8;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${idx + 1}</div>
+      <div style="width:28px;height:28px;border-radius:50%;background:#00008B;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${idx + 1}</div>
       <div style="font-size:16px;font-weight:700;color:#0f172a;line-height:1.5;padding-top:4px">${fbEsc(q.noi_dung || q.text || '')}</div>
     </div>
     ${answerHtml}
@@ -528,7 +528,7 @@ async function openFormViewModal() {
   const rLabel = t => ({choice:'Trắc nghiệm',checkbox:'Hộp kiểm',dropdown:'Thả xuống',paragraph:'Đoạn văn',rating:'Xếp hạng',scale:'Tuyến tính',grid_radio:'Lưới trắc nghiệm',grid_checkbox:'Lưới hộp kiểm'}[rNorm(t)] || t || 'Khác');
   const rOpts = (opts, kind) => `<div style="display:flex;flex-direction:column;gap:0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:#fff;margin-top:10px">
     ${opts.map(o=>`<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#374151">
-      <span style="width:16px;height:16px;border:1.8px solid #93c5fd;border-radius:${kind==='checkbox'?'4px':'50%'};display:inline-block;flex-shrink:0;background:#fff"></span>
+      <span style="width:16px;height:16px;border:1.8px solid #00008B;border-radius:${kind==='checkbox'?'4px':'50%'};display:inline-block;flex-shrink:0;background:#fff"></span>
       ${rEsc(o)}</div>`).join('')}</div>`;
   const rQ = (q, idx) => {
     const n = rNorm(q.type||q.loai);
@@ -538,12 +538,12 @@ async function openFormViewModal() {
     if (n==='paragraph') ans = `<textarea disabled rows="3" placeholder="Nhập câu trả lời..." style="width:100%;padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;color:#94a3b8;background:#f8fafc;resize:none;outline:none;box-sizing:border-box;margin-top:10px"></textarea>`;
     else if (n==='dropdown') ans = `<select disabled style="margin-top:10px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;color:#64748b;background:#f8fafc;outline:none;min-width:220px"><option>Chọn một mục...</option>${opts.map(o=>`<option>${rEsc(o)}</option>`).join('')}</select>`;
     else if (opts.length) ans = rOpts(opts, n==='checkbox'?'checkbox':'radio');
-    return `<div style="border:1px solid #bfdbfe;border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.95);box-shadow:0 6px 18px rgba(59,130,246,.07)">
+    return `<div style="border:1px solid #00008B;border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.95);box-shadow:0 6px 18px rgba(0,0,139,.07)">
       <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="width:34px;height:34px;border-radius:50%;background:#dbeafe;color:#2563eb;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${idx+1}</div>
+        <div style="width:34px;height:34px;border-radius:50%;background:#00008B;color:#fff;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${idx+1}</div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <span style="padding:5px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:11.5px;font-weight:700">${rLabel(q.type||q.loai)}</span>
+            <span style="padding:5px 10px;border-radius:999px;background:#00008B;color:#fff;font-size:11.5px;font-weight:700">${rLabel(q.type||q.loai)}</span>
             ${req?'<span style="padding:5px 10px;border-radius:999px;background:#fee2e2;color:#dc2626;font-size:11.5px;font-weight:700">Bắt buộc</span>':''}
           </div>
           <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:2px;line-height:1.4">${rEsc(q.noi_dung||q.text||'')}</div>
@@ -574,7 +574,7 @@ async function openFormViewModal() {
     if (!body) return;
     if (!qs.length) { body.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8">Form chưa có câu hỏi nào.</div>'; return; }
     body.innerHTML = `
-      <div style="background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 52%,#93c5fd 100%);border-radius:20px;padding:22px 24px;margin-bottom:18px;color:#1e3a8a;box-shadow:0 16px 36px rgba(59,130,246,.13)">
+      <div style="background:linear-gradient(135deg,#00008B 0%,#00008B 52%,#00008B 100%);border-radius:20px;padding:22px 24px;margin-bottom:18px;color:#00008B;box-shadow:0 16px 36px rgba(0,0,139,.13)">
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
           ${cat?`<span style="font-size:12px;background:rgba(255,255,255,.55);padding:5px 12px;border-radius:999px;font-weight:700">${rEsc(cat)}</span>`:''}
           <span style="font-size:12px;background:rgba(255,255,255,.55);padding:5px 12px;border-radius:999px;font-weight:700">Tổng ${qs.length} câu hỏi</span>
@@ -698,19 +698,19 @@ async function openRespDetail(id) {
         ${f.chi_tiet.map((ct, idx) => `
           <div style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden">
             <div style="background:var(--gray-50);padding:10px 14px;font-size:12.5px;font-weight:600;color:var(--gray-700);border-bottom:1px solid var(--gray-200);display:flex;gap:8px;align-items:center">
-              <span style="width:20px;height:20px;background:#0ea5e9;color:#fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${idx+1}</span>
+              <span style="width:20px;height:20px;background:#00008B;color:#fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${idx+1}</span>
               ${ct.ten_cau_hoi}
               <span style="margin-left:auto;font-size:10px;font-weight:500;padding:2px 8px;border-radius:999px;background:${
-                ct.loai_cau_hoi==='choice'?'#e0f2fe':ct.loai_cau_hoi==='rating'?'#fef3c7':'#f0fdf4'
+                ct.loai_cau_hoi==='choice'?'#00008B':ct.loai_cau_hoi==='rating'?'#fef3c7':'#f0fdf4'
               };color:${
-                ct.loai_cau_hoi==='choice'?'#0284c7':ct.loai_cau_hoi==='rating'?'#d97706':'#16a34a'
+                ct.loai_cau_hoi==='choice'?'#00008B':ct.loai_cau_hoi==='rating'?'#d97706':'#16a34a'
               }">${
                 ct.loai_cau_hoi==='choice'?'Trắc nghiệm':ct.loai_cau_hoi==='rating'?'Đánh giá':'Tự luận'
               }</span>
             </div>
             <div style="padding:10px 14px;font-size:13px;color:var(--gray-800);display:flex;align-items:center;gap:8px">
               ${ct.loai_cau_hoi==='choice' ? `
-                <svg viewBox="0 0 24 24" fill="#0ea5e9" width="14" height="14"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg viewBox="0 0 24 24" fill="#00008B" width="14" height="14"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <strong>${ct.ten_lua_chon || '—'}</strong>` : ''}
               ${ct.loai_cau_hoi==='rating' ? `
                 <span style="color:#f59e0b;font-size:16px">★</span>
@@ -854,7 +854,7 @@ function buildFbCharts() {
         datasets: [
           { label:'Điểm hài lòng TB', data:scores, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.10)',
             fill:true, tension:0.45, borderWidth:2.5, pointBackgroundColor:'#f59e0b', pointRadius:5, yAxisID:'y' },
-          { label:'Lượt phản hồi', data:respCnts, borderColor:'#0ea5e9', backgroundColor:'rgba(14,165,233,.06)',
+          { label:'Lượt phản hồi', data:respCnts, borderColor:'#00008B', backgroundColor:'rgba(0,0,139,.06)',
             fill:false, tension:0.4, borderWidth:2, pointRadius:3, borderDash:[4,3], yAxisID:'y1' },
         ]
       },

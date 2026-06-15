@@ -60,7 +60,7 @@ function _exportPDF(headers, rows, title) {
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) return;
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title)}</title>
-<style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h2{font-size:16px;margin-bottom:4px}.sub{font-size:11px;color:#666;margin-bottom:14px}table{width:100%;border-collapse:collapse}th{background:#1d4ed8;color:#fff;padding:7px 10px;text-align:left;font-size:11px}td{padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px}tr:nth-child(even)td{background:#f8fafc}@media print{@page{margin:1cm}}</style>
+<style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h2{font-size:16px;margin-bottom:4px}.sub{font-size:11px;color:#666;margin-bottom:14px}table{width:100%;border-collapse:collapse}th{background:#00008B;color:#fff;padding:7px 10px;text-align:left;font-size:11px}td{padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11px}tr:nth-child(even)td{background:#f8fafc}@media print{@page{margin:1cm}}</style>
 </head><body><h2>${esc(title)}</h2><div class="sub">Xuất lúc: ${new Date().toLocaleString('vi-VN')} · Tổng: ${rows.length} dòng</div>
 <table><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead>
 <tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
@@ -165,7 +165,7 @@ function openPanel(id)  { const o=document.getElementById(id); if(o){ o.classLis
 function closePanel(id) { const o=document.getElementById(id); if(o){ o.classList.remove('open'); document.body.style.overflow=''; } }
 document.addEventListener('click', e => {
   if (e.target.classList.contains('modal-overlay') || e.target.classList.contains('panel-overlay')) {
-    if (e.target.id === 'edit-form-modal') return; // không tự đóng khi click ngoài
+    if (e.target.id === 'edit-form-modal' || e.target.id === 'create-form-modal') return; // không tự đóng khi click ngoài
     e.target.classList.remove('open');
     document.body.style.overflow = '';
   }

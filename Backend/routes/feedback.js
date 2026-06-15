@@ -5,27 +5,82 @@ const { authMiddleware } = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const { err500, validId, getPhanHoiColumns, buildFeedbackSelect } = require('../utils/helpers');
 
+let feedbackRatingConstraintReady = false;
+async function ensureFeedbackRatingConstraint() {
+  if (feedbackRatingConstraintReady) return;
+  await sql.query`
+    IF EXISTS (
+      SELECT 1 FROM sys.check_constraints
+      WHERE name = 'CHK_ChiTietPhanHoi_Diem'
+    )
+    BEGIN
+      ALTER TABLE ChiTietPhanHoi DROP CONSTRAINT CHK_ChiTietPhanHoi_Diem;
+    END
+    ALTER TABLE ChiTietPhanHoi
+    ADD CONSTRAINT CHK_ChiTietPhanHoi_Diem
+    CHECK (diem_danh_gia IS NULL OR diem_danh_gia BETWEEN 0 AND 10);
+  `;
+  feedbackRatingConstraintReady = true;
+}
+
 // ── POST /api/feedback (public – không cần đăng nhập) ────────────
 router.post('/', async (req, res) => {
   const { form_id, ho_ten, email, danh_gia, cam_xuc, noi_dung, lop, khoa, giao_vien } = req.body;
   if (!form_id) return res.status(400).json({ message: 'Thiếu form_id' });
   if (!noi_dung) return res.status(400).json({ message: 'Thiếu noi_dung' });
   try {
+    const formId = Number(form_id);
+    if (!Number.isInteger(formId) || formId <= 0) {
+      return res.status(400).json({ message: 'form_id không hợp lệ' });
+    }
+
+    const formRequest = new sql.Request();
+    formRequest.input('form_id', sql.Int, formId);
+    const formResult = await formRequest.query(`
+      SELECT TOP 1 id, trang_thai, ngay_dong
+      FROM Form
+      WHERE id = @form_id
+    `);
+    const form = formResult.recordset[0];
+    if (!form) return res.status(404).json({ message: 'Không tìm thấy biểu mẫu' });
+
+    const closeDate = form.ngay_dong ? new Date(form.ngay_dong) : null;
+    const isExpired = closeDate && closeDate < new Date();
+    if (form.trang_thai !== 'active' || isExpired) {
+      return res.status(400).json({ message: 'Biểu mẫu đã đóng, không nhận phản hồi mới' });
+    }
+
+    const columns = await getPhanHoiColumns(sql);
     const request = new sql.Request();
-    request.input('form_id',    sql.Int,          Number(form_id));
-    request.input('ho_ten',     sql.NVarChar(100), ho_ten     || null);
-    request.input('email',      sql.NVarChar(150), email      || null);
-    request.input('danh_gia',   sql.Int,           danh_gia   || null);
-    request.input('cam_xuc',    sql.NVarChar(20),  cam_xuc    || 'neutral');
-    request.input('noi_dung',   sql.NVarChar(1000),noi_dung);
-    request.input('lop',        sql.NVarChar(50),  lop        || null);
-    request.input('khoa',       sql.NVarChar(100), khoa       || null);
-    request.input('giao_vien',  sql.NVarChar(100), giao_vien  || null);
+    const fields = [];
+    const values = [];
+    const addField = (column, param, type, value) => {
+      if (!columns.has(column)) return;
+      fields.push(column);
+      values.push('@' + param);
+      request.input(param, type, value);
+    };
+
+    addField('form_id', 'form_id', sql.Int, formId);
+    addField('ho_ten', 'ho_ten', sql.NVarChar(100), ho_ten || null);
+    addField('ho_ten_nguoi_gui', 'ho_ten_nguoi_gui', sql.NVarChar(100), ho_ten || null);
+    addField('email', 'email', sql.NVarChar(150), email || null);
+    addField('email_nguoi_gui', 'email_nguoi_gui', sql.NVarChar(150), email || null);
+    addField('danh_gia', 'danh_gia', sql.Int, danh_gia || null);
+    addField('cam_xuc', 'cam_xuc', sql.NVarChar(20), cam_xuc || 'neutral');
+    addField('noi_dung', 'noi_dung', sql.NVarChar(1000), noi_dung);
+    addField('lop', 'lop', sql.NVarChar(50), lop || null);
+    addField('khoa', 'khoa', sql.NVarChar(100), khoa || null);
+    addField('giao_vien', 'giao_vien', sql.NVarChar(100), giao_vien || null);
+
+    if (!fields.includes('form_id')) {
+      return res.status(500).json({ message: 'Bảng PhanHoi thiếu cột form_id' });
+    }
 
     const result = await request.query(`
-      INSERT INTO PhanHoi (form_id, ho_ten, email, danh_gia, cam_xuc, noi_dung, lop, khoa, giao_vien)
+      INSERT INTO PhanHoi (${fields.join(', ')})
       OUTPUT INSERTED.id
-      VALUES (@form_id, @ho_ten, @email, @danh_gia, @cam_xuc, @noi_dung, @lop, @khoa, @giao_vien)
+      VALUES (${values.join(', ')})
     `);
     const newId = result.recordset[0].id;
     res.status(201).json({ id: newId, message: 'Đã lưu phản hồi' });
@@ -45,12 +100,14 @@ router.post('/:id/chitiet', async (req, res) => {
   }
 
   try {
+    await ensureFeedbackRatingConstraint();
     for (const row of chi_tiet) {
+      const hasRating = row.diem_danh_gia !== undefined && row.diem_danh_gia !== null && row.diem_danh_gia !== '';
       const request = new sql.Request();
       request.input('phan_hoi_id',   sql.Int,           phan_hoi_id);
       request.input('cau_hoi_id',    sql.Int,           Number(row.cau_hoi_id));
       request.input('lua_chon_id',   sql.Int,           row.lua_chon_id   ? Number(row.lua_chon_id)   : null);
-      request.input('diem_danh_gia', sql.Int,           row.diem_danh_gia ? Number(row.diem_danh_gia) : null);
+      request.input('diem_danh_gia', sql.Int,           hasRating ? Number(row.diem_danh_gia) : null);
       request.input('noi_dung',      sql.NVarChar(1000),row.noi_dung      || null);
       await request.query(`
         INSERT INTO ChiTietPhanHoi (phan_hoi_id, cau_hoi_id, lua_chon_id, diem_danh_gia, noi_dung_tra_loi)

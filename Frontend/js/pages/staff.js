@@ -26,12 +26,12 @@ let deleteStaffId = null;
 let activeStaffDetail = null;
 
 const roleBadge = (r) =>
-  (r === "admin" || r === "manager")
+  r === "admin"
     ? '<span class="badge" style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa">Quản lý</span>'
     : '<span class="badge badge-gray">Nhân viên</span>';
 
 const roleLabel = (r) =>
-  r === "admin" ? "Quản lý" : r === "manager" ? "Quản lý" : "Nhân viên";
+  r === "admin" ? "Quản lý" : "Nhân viên";
 
 function mapStaff(s) {
   return {
@@ -47,7 +47,7 @@ function mapStaff(s) {
       ? new Date(s.ngay_tao).toLocaleDateString("vi-VN")
       : "---",
     seed: s.email,
-    color: "#0ea5e9",
+    color: "#00008B",
   };
 }
 
@@ -139,6 +139,14 @@ function updateStats() {
 }
 
 document.getElementById("page-content").innerHTML = `
+  <style>
+    #add-staff-modal input[type="password"]::-ms-reveal,
+    #add-staff-modal input[type="password"]::-ms-clear,
+    #staff-edit-modal input[type="password"]::-ms-reveal,
+    #staff-edit-modal input[type="password"]::-ms-clear {
+      display: none;
+    }
+  </style>
   <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between">
     <div>
       <h2 class="page-title">Quản lý nhân viên</h2>
@@ -153,8 +161,8 @@ document.getElementById("page-content").innerHTML = `
     ${statCard(
       "Tổng nhân viên",
       `<span id="stat-total">0</span>`,
-      "#0ea5e9",
-      "#e0f2fe",
+      "#00008B",
+      "#00008B",
       '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>'
     )}
     ${statCard(
@@ -194,7 +202,7 @@ document.getElementById("page-content").innerHTML = `
   </div>
 
   <div class="modal-overlay" id="add-staff-modal">
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:580px">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:580px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">
       <div class="modal-header">
         <div>
           <div class="modal-title">Thêm nhân viên mới</div>
@@ -202,8 +210,8 @@ document.getElementById("page-content").innerHTML = `
         </div>
         <button class="icon-btn close-btn" onclick="closeModal('add-staff-modal')">${IC.close}</button>
       </div>
-      <div class="modal-body" style="max-height:72vh;overflow-y:auto">
-        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;font-size:13px;color:#1e40af;line-height:1.5">
+      <div class="modal-body" style="flex:1 1 auto;min-height:0;overflow-y:auto">
+        <div style="background:#00008B;border:1px solid #00008B;border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;font-size:13px;color:#fff;line-height:1.5">
           Nhân viên mới sẽ nhận email hướng dẫn kích hoạt tài khoản và thiết lập mật khẩu lần đầu.
         </div>
 
@@ -211,7 +219,7 @@ document.getElementById("page-content").innerHTML = `
           <div style="font-size:15px;font-weight:700;color:var(--sky);margin-bottom:16px">Thông tin cá nhân</div>
           <div class="form-group">
             <label class="form-label">Họ và tên <span style="color:var(--red)">*</span></label>
-            <input type="text" class="input" id="as-name" placeholder="VD: Nguyễn Văn A">
+            <input type="text" class="input" id="as-name" placeholder="Ví dụ: Nguyễn Văn A">
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div class="form-group" style="margin-bottom:0">
@@ -220,19 +228,19 @@ document.getElementById("page-content").innerHTML = `
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label">Số điện thoại</label>
-              <input type="tel" class="input" id="as-phone" placeholder="0912345678">
+              <input type="tel" class="input" id="as-phone" placeholder="Nhập số điện thoại">
             </div>
           </div>
         </div>
 
         <div style="border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:20px;margin-bottom:14px">
-          <div style="font-size:15px;font-weight:700;color:#0284c7;margin-bottom:16px">Thông tin công việc</div>
+          <div style="font-size:15px;font-weight:700;color:#00008B;margin-bottom:16px">Thông tin công việc</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
             <div>
               <label class="form-label">Vai trò <span style="color:var(--red)">*</span></label>
               <select class="input" style="width:100%" id="as-role">
                 <option value="staff">Nhân viên</option>
-                <option value="manager">Quản lý</option>
+                <option value="admin">Quản lý</option>
               </select>
             </div>
             <div>
@@ -243,14 +251,26 @@ document.getElementById("page-content").innerHTML = `
               </select>
             </div>
           </div>
+          <div class="form-group">
+            <label class="form-label">Phòng ban</label>
+            <select class="input" id="as-dept" style="width:100%">
+              <option value="">Chưa phân công</option>
+              <option value="Ngoại ngữ">Ngoại ngữ</option>
+              <option value="Tin học">Tin học</option>
+            </select>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div>
               <label class="form-label">Mật khẩu <span style="color:var(--red)">*</span></label>
-              <input type="password" class="input" id="as-pw" placeholder="Nhập mật khẩu">
+              <input type="password" class="input" id="as-pw" placeholder="Nhập mật khẩu" onmousedown="event.stopPropagation()">
             </div>
             <div>
               <label class="form-label">Nhập lại mật khẩu <span style="color:var(--red)">*</span></label>
-              <input type="password" class="input" id="as-pw2" placeholder="Xác nhận mật khẩu">
+              <div style="position:relative">
+                <input type="password" class="input" id="as-pw2" placeholder="Xác nhận mật khẩu" style="padding-right:44px" onmousedown="event.stopPropagation()">
+                <button type="button" class="icon-btn" onclick="togglePwField('as-pw2')" title="Hiện/ẩn mật khẩu"
+                  style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:30px;height:30px;color:var(--gray-400)">${IC.eye}</button>
+              </div>
             </div>
           </div>
         </div>
@@ -287,18 +307,26 @@ document.getElementById("page-content").innerHTML = `
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label">Số điện thoại</label>
-            <input type="tel" class="input" id="se-phone" placeholder="0912345678">
+            <input type="tel" class="input" id="se-phone" placeholder="Nhập số điện thoại">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Phòng ban</label>
+            <select class="input" id="se-dept">
+              <option value="">Chưa phân công</option>
+              <option value="Ngoại ngữ">Ngoại ngữ</option>
+              <option value="Tin học">Tin học</option>
+            </select>
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label">Vai trò <span style="color:var(--red)">*</span></label>
             <select class="input" id="se-role">
-              <option value="manager">Quản lý</option>
+              <option value="admin">Quản lý</option>
               <option value="staff">Nhân viên</option>
             </select>
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label">Mật khẩu mới</label>
-            <input type="password" class="input" id="se-pw" placeholder="Để trống nếu không đổi">
+            <input type="password" class="input" id="se-pw" placeholder="Để trống nếu không đổi" onmousedown="event.stopPropagation()">
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label">Trạng thái <span style="color:var(--red)">*</span></label>
@@ -334,7 +362,7 @@ document.getElementById("page-content").innerHTML = `
       </div>
       <div class="modal-body">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--gray-100)">
-          <img id="sd-avatar" src="" style="width:72px;height:72px;border-radius:50%;border:3px solid #e0f2fe;object-fit:cover">
+          <img id="sd-avatar" src="" style="width:72px;height:72px;border-radius:50%;border:3px solid #00008B;object-fit:cover">
           <div>
             <div id="sd-name" style="font-size:18px;font-weight:800;color:var(--gray-900);margin-bottom:2px"></div>
             <div id="sd-dept" style="font-size:13px;color:var(--gray-500);margin-bottom:8px"></div>
@@ -390,8 +418,8 @@ document.getElementById("page-content").innerHTML = `
         ${[
           {
             group: "Quản lý biểu mẫu",
-            color: "#0ea5e9",
-            bg: "#e0f2fe",
+            color: "#00008B",
+            bg: "#00008B",
             perms: [
               { id: "p-view-form",   label: "Xem danh sách biểu mẫu",  checked: true  },
               { id: "p-add-form",    label: "Thêm biểu mẫu",           checked: false },
@@ -401,8 +429,8 @@ document.getElementById("page-content").innerHTML = `
           },
           {
             group: "Thư viện câu hỏi",
-            color: "#06b6d4",
-            bg: "#cffafe",
+            color: "#00008B",
+            bg: "#00008B",
             perms: [
               { id: "p-view-library",   label: "Xem danh sách câu hỏi", checked: true  },
               { id: "p-add-library",    label: "Thêm câu hỏi",          checked: false },
@@ -417,7 +445,7 @@ document.getElementById("page-content").innerHTML = `
             perms: [
               { id: "p-view-appr", label: "Xem yêu cầu phê duyệt", checked: true },
               { id: "p-approve", label: "Phê duyệt / Từ chối", checked: false },
-              { id: "p-share-form", label: "Chia sẻ form", checked: false },
+              { id: "p-share-form", label: "Chia sẻ biểu mẫu", checked: false },
             ],
           },
           {
@@ -506,7 +534,7 @@ document.getElementById("page-content").innerHTML = `
       <div class="modal-body">
         <p style="color:var(--gray-700);margin:0 0 14px">Bạn có chắc muốn xóa nhân viên này?</p>
         <div style="background:var(--gray-50);border-radius:var(--radius);padding:12px;display:flex;align-items:center;gap:12px">
-          <div id="sdel-avatar" class="avatar-initials" style="background:#0ea5e9;font-size:13px;width:40px;height:40px;flex-shrink:0"></div>
+          <div id="sdel-avatar" class="avatar-initials" style="background:#00008B;font-size:13px;width:40px;height:40px;flex-shrink:0"></div>
           <div>
             <div id="sdel-name" style="font-weight:700;font-size:14px"></div>
             <div id="sdel-dept" style="font-size:12px;color:var(--gray-500)"></div>
@@ -530,7 +558,7 @@ function renderStaff(list) {
           .map(
             (s) => `
       <div style="background:#fff;border-radius:var(--radius-lg);border:1px solid var(--gray-200);overflow:hidden;box-shadow:var(--shadow-sm)">
-        <div style="height:72px;background:linear-gradient(135deg,#1976d2,#42a5f5)"></div>
+        <div style="height:72px;background:linear-gradient(135deg,#00008B,#00008B)"></div>
         <div style="padding:0 16px 16px">
           <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:-32px;margin-bottom:10px">
             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${s.seed}" style="width:64px;height:64px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.15)" loading="lazy">
@@ -559,7 +587,7 @@ function renderStaff(list) {
             <div style="display:flex;align-items:center;gap:6px">${s.phone}</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:10px;border-top:1px solid var(--gray-100);text-align:center">
-            <div><div style="font-size:20px;font-weight:800;color:#1976d2">${s.forms}</div><div style="font-size:11px;color:var(--gray-500)">Form tạo</div></div>
+            <div><div style="font-size:20px;font-weight:800;color:#00008B">${s.forms}</div><div style="font-size:11px;color:var(--gray-500)">Form tạo</div></div>
             <div><div style="font-size:12px;font-weight:600;color:var(--gray-800)">${s.last}</div><div style="font-size:11px;color:var(--gray-500)">Ngày tạo</div></div>
           </div>
         </div>
@@ -580,6 +608,7 @@ function openAddStaffModal() {
   document.getElementById("as-name").value = "";
   document.getElementById("as-email").value = "";
   document.getElementById("as-phone").value = "";
+  document.getElementById("as-dept").value = "";
   document.getElementById("as-role").value = "staff";
   document.getElementById("as-status").value = "active";
   document.getElementById("as-pw").value = "";
@@ -643,6 +672,7 @@ async function openStaffEdit(id) {
   document.getElementById("se-name").value = s.name;
   document.getElementById("se-email").value = s.email;
   document.getElementById("se-phone").value = s.phone === "---" ? "" : s.phone;
+  document.getElementById("se-dept").value = s.dept === "Chưa phân công" ? "" : s.dept;
   document.getElementById("se-role").value = s.role;
   document.getElementById("se-status").value = s.status;
   document.getElementById("se-pw").value = "";
@@ -660,6 +690,7 @@ async function openStaffEdit(id) {
       document.getElementById("se-name").value = data.ho_ten || "";
       document.getElementById("se-email").value = data.email || "";
       document.getElementById("se-phone").value = data.so_dien_thoai || "";
+      document.getElementById("se-dept").value = data.phong_ban || "";
       document.getElementById("se-role").value = data.vai_tro || "staff";
       document.getElementById("se-status").value = data.trang_thai || "active";
       setPermissionData(data);
@@ -698,7 +729,8 @@ async function saveStaffEdit() {
   const body = {
     ho_ten: name,
     email,
-    so_dien_thoai: phone,
+    so_dien_thoai: phone || null,
+    phong_ban: document.getElementById("se-dept")?.value?.trim() || null,
     vai_tro: document.getElementById("se-role").value,
     trang_thai: document.getElementById("se-status").value,
     quyen: getPermissionData(),
@@ -762,7 +794,8 @@ async function saveAddStaff() {
   const body = {
     ho_ten: name,
     email,
-    so_dien_thoai: document.getElementById("as-phone")?.value || "",
+    so_dien_thoai: document.getElementById("as-phone")?.value?.trim() || null,
+    phong_ban: document.getElementById("as-dept")?.value?.trim() || null,
     ten_dang_nhap: email.split("@")[0],
     mat_khau: pw,
     vai_tro: document.getElementById("as-role")?.value || "staff",
@@ -1004,7 +1037,7 @@ async function openStaffSetting(id) {
 
   document.getElementById('smenu-' + id)?.classList.remove('open');
 
-  const roleLabel = s.role === 'admin' ? 'Quản trị viên' : s.role === 'manager' ? 'Quản lý' : 'Nhân viên';
+  const roleLabel = s.role === 'admin' ? 'Quản lý' : 'Nhân viên';
   const statusBadge = s.status === 'active'
     ? '<span class="badge badge-green">Hoạt động</span>'
     : '<span class="badge badge-gray">Ngừng hoạt động</span>';
@@ -1023,7 +1056,7 @@ async function openStaffSetting(id) {
 
   const permGroups = [
     {
-      label: 'Quản lý biểu mẫu', color: '#0ea5e9',
+      label: 'Quản lý biểu mẫu', color: '#00008B',
       items: [
         { key: 'view_form',   label: 'Xem danh sách biểu mẫu' },
         { key: 'add_form',    label: 'Thêm biểu mẫu' },
@@ -1032,7 +1065,7 @@ async function openStaffSetting(id) {
       ]
     },
     {
-      label: 'Thư viện câu hỏi', color: '#06b6d4',
+      label: 'Thư viện câu hỏi', color: '#00008B',
       items: [
         { key: 'view_library',   label: 'Xem danh sách câu hỏi' },
         { key: 'add_library',    label: 'Thêm câu hỏi' },
@@ -1045,7 +1078,7 @@ async function openStaffSetting(id) {
       items: [
         { key: 'view_approval', label: 'Xem phê duyệt' },
         { key: 'approve',       label: 'Phê duyệt / Từ chối' },
-        { key: 'share_form',    label: 'Chia sẻ form' },
+        { key: 'share_form',    label: 'Chia sẻ biểu mẫu' },
       ]
     },
     {
@@ -1081,7 +1114,7 @@ async function openStaffSetting(id) {
   document.getElementById('staff-setting-body').innerHTML = `
     <!-- Thông tin cơ bản -->
     <div style="display:flex;align-items:center;gap:16px;padding:16px;background:#f8fafc;border-radius:12px;margin-bottom:20px">
-      <div style="width:56px;height:56px;border-radius:50%;background:#0ea5e9;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:700;flex-shrink:0">
+      <div style="width:56px;height:56px;border-radius:50%;background:#00008B;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:700;flex-shrink:0">
         ${(s.name||'U')[0].toUpperCase()}
       </div>
       <div style="flex:1">
@@ -1097,7 +1130,7 @@ async function openStaffSetting(id) {
     <!-- Tabs -->
     <div style="display:flex;gap:0;border-bottom:2px solid var(--gray-200);margin-bottom:20px">
       <button onclick="switchSettingTab('tab-info')" id="stab-info"
-        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #0ea5e9;color:#0ea5e9;margin-bottom:-2px">
+        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #00008B;color:#00008B;margin-bottom:-2px">
         Thông tin
       </button>
       <button onclick="switchSettingTab('tab-perm')" id="stab-perm"
@@ -1118,9 +1151,13 @@ async function openStaffSetting(id) {
         <div class="form-group"><label class="form-label">Email</label>
           <input type="email" id="ss-email" class="input" value="${s.email || ''}"></div>
         <div class="form-group"><label class="form-label">Số điện thoại</label>
-          <input type="tel" id="ss-phone" class="input" value="${s.phone !== '---' ? s.phone : ''}"></div>
+          <input type="tel" id="ss-phone" class="input" placeholder="Nhập số điện thoại" value="${s.phone !== '---' ? s.phone : ''}"></div>
         <div class="form-group"><label class="form-label">Phòng ban</label>
-          <input type="text" id="ss-dept" class="input" value="${s.dept || ''}" readonly style="background:var(--gray-50)"></div>
+          <select id="ss-dept" class="input">
+            <option value="" ${!s.dept || s.dept === 'Chưa phân công' ? 'selected' : ''}>Chưa phân công</option>
+            <option value="Ngoại ngữ" ${s.dept === 'Ngoại ngữ' ? 'selected' : ''}>Ngoại ngữ</option>
+            <option value="Tin học" ${s.dept === 'Tin học' ? 'selected' : ''}>Tin học</option>
+          </select></div>
         <div class="form-group"><label class="form-label">Vai trò</label>
           <input type="text" class="input" value="${roleLabel}" readonly style="background:var(--gray-50)"></div>
         <div class="form-group"><label class="form-label">Ngày tạo</label>
@@ -1192,8 +1229,8 @@ function switchSettingTab(tabId) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
     const active = tabMap[tabId] === btnId;
-    btn.style.borderBottomColor = active ? '#0ea5e9' : 'transparent';
-    btn.style.color = active ? '#0ea5e9' : 'var(--gray-400)';
+    btn.style.borderBottomColor = active ? '#00008B' : 'transparent';
+    btn.style.color = active ? '#00008B' : 'var(--gray-400)';
   });
 }
 
@@ -1201,16 +1238,19 @@ function togglePwField(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.type = el.type === 'password' ? 'text' : 'password';
+  el.focus();
 }
 
 async function saveStaffSetting() {
   const modal = document.getElementById('staff-setting-modal');
   const id = parseInt(modal.dataset.staffId, 10);
   if (!id) return;
+  const staff = STAFF.find(x => x.id === id);
 
   const name  = document.getElementById('ss-name')?.value?.trim();
   const email = document.getElementById('ss-email')?.value?.trim();
   const phone = document.getElementById('ss-phone')?.value?.trim();
+  const dept  = document.getElementById('ss-dept')?.value?.trim();
   const pw    = document.getElementById('ss-pw')?.value || '';
 
   if (!name)  { showToast('Họ tên không được để trống!', 'error'); switchSettingTab('tab-info'); return; }
@@ -1232,7 +1272,15 @@ async function saveStaffSetting() {
     quyen[k] = el ? el.checked : false;
   });
 
-  const body = { ho_ten: name, email, so_dien_thoai: phone, quyen };
+  const body = {
+    ho_ten: name,
+    email,
+    so_dien_thoai: phone || null,
+    phong_ban: dept || null,
+    vai_tro: staff?.role || 'staff',
+    trang_thai: staff?.status || 'active',
+    quyen,
+  };
   if (pw) body.mat_khau = pw;
 
   try {

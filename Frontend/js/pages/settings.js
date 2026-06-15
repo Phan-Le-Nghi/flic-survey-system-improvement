@@ -29,7 +29,7 @@ async function renderSettingsPage() {
 
   const avatarHtml = avatarSrc
     ? `<img id="avatar-img" src="${avatarSrc}" style="width:72px;height:72px;border-radius:50%;object-fit:cover">`
-    : `<div id="avatar-img" class="avatar-initials" style="background:#0ea5e9;width:72px;height:72px;font-size:24px">${initials}</div>`;
+    : `<div id="avatar-img" class="avatar-initials" style="background:#00008B;width:72px;height:72px;font-size:24px">${initials}</div>`;
 
   document.getElementById('page-content').innerHTML = `
   <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -163,14 +163,14 @@ async function renderSettingsPage() {
         <div style="font-size:16px;font-weight:700;margin-bottom:20px">Giao diện</div>
         <div class="form-label" style="margin-bottom:12px">Giao diện hiển thị</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:720px">
-          <div onclick="selectTheme('light')" style="cursor:pointer;border-radius:12px;border:2.5px solid #0ea5e9;overflow:hidden" id="t-light">
+          <div onclick="selectTheme('light')" style="cursor:pointer;border-radius:12px;border:2.5px solid #00008B;overflow:hidden" id="t-light">
             <div style="height:90px;background:#f8fafc;border-bottom:1px solid #e2e8f0;position:relative">
               <div style="position:absolute;top:8px;left:8px;right:8px;height:10px;background:#e2e8f0;border-radius:3px"></div>
               <div style="position:absolute;top:26px;left:8px;width:40%;height:8px;background:#cbd5e1;border-radius:3px"></div>
             </div>
             <div style="padding:10px 12px;background:#fff;display:flex;align-items:center;justify-content:space-between">
               <span style="font-size:13px;font-weight:600">Sáng</span>
-              <div id="t-light-check" style="width:18px;height:18px;border-radius:50%;background:#0ea5e9;display:flex;align-items:center;justify-content:center">
+              <div id="t-light-check" style="width:18px;height:18px;border-radius:50%;background:#00008B;display:flex;align-items:center;justify-content:center">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
             </div>
@@ -281,7 +281,7 @@ async function changePassword() {
 
   if (!mat_khau_cu)              { showToast('Vui lòng nhập mật khẩu hiện tại!', 'error'); return; }
   if (!mat_khau_moi)             { showToast('Vui lòng nhập mật khẩu mới!', 'error'); return; }
-  if (mat_khau_moi.length < 6)   { showToast('Mật khẩu mới phải ít nhất 6 ký tự!', 'error'); return; }
+  if (mat_khau_moi.length < 6)   { showToast('Mật khẩu mới phải có ít nhất 6 ký tự!', 'error'); return; }
   if (mat_khau_moi !== confirm_pw){ showToast('Mật khẩu xác nhận không khớp!', 'error'); return; }
 
   try {
@@ -343,8 +343,8 @@ function selectTheme(theme) {
     const check = document.getElementById('t-' + t + '-check');
     if (!card || !check) return;
     if (t === theme) {
-      card.style.border = '2.5px solid #0ea5e9';
-      check.style.background = '#0ea5e9';
+      card.style.border = '2.5px solid #00008B';
+      check.style.background = '#00008B';
       check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>';
     } else {
       card.style.border = '2px solid #e2e8f0';
@@ -403,8 +403,8 @@ async function openMyAccountSetting() {
   }
 
   const permGroups = [
-    { label:'Quản lý biểu mẫu', color:'#0ea5e9', items:[
-      {key:'view_form',label:'Xem form'},{key:'create_form',label:'Tạo form'},
+    { label:'Quản lý biểu mẫu', color:'#00008B', items:[
+      {key:'view_form',label:'Xem biểu mẫu'},{key:'create_form',label:'Tạo biểu mẫu'},
       {key:'edit_form',label:'Sửa form'},{key:'delete_form',label:'Xóa form'}]},
     { label:'Phê duyệt', color:'#10b981', items:[
       {key:'view_approval',label:'Xem phê duyệt'},{key:'approve',label:'Phê duyệt / Từ chối'}]},
@@ -418,7 +418,7 @@ async function openMyAccountSetting() {
 
   document.getElementById('my-setting-body').innerHTML = `
     <div style="display:flex;gap:0;border-bottom:2px solid var(--gray-200);margin-bottom:20px">
-      <button onclick="switchMyTab('myt-info')" id="mybtn-info" style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #0ea5e9;color:#0ea5e9;margin-bottom:-2px">Thông tin</button>
+      <button onclick="switchMyTab('myt-info')" id="mybtn-info" style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #00008B;color:#00008B;margin-bottom:-2px">Thông tin</button>
       <button onclick="switchMyTab('myt-perm')" id="mybtn-perm" style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--gray-400);margin-bottom:-2px">Phân quyền</button>
       <button onclick="switchMyTab('myt-notif')" id="mybtn-notif" style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--gray-400);margin-bottom:-2px">Thông báo</button>
     </div>
@@ -492,8 +492,8 @@ function switchMyTab(tabId) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
     const active = map[tabId] === btnId;
-    btn.style.borderBottomColor = active ? '#0ea5e9' : 'transparent';
-    btn.style.color = active ? '#0ea5e9' : 'var(--gray-400)';
+    btn.style.borderBottomColor = active ? '#00008B' : 'transparent';
+    btn.style.color = active ? '#00008B' : 'var(--gray-400)';
   });
 }
 
@@ -521,7 +521,7 @@ async function saveMyAccountSetting() {
 
   // Đổi mật khẩu nếu có nhập
   if (pwOld && pwNew) {
-    if (pwNew.length < 6) { showToast('Mật khẩu mới phải ít nhất 6 ký tự!', 'error'); return; }
+    if (pwNew.length < 6) { showToast('Mật khẩu mới phải có ít nhất 6 ký tự!', 'error'); return; }
     try {
       const r2 = await fetch(`${API_BASE}/auth/change-password`, {
         method: 'POST',
@@ -552,8 +552,8 @@ function syncThemeSelection(theme) {
     const check = document.getElementById('t-' + t + '-check');
     if (!card || !check) return;
     if (t === theme) {
-      card.style.border = '2.5px solid #0ea5e9';
-      check.style.background = '#0ea5e9';
+      card.style.border = '2.5px solid #00008B';
+      check.style.background = '#00008B';
       check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>';
     } else {
       card.style.border = '2px solid #e2e8f0';

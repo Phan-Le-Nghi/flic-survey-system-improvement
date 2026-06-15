@@ -54,7 +54,7 @@ router.get("/stats", authMiddleware, authorize("view_notif"), async (req, res) =
 router.get("/unread", async (req, res) => {
   try {
     const result = await sql.query`
-      SELECT TOP 5 id, tieu_de, loai, ngay_tao
+      SELECT TOP 4 id, tieu_de, loai, ngay_tao
       FROM ThongBao
       WHERE trang_thai = 'sent'
       ORDER BY ngay_tao DESC
