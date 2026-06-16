@@ -9,22 +9,29 @@ function buildPublicFormLink(formId) {
 
 // ===== SHARED LOGGING =====
 function logActivityAction(actionType, actionLabel, formName, detail, formId = '') {
-  const logs = JSON.parse(localStorage.getItem('flic_audit_logs') || 'null') || [];
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const user = currentUser.ho_ten || currentUser.ten_đang_nhap || 'Nguyễn Văn A';
-  const role = (currentUser.vai_tro === 'admin' || currentUser.vai_tro === 'manager') ? 'Quản lý' : 'Nhân viên';
-  logs.unshift({
-    id: Date.now(),
-    time: new Date().toISOString(),
-    user: user,
-    role: role,
-    actionType,
-    actionLabel,
-    formName,
-    detail,
-    formId
-  });
-  localStorage.setItem('flic_audit_logs', JSON.stringify(logs));
+  try {
+    const token = localStorage.getItem('token') || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    let finalActionType = actionType;
+    if (actionLabel && actionLabel !== 'Xóa' && actionLabel !== 'Tạo mới' && actionLabel !== 'Chỉnh sửa' && actionLabel !== 'Khôi phục' && actionLabel !== 'Phê duyệt' && actionLabel !== 'Từ chối') {
+      finalActionType = actionLabel; // Giữ lại tiếng Việt cho những case đặc biệt như Xóa vĩnh viễn
+    }
+
+    fetch(`${API_BASE}/audit-logs`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        actionType: finalActionType,
+        formId: formId,
+        formName: formName,
+        detail: detail
+      })
+    }).catch(e => console.error('Lỗi khi ghi nhật ký:', e));
+  } catch(e) {
+    console.error('Lỗi khi ghi nhật ký:', e);
+  }
 }
 
 // ===== SHARED SVG ICONS =====
