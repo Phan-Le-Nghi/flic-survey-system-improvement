@@ -40,7 +40,7 @@ router.get('/', authMiddleware, async (req, res) => {
         ISNULL(nv.ho_ten, 'Hệ thống') AS [user], 
         ISNULL(nv.vai_tro, 'system') AS role, 
         n.hanh_dong AS actionType, 
-        f.ten_form AS formName, 
+        ISNULL(f.ten_form, CASE WHEN n.doi_tuong = 'system' THEN N'Hệ thống' ELSE N'Biểu mẫu đã xóa' END) AS formName, 
         n.chi_tiet AS detail,
         n.doi_tuong_id AS formId
       FROM NhatKyHoatDong n
