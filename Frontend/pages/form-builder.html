@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biểu mẫu công khai - FLIC</title>
+  <link rel="icon" type="image/png" href="../src/assets/bb21610d5fa0b1d8a65b7ce9827d83c61bf7a2c5.png">
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: "Be Vietnam Pro", sans-serif;
+      color: #0f172a;
+      background:
+        radial-gradient(circle at top left, rgba(0,0,139,.12), transparent 28%),
+        linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%);
+    }
+    .public-shell {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 52px 20px 64px;
+    }
+    .form-card-public {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+    }
+    .form-head {
+      min-height: 180px;
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+      border-radius: 30px;
+      background: linear-gradient(135deg,#eef5ff 0%,#ffffff 70%);
+      border-top: 8px solid #00008B;
+      box-shadow: 0 24px 48px rgba(15,23,42,.12);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 28px 30px;
+    }
+    .form-head::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+    }
+    .form-head::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top right, rgba(255,255,255,.32), transparent 34%), radial-gradient(circle at bottom left, rgba(255,255,255,.22), transparent 28%);
+    }
+    .form-head > * {
+      position: relative;
+      z-index: 1;
+    }
+    .form-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .form-badge {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.72);
+      color: #334155;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .form-title {
+      margin: 0;
+      font-size: 42px;
+      font-weight: 800;
+      line-height: 1.08;
+      color: #00008B;
+    }
+    .form-sub {
+      margin: 12px 0 0;
+      color: #00008B;
+      font-size: 16px;
+    }
+    .form-created {
+      padding: 8px 8px 14px;
+      color: #00008B;
+      font-size: 14px;
+    }
+    .form-created strong {
+      color: #c2410c;
+    }
+    .prefill-grid {
+      display: none;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .prefill-grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .field-block label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .field-block input,
+    .field-block select,
+    .field-block textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+      color: #0f172a;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .field-block input:focus,
+    .field-block select:focus,
+    .field-block textarea:focus {
+      border-color: #00008B;
+      box-shadow: 0 0 0 4px rgba(56,189,248,.12);
+    }
+    .question-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 0;
+    }
+    .question-card {
+      border: 1px solid #00008B;
+      border-radius: 22px;
+      padding: 20px 20px 22px;
+      background: linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,247,237,.95) 100%);
+      box-shadow: 0 12px 26px rgba(0,0,139,.08);
+    }
+    .question-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .question-left {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .question-no {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      margin-bottom: 10px;
+      background: #00008B;
+      color: #00008B;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .question-text {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1.45;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .question-chip {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #00008B;
+      color: #00008B;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .option-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .option-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 50px;
+      padding: 12px 14px;
+      border: 1px solid #dbe4f0;
+      border-radius: 12px;
+      background: rgba(255,255,255,.92);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #334155;
+    }
+    .option-item input {
+      margin: 0;
+      accent-color: #00008B;
+    }
+    .text-answer,
+    .select-answer {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      font: inherit;
+      background: #fff;
+    }
+    .text-answer {
+      min-height: 48px;
+    }
+    textarea.text-answer {
+      min-height: 120px;
+      resize: vertical;
+    }
+    .rating-line {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 26px;
+      flex-wrap: wrap;
+      padding-top: 6px;
+    }
+    .rating-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .rating-pill input {
+      margin: 0;
+      accent-color: #00008B;
+    }
+    .star-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .star-scale {
+      display: flex;
+      gap: 30px;
+      font-size: 14px;
+      color: #475569;
+      font-weight: 700;
+    }
+    .star-row {
+      display: flex;
+      gap: 18px;
+    }
+    .star-item {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .star-item input {
+      display: none;
+    }
+    .star-icon {
+      font-size: 30px;
+      line-height: 1;
+      color: #cbd5e1;
+      transition: transform .15s, color .15s;
+    }
+    .star-item:hover .star-icon {
+      transform: scale(1.08);
+    }
+    .star-item.active .star-icon {
+      color: #f59e0b;
+    }
+    .helper-text {
+      margin-top: 18px;
+      font-size: 13px;
+      color: #64748b;
+    }
+    .success-box {
+      display: none;
+      margin-top: 16px;
+      padding: 14px 16px;
+      border: 1px solid #bbf7d0;
+      background: #f0fdf4;
+      color: #15803d;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .success-box.open {
+      display: block;
+    }
+    .public-footer {
+      display: flex;
+      justify-content: center;
+      margin-top: 18px;
+    }
+    .submit-btn {
+      min-width: 210px;
+      height: 48px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #22c1f1, #1d9bf0);
+      color: #fff;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 12px 28px rgba(29,155,240,.24);
+    }
+    .submit-btn:disabled {
+      opacity: .7;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .error-text {
+      display: none;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #dc2626;
+      font-weight: 600;
+    }
+    .error-text.open {
+      display: block;
+    }
+    @media (max-width: 768px) {
+      .public-shell {
+        padding: 20px 12px 32px;
+      }
+      .form-card-public {
+        border-radius: 0;
+        padding: 0;
+      }
+      .form-head {
+        border-radius: 22px;
+        padding: 24px 22px;
+      }
+      .form-title {
+        font-size: 34px;
+      }
+      .prefill-grid,
+      .prefill-grid.three {
+        grid-template-columns: 1fr;
+      }
+      .question-head {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .rating-line,
+      .star-scale,
+      .star-row {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="public-shell">
+    <section class="form-card-public">
+      <div class="form-head">
+        <div class="form-badges">
+          <span class="form-badge" id="public-form-cat">FLIC</span>
+          <span class="form-badge" id="public-form-count">0 c&acirc;u h&#7887;i</span>
+        </div>
+        <h1 class="form-title" id="public-form-title">Đang tải biểu mẫu...</h1>
+        <p class="form-sub" id="public-form-sub" style="display:none"></p>
+      </div>
+
+      <div class="form-created">Ng&agrave;y t&#7841;o: <strong id="public-form-created">--</strong></div>
+
+      <div id="public-question-list" class="question-list">
+        <div class="question-card" style="text-align:center;color:#64748b">Đang tải câu hỏi...</div>
+      </div>
+
+      <div class="success-box" id="submit-success-box">
+        <div style="font-size:36px;line-height:1;margin-bottom:12px">🎉</div>
+        <div style="font-size:18px;font-weight:800;margin-bottom:8px">Gửi thành công!</div>
+        <div id="submit-loi-ket" style="font-size:14px;line-height:1.6;opacity:.9">Cảm ơn bạn đã phản hồi!</div>
+      </div>
+
+      <div class="helper-text">Các câu có dấu * là bắt buộc.</div>
+
+      <div class="public-footer">
+        <button class="submit-btn" id="public-submit-btn" type="button" onclick="submitPublicForm()">Gửi phản hồi</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="../js/main.js"></script>
+  <script>
+    // API_BASE đã được khai báo trong main.js
+    let currentForm = null;
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    const DEFAULT_PUBLIC_THEME = {
+      color: "#00008B",
+      background: "#eef5ff",
+      headerImage: "",
+      fontFamily: "Be Vietnam Pro"
+    };
+    const LEGACY_DEFAULT_BACKGROUNDS = new Set(["", "#ffffff", "#fff", "#f0f4f9"]);
+
+    function hasCustomPublicTheme(data = {}) {
+      const image = String(data.anh_bia || "").trim();
+      const bg = String(data.mau_nen || "").trim().toLowerCase();
+      const font = String(data.font_family || "").trim();
+      return !!image || (!!bg && !LEGACY_DEFAULT_BACKGROUNDS.has(bg)) || (!!font && font !== "Roboto");
+    }
+
+    function applyPublicTheme(data = {}) {
+      const custom = hasCustomPublicTheme(data);
+      const accent = DEFAULT_PUBLIC_THEME.color;
+      const background = custom && data.mau_nen ? data.mau_nen : DEFAULT_PUBLIC_THEME.background;
+      const font = custom && data.font_family ? data.font_family : DEFAULT_PUBLIC_THEME.fontFamily;
+      const headerImage = custom ? String(data.anh_bia || "").trim() : "";
+      document.body.style.fontFamily = `"${font}", "Be Vietnam Pro", sans-serif`;
+      document.body.style.background = custom && data.mau_nen
+        ? data.mau_nen
+        : "radial-gradient(circle at top left, rgba(0,0,139,.12), transparent 28%), linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%)";
+
+      const head = document.querySelector(".form-head");
+      if (head) {
+        head.style.borderTopColor = accent;
+        head.style.background = headerImage
+          ? `linear-gradient(135deg,rgba(255,255,255,.92),rgba(255,255,255,.78)),url("${headerImage.replace(/"/g, "%22")}") center/cover`
+          : `linear-gradient(135deg,${background} 0%,#ffffff 70%)`;
+      }
+    }
+
+    function formatRichText(value) {
+      return escapeHtml(value)
+        .replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/g, "<u>$1</u>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
+        .replace(/\n/g, "<br>");
+    }
+
+    function getYoutubeEmbedUrl(url) {
+      const text = String(url || "").trim();
+      if (!text) return "";
+      try {
+        const parsed = new URL(text);
+        let id = "";
+        if (parsed.hostname.includes("youtu.be")) id = parsed.pathname.split("/").filter(Boolean)[0] || "";
+        if (parsed.hostname.includes("youtube.com")) id = parsed.searchParams.get("v") || parsed.pathname.split("/").filter(Boolean).pop() || "";
+        return id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}` : "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function renderQuestionMedia(question) {
+      const imageUrl = question.hinh_anh_url || question.image_url || question.image || "";
+      const videoUrl = question.video_url || question.video || "";
+      if (!imageUrl && !videoUrl) return "";
+
+      const imageHtml = imageUrl ? `
+        <div style="margin:0 0 16px 52px">
+          <img src="${escapeHtml(imageUrl)}" alt="Hình ảnh câu hỏi" style="display:block;max-width:100%;max-height:280px;border-radius:14px;border:1px solid #dbe4f0;object-fit:contain;background:#f8fafc">
+        </div>` : "";
+
+      const embedUrl = getYoutubeEmbedUrl(videoUrl);
+      const videoHtml = videoUrl ? (embedUrl ? `
+        <div style="margin:0 0 16px 52px;max-width:620px;aspect-ratio:16/9;border-radius:14px;overflow:hidden;border:1px solid #dbe4f0;background:#0f172a">
+          <iframe src="${escapeHtml(embedUrl)}" title="Video câu hỏi" style="width:100%;height:100%;border:0" allowfullscreen></iframe>
+        </div>` : `
+        <div style="margin:0 0 16px 52px">
+          <a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener" style="display:inline-flex;padding:10px 13px;border-radius:12px;background:#f5f3ff;border:1px solid #ddd6fe;color:#6d28d9;font-size:13px;font-weight:700;text-decoration:none;word-break:break-all">Video: ${escapeHtml(videoUrl)}</a>
+        </div>`) : "";
+
+      return imageHtml + videoHtml;
+    }
+
+    function getFormIdFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("form_id") || "";
+    }
+
+    function getQuestionTypeLabel(type) {
+      const normalized = String(type || "choice").toLowerCase();
+      if (normalized === "rating") return "Đánh giá";
+      if (normalized === "star_rating") return "Đánh giá sao";
+      if (normalized === "checkbox") return "Hộp kiểm";
+      if (normalized === "dropdown") return "Thả xuống";
+      if (normalized === "grid_radio") return "Lưới trắc nghiệm";
+      if (normalized === "grid_checkbox") return "Lưới hộp kiểm";
+      if (normalized === "text" || normalized === "paragraph") return "Tự luận";
+      return "Lựa chọn";
+    }
+
+    function getOptionLabel(option) {
+      return typeof option === "string" ? option : option?.noi_dung || "";
+    }
+
+    function getOptionId(option, fallbackIndex) {
+      if (typeof option === "string") return "";
+      return option?.id || `opt_${fallbackIndex}`;
+    }
+
+    function getCleanTextArray(values) {
+      return (Array.isArray(values) ? values : [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+    }
+
+    function getGridRows(question) {
+      return getCleanTextArray(question?.rows || question?.hang);
+    }
+
+    function getGridCols(question) {
+      return getCleanTextArray(question?.cols || question?.cot);
+    }
+
+    function renderChoiceOptions(question, type) {
+      const options = Array.isArray(question.lua_chon) ? question.lua_chon : [];
+      return `
+        <div class="option-list">
+          ${options.map((option, optionIndex) => `
+            <label class="option-item">
+              <input
+                type="${type === "checkbox" ? "checkbox" : "radio"}"
+                ${type === "checkbox" ? "" : `name="question_${question.id}"`}
+                value="${escapeHtml(getOptionId(option, optionIndex))}"
+                data-question-id="${question.id}"
+                data-question-type="${type}"
+                data-option-id="${escapeHtml(getOptionId(option, optionIndex))}"
+                data-option-label="${escapeHtml(getOptionLabel(option))}"
+              >
+              <span>${escapeHtml(getOptionLabel(option))}</span>
+            </label>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderAgreementScale(question, options) {
+      const values = options.length
+        ? options.map((option, index) => ({
+            label: getOptionLabel(option),
+            value: index + 1,
+            optionId: getOptionId(option, index),
+          }))
+        : [
+            { value: 1, label: "1 - Rất không đồng ý", optionId: "" },
+            { value: 2, label: "2 - Không đồng ý", optionId: "" },
+            { value: 3, label: "3 - Chấp nhận được", optionId: "" },
+            { value: 4, label: "4 - Hài lòng", optionId: "" },
+            { value: 5, label: "5 - Rất hài lòng", optionId: "" },
+          ];
+
+      return `
+        <div class="option-list">
+          ${values.map((option) => `
+            <label class="option-item">
+              <input
+                type="radio"
+                name="question_${question.id}"
+                value="${option.value}"
+                data-question-id="${question.id}"
+                data-question-type="rating"
+                data-option-id="${escapeHtml(option.optionId)}"
+                data-option-label="${escapeHtml(option.label)}"
+              >
+              <span>${escapeHtml(option.label)}</span>
+            </label>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderStarScale(question) {
+      return `
+        <div class="star-wrap">
+          <div class="star-scale">
+            <span>1</span>
+            <span>2</span>
+            <span>3</span>
+            <span>4</span>
+            <span>5</span>
+          </div>
+          <div class="star-row">
+            ${[1, 2, 3, 4, 5].map((value) => `
+              <label class="star-item" data-star-item="${question.id}-${value}">
+                <input
+                  type="radio"
+                  name="question_${question.id}"
+                  value="${value}"
+                  data-question-id="${question.id}"
+                  data-question-type="star_rating"
+                  data-option-id=""
+                  data-option-label="${value} sao"
+                  onchange="updateStarVisual(${question.id}, ${value})"
+                >
+                <span class="star-icon">★</span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGridAnswer(question, type) {
+      const rows = getGridRows(question);
+      const cols = getGridCols(question);
+      if (!rows.length || !cols.length) {
+        return `<div style="padding:12px 14px;border:1px dashed #f59e0b;border-radius:12px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:700">Câu hỏi lưới chưa có dữ liệu hàng/cột.</div>`;
+      }
+
+      const inputType = type === "grid_checkbox" ? "checkbox" : "radio";
+      return `
+        <div style="overflow-x:auto;margin-top:12px">
+          <table style="width:100%;min-width:520px;border-collapse:separate;border-spacing:0 8px">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:0 12px 6px;color:#64748b;font-size:12px;font-weight:800"></th>
+                ${cols.map((col) => `<th style="text-align:center;padding:0 12px 6px;color:#00008B;font-size:12px;font-weight:800">${escapeHtml(col)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row, rowIndex) => `
+                <tr>
+                  <td style="padding:13px 12px;background:#fff;border:1px solid #dbe4f0;border-right:none;border-radius:12px 0 0 12px;font-size:14px;font-weight:700;color:#334155">${escapeHtml(row)}</td>
+                  ${cols.map((col, colIndex) => `
+                    <td style="padding:13px 12px;background:#fff;border-top:1px solid #dbe4f0;border-bottom:1px solid #dbe4f0;text-align:center">
+                      <input
+                        type="${inputType}"
+                        ${inputType === "radio" ? `name="question_${question.id}_row_${rowIndex}"` : ""}
+                        data-question-id="${question.id}"
+                        data-question-type="${type}"
+                        data-row-index="${rowIndex}"
+                        data-col-index="${colIndex}"
+                        data-row-label="${escapeHtml(row)}"
+                        data-col-label="${escapeHtml(col)}"
+                        style="width:18px;height:18px;accent-color:${inputType === "radio" ? "#00008B" : "#f59e0b"};cursor:pointer"
+                      >
+                    </td>
+                  `).join("")}
+                  <td style="width:1px;padding:0;background:transparent;border:none"></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderQuestion(question, index) {
+      const options = Array.isArray(question.lua_chon) ? question.lua_chon : [];
+      const type = String(question.loai || "choice").toLowerCase();
+      const requiredMark = question.bat_buoc ? '<span style="color:#dc2626"> *</span>' : "";
+
+      let answerHtml = "";
+      if (type === "text" || type === "paragraph") {
+        answerHtml = type === "paragraph"
+          ? `<textarea class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn"></textarea>`
+          : `<input class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn">`;
+      } else if (type === "dropdown") {
+        answerHtml = `
+          <select class="select-answer" data-question-id="${question.id}" data-question-type="${type}">
+            <option value="">-- Chọn đáp án --</option>
+            ${options.map((option, optionIndex) => `
+              <option
+                value="${escapeHtml(getOptionId(option, optionIndex))}"
+                data-option-label="${escapeHtml(getOptionLabel(option))}">
+                ${escapeHtml(getOptionLabel(option))}
+              </option>
+            `).join("")}
+          </select>
+        `;
+      } else if (type === "checkbox") {
+        answerHtml = renderChoiceOptions(question, "checkbox");
+      } else if (type === "rating") {
+        answerHtml = renderAgreementScale(question, options);
+      } else if (type === "star_rating") {
+        answerHtml = renderStarScale(question);
+      } else if (type === "grid_radio" || type === "grid_checkbox") {
+        answerHtml = renderGridAnswer(question, type);
+      } else if (options.length) {
+        answerHtml = renderChoiceOptions(question, "choice");
+      } else {
+        answerHtml = `<textarea class="text-answer" data-question-id="${question.id}" data-question-type="fallback-text" placeholder="Nhập câu trả lời của bạn"></textarea>`;
+      }
+
+      return `
+        <div class="question-card" data-question-card="${question.id}">
+          <div class="question-head">
+            <div class="question-left">
+              <div class="question-no">${index + 1}</div>
+              <p class="question-text">${formatRichText(question.noi_dung || "Câu hỏi")}${requiredMark}</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+              <div class="question-chip">${getQuestionTypeLabel(type)}</div>
+              <div class="question-chip">${question.bat_buoc ? "Bắt buộc" : "Không bắt buộc"}</div>
+            </div>
+          </div>
+          ${renderQuestionMedia(question)}
+          ${answerHtml}
+          <div class="error-text" id="error-question-${question.id}">Câu hỏi này chưa được trả lời.</div>
+        </div>
+      `;
+    }
+
+    function renderQuestions(questions) {
+      const target = document.getElementById("public-question-list");
+      target.innerHTML = questions.length
+        ? questions.map(renderQuestion).join("")
+        : `<div class="question-card" style="text-align:center;color:#64748b">Biểu mẫu này chưa có câu hỏi.</div>`;
+    }
+
+    function updateStarVisual(questionId, selectedValue) {
+      document.querySelectorAll(`[data-star-item^="${questionId}-"]`).forEach((item) => {
+        const value = Number(item.getAttribute("data-star-item").split("-").pop());
+        item.classList.toggle("active", value <= selectedValue);
+      });
+    }
+
+    function collectQuestionAnswer(question) {
+      const type = String(question.loai || "choice").toLowerCase();
+      const questionId = question.id;
+
+      if (type === "text" || type === "paragraph") {
+        const input = document.querySelector(`[data-question-id="${questionId}"][data-question-type="${type}"]`);
+        const value = input?.value?.trim() || "";
+        return { valid: !question.bat_buoc || Boolean(value), summary: value, details: value ? [{ cau_hoi_id: questionId, noi_dung: value }] : [] };
+      }
+
+      if (type === "dropdown") {
+        const select = document.querySelector(`[data-question-id="${questionId}"][data-question-type="${type}"]`);
+        const optionId = select?.value || "";
+        const optionLabel = select?.selectedOptions?.[0]?.dataset?.optionLabel || "";
+        return { valid: !question.bat_buoc || Boolean(optionId), summary: optionLabel, details: optionId ? [{ cau_hoi_id: questionId, lua_chon_id: optionId }] : [] };
+      }
+
+      if (type === "checkbox") {
+        const checked = Array.from(document.querySelectorAll(`input[data-question-id="${questionId}"][data-question-type="${type}"]:checked`));
+        return {
+          valid: !question.bat_buoc || checked.length > 0,
+          summary: checked.map((item) => item.dataset.optionLabel || "").join(", "),
+          details: checked.map((item) => ({ cau_hoi_id: questionId, lua_chon_id: item.dataset.optionId || null })),
+        };
+      }
+
+      if (type === "rating" || type === "star_rating") {
+        const selected = document.querySelector(`input[data-question-id="${questionId}"][data-question-type="${type}"]:checked`);
+        const score = selected ? parseInt(selected.value, 10) : null;
+        return {
+          valid: !question.bat_buoc || Boolean(score),
+          summary: score ? `${score} sao` : "",
+          details: score ? [{ cau_hoi_id: questionId, lua_chon_id: selected.dataset.optionId || null, diem_danh_gia: score }] : [],
+          rating: score,
+        };
+      }
+
+      if (type === "grid_radio" || type === "grid_checkbox") {
+        const rows = getGridRows(question);
+        const selected = Array.from(document.querySelectorAll(`input[data-question-id="${questionId}"][data-question-type="${type}"]:checked`));
+        const grouped = new Map();
+        selected.forEach((item) => {
+          const rowIndex = Number(item.dataset.rowIndex);
+          if (!grouped.has(rowIndex)) grouped.set(rowIndex, []);
+          grouped.get(rowIndex).push(item.dataset.colLabel || "");
+        });
+
+        const answeredRows = new Set(selected.map((item) => Number(item.dataset.rowIndex)));
+        const valid = !question.bat_buoc || (rows.length > 0 && rows.every((_, index) => answeredRows.has(index)));
+        const summaryParts = rows
+          .map((row, index) => {
+            const cols = grouped.get(index) || [];
+            return cols.length ? `${row}: ${cols.join(", ")}` : "";
+          })
+          .filter(Boolean);
+
+        return {
+          valid,
+          summary: summaryParts.join("; "),
+          details: selected.map((item) => ({
+            cau_hoi_id: questionId,
+            noi_dung: JSON.stringify({
+              type,
+              row: item.dataset.rowLabel || "",
+              col: item.dataset.colLabel || "",
+            }),
+          })),
+        };
+      }
+
+      const fallbackInput = document.querySelector(`[data-question-id="${questionId}"][data-question-type="fallback-text"]`);
+      if (fallbackInput) {
+        const value = fallbackInput.value.trim();
+        return { valid: !question.bat_buoc || Boolean(value), summary: value, details: value ? [{ cau_hoi_id: questionId, noi_dung: value }] : [] };
+      }
+
+      const selected = document.querySelector(`input[data-question-id="${questionId}"][data-question-type="choice"]:checked`);
+      return {
+        valid: !question.bat_buoc || Boolean(selected),
+        summary: selected?.dataset?.optionLabel || "",
+        details: selected ? [{ cau_hoi_id: questionId, lua_chon_id: selected.dataset.optionId || null }] : [],
+      };
+    }
+
+    function clearValidationErrors() {
+      document.querySelectorAll(".error-text.open").forEach((item) => item.classList.remove("open"));
+    }
+
+    function normalizeVietnameseKey(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    }
+
+    function isClassQuestionText(value) {
+      const key = normalizeVietnameseKey(value);
+      return key === "lop" || key === "ten lop" || key === "lop hoc" || key === "ma lop" || key.startsWith("lop ");
+    }
+
+    function getClassAnswerFromQuestions(answers) {
+      const questions = Array.isArray(currentForm?.cau_hoi) ? currentForm.cau_hoi : [];
+      for (let i = 0; i < questions.length; i++) {
+        if (isClassQuestionText(questions[i]?.noi_dung)) {
+          const value = String(answers[i]?.summary || "").trim();
+          if (value) return value;
+        }
+      }
+      return "";
+    }
+
+    function buildFeedbackBody(answers) {
+      const ratingAnswers = answers.map((item) => item.rating).filter((value) => Number.isFinite(value));
+      const averageRating = ratingAnswers.length
+        ? Math.round(ratingAnswers.reduce((sum, value) => sum + value, 0) / ratingAnswers.length)
+        : null;
+
+      const sentiment = averageRating >= 4 ? "positive" : averageRating && averageRating <= 2 ? "negative" : "neutral";
+      const textSummaries = answers.map((item) => String(item.summary || "").trim()).filter(Boolean);
+      const primarySummary = textSummaries.find((item) => item.length > 12) || `Đã gửi phản hồi cho biểu mẫu "${currentForm.ten_form || "FLIC"}"`;
+
+      return {
+        form_id: Number(currentForm.id),
+        danh_gia: averageRating,
+        cam_xuc: sentiment,
+        noi_dung: primarySummary,
+      };
+    }
+
+    function showSubmittedConfirmation() {
+      const message = (currentForm?.loi_ket && currentForm.loi_ket.trim())
+        ? currentForm.loi_ket.trim()
+        : "Cảm ơn bạn đã phản hồi! Chúng tôi trân trọng ý kiến của bạn.";
+      const card = document.querySelector(".form-card-public");
+      if (!card) return;
+      card.innerHTML = `
+        <div style="border-top:8px solid #00008B;border-radius:22px;background:#fff;padding:34px 30px;text-align:left;box-shadow:0 16px 40px rgba(0,0,139,.12)">
+          <div style="font-size:24px;font-weight:900;color:#0f172a;margin-bottom:14px">Gửi thành công!</div>
+          <div style="font-size:16px;line-height:1.7;color:#334155;font-weight:600">${formatRichText(message)}</div>
+        </div>
+      `;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function submitPublicForm() {
+      if (!currentForm) return;
+
+      clearValidationErrors();
+      const submitBtn = document.getElementById("public-submit-btn");
+      const successBox = document.getElementById("submit-success-box");
+      successBox.classList.remove("open");
+
+      const answers = [];
+      let hasError = false;
+
+      currentForm.cau_hoi.forEach((question) => {
+        const answer = collectQuestionAnswer(question);
+        answers.push(answer);
+        if (!answer.valid) {
+          hasError = true;
+          document.getElementById(`error-question-${question.id}`)?.classList.add("open");
+        }
+      });
+
+      if (hasError) {
+        showToast("Vui lòng điền đủ các câu bắt buộc", "error");
+        return;
+      }
+
+      const feedbackBody = buildFeedbackBody(answers);
+      const detailRows = answers.flatMap((item) => item.details);
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Đang lưu...";
+
+      try {
+        const feedbackRes = await fetch(`${API_BASE}/feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(feedbackBody),
+        });
+        const feedbackResult = await feedbackRes.json();
+        if (!feedbackRes.ok) throw new Error(feedbackResult.error || feedbackResult.message || "Không lưu được phản hồi");
+
+        if (detailRows.length) {
+          const detailRes = await fetch(`${API_BASE}/feedback/${feedbackResult.id}/chitiet`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chi_tiet: detailRows }),
+          });
+          const detailResult = await detailRes.json();
+          if (!detailRes.ok) {
+            throw new Error(detailResult.error || detailResult.message || "Không lưu được chi tiết phản hồi");
+          }
+        }
+
+        showSubmittedConfirmation();
+        showToast("Đã gửi phản hồi thành công", "success");
+      } catch (error) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Gửi phản hồi";
+        showToast(error.message || "Lỗi server", "error");
+      }
+    }
+
+    async function loadPublicForm() {
+      const formId = getFormIdFromUrl();
+      if (!formId) {
+        document.getElementById("public-form-title").textContent = "Không tìm thấy biểu mẫu";
+        const sub = document.getElementById("public-form-sub");
+        sub.textContent = "Link chia sẻ chưa có mã biểu mẫu hợp lệ.";
+        sub.style.display = "";
+        document.getElementById("public-question-list").innerHTML = `<div class="question-card" style="text-align:center;color:#64748b">Không có dữ liệu để hiển thị.</div>`;
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/forms/public/${formId}`);
+        if (!res.ok) throw new Error("Không tải được biểu mẫu");
+        const data = await res.json();
+        currentForm = data;
+        applyPublicTheme(data);
+
+        document.getElementById("public-form-title").textContent = data.ten_form || "Biểu mẫu công khai";
+        const publicFormSub = document.getElementById("public-form-sub");
+        if (data.mo_ta) {
+          publicFormSub.innerHTML = formatRichText(data.mo_ta);
+          publicFormSub.style.display = "";
+        } else {
+          publicFormSub.innerHTML = "";
+          publicFormSub.style.display = "none";
+        }
+        const publicQuestions = Array.isArray(data.cau_hoi) ? data.cau_hoi : [];
+        renderQuestions(publicQuestions);
+        document.getElementById("public-form-cat").textContent = data.danh_muc || "Khác";
+        document.getElementById("public-form-count").textContent = `Tổng ${publicQuestions.length} câu hỏi`;
+        document.getElementById("public-form-created").textContent = data.ngay_tao || data.created || new Date().toLocaleDateString("vi-VN");
+      } catch (error) {
+        document.getElementById("public-form-title").textContent = "Không tải được biểu mẫu";
+        const sub = document.getElementById("public-form-sub");
+        sub.textContent = error.message;
+        sub.style.display = "";
+        document.getElementById("public-question-list").innerHTML = `<div class="question-card" style="text-align:center;color:#64748b">Vui lòng kiểm tra lại backend hoặc mã biểu mẫu.</div>`;
+      }
+    }
+
+    loadPublicForm();
+  </script>
+</body>
+</html>
