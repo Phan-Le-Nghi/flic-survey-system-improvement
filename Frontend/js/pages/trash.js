@@ -38,6 +38,7 @@ function authHeaders() {
 }
 
 // ── State ────────────────────────────────────────────────────────
+let trashActiveTab = 'forms'; // 'forms' hoặc 'feedbacks'
 let trashItems = [];
 let trashSearchQuery = '';
 let trashDateFilter = '';
@@ -55,26 +56,28 @@ function initTrashPage() {
       <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
           <h2 class="page-title">Thùng rác</h2>
-          <p class="page-sub">Các biểu mẫu đã xóa sẽ tự động xóa vĩnh viễn sau 30 ngày</p>
+          <p class="page-sub">Dữ liệu đã xóa sẽ tự động bị xóa vĩnh viễn sau 30 ngày</p>
         </div>
         <div style="display:flex;gap:10px;">
           <button id="btn-restore-selected" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:6px;" disabled onclick="restoreSelected()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg>
             Khôi phục đã chọn
           </button>
-          <button id="btn-delete-selected" class="btn" style="background:#f97316; color:#fff; border:none; display:inline-flex; align-items:center; gap:6px;" disabled onclick="deleteSelected()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+          <button id="btn-delete-selected" class="btn" style="background:#fff; border:1px solid #fecaca; color:#dc2626; font-weight:700; display:inline-flex; align-items:center; gap:8px; padding:10px 16px;" disabled onclick="deleteSelected()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
             Xóa vĩnh viễn
           </button>
         </div>
       </div>
+
+      <!-- Tabs removed -->
 
       <!-- Filters -->
       <div class="card card-body" style="margin-bottom:0; padding:16px;">
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
           <div class="input-wrap" style="flex:1;min-width:200px">
             <div class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
-            <input type="text" class="input" placeholder="Tìm kiếm biểu mẫu..." id="trash-search-input" oninput="handleTrashSearch(this.value)">
+            <input type="text" class="input" placeholder="Tìm kiếm biểu mẫu..." id="trash-search-input" value="${trashSearchQuery}" oninput="handleTrashSearch(this.value)">
           </div>
 
         </div>
@@ -92,6 +95,16 @@ function initTrashPage() {
   `;
 }
 
+function switchTrashTab(tab) {
+  if (trashActiveTab === tab) return;
+  trashActiveTab = tab;
+  trashSelectedIds.clear();
+  trashCurrentPage = 1;
+  trashSearchQuery = '';
+  initTrashPage();
+  loadTrashData();
+}
+
 function handleTrashSearch(val) {
   trashSearchQuery = val;
   if (trashSearchTimeout) clearTimeout(trashSearchTimeout);
@@ -101,25 +114,6 @@ function handleTrashSearch(val) {
   }, 400);
 }
 
-function handleTrashFilterChange(val) {
-  trashDateFilter = val;
-  const customDateWrap = document.getElementById('trash-custom-date');
-  if (val === 'custom') {
-    customDateWrap.style.display = 'flex';
-  } else {
-    customDateWrap.style.display = 'none';
-    trashCurrentPage = 1;
-    loadTrashData();
-  }
-}
-
-function handleCustomDateChange() {
-  trashCustomStartDate = document.getElementById('trash-start-date').value;
-  trashCustomEndDate = document.getElementById('trash-end-date').value;
-  trashCurrentPage = 1;
-  loadTrashData();
-}
-
 // ── Data Loading ─────────────────────────────────────────────────
 async function loadTrashData() {
   if (!document.getElementById('trash-list-container')) {
@@ -127,26 +121,35 @@ async function loadTrashData() {
   }
   
   try {
-    let url = `${API_BASE}/forms/trash/list?`;
+    let url = trashActiveTab === 'forms' 
+      ? `${API_BASE}/forms/trash/list?`
+      : `${API_BASE}/feedback/trash/list?`;
+      
     const params = new URLSearchParams();
     if (trashSearchQuery) params.append('search', trashSearchQuery);
-    if (trashDateFilter) params.append('filter', trashDateFilter);
-    if (trashDateFilter === 'custom') {
-      if (trashCustomStartDate) params.append('start_date', trashCustomStartDate);
-      if (trashCustomEndDate) params.append('end_date', trashCustomEndDate);
-    }
     
     const res = await fetch(url + params.toString(), { headers: authHeaders() });
     if (res.ok) {
       const dbItems = await res.json();
-      trashItems = dbItems.map(f => ({
-        id: String(f.id),
-        name: f.ten_form,
-        cat: f.danh_muc || '',
-        deletedBy: f.nguoi_xoa || 'Hệ thống',
-        deletedAt: new Date(f.ngay_xoa).getTime(),
-        deleteReason: f.ly_do_xoa || 'Không có lý do'
-      }));
+      if (trashActiveTab === 'forms') {
+        trashItems = dbItems.map(f => ({
+          id: String(f.id),
+          name: f.ten_form,
+          cat: f.danh_muc || '',
+          deletedBy: f.nguoi_xoa || 'Hệ thống',
+          deletedAt: new Date(typeof f.ngay_xoa === 'string' ? f.ngay_xoa.replace('Z', '') : f.ngay_xoa).getTime(),
+          deleteReason: f.ly_do_xoa || 'Không có lý do'
+        }));
+      } else {
+        trashItems = dbItems.map(f => ({
+          id: String(f.id),
+          name: `Phản hồi cho: ${f.ten_form}`,
+          cat: (f.ho_ten || 'Ẩn danh') + (f.email ? ` - ${f.email}` : ''), // Re-use cat for Sender info
+          deletedBy: f.nguoi_xoa_ten || f.nguoi_xoa || 'Hệ thống',
+          deletedAt: new Date(typeof f.ngay_xoa === 'string' ? f.ngay_xoa.replace('Z', '') : f.ngay_xoa).getTime(),
+          deleteReason: f.ly_do_xoa || 'Không có lý do'
+        }));
+      }
     } else {
       trashItems = [];
     }
@@ -185,6 +188,7 @@ function updateTrashActionButtons() {
 function renderTrash() {
   const listEl = document.getElementById('trash-list-container');
   const countEl = document.getElementById('trash-count');
+  const labelText = trashActiveTab === 'forms' ? 'biểu mẫu' : 'phản hồi';
   
   const valid = trashItems.filter(f => daysLeft(f.deletedAt) > 0);
   if (!valid.length) {
@@ -192,7 +196,7 @@ function renderTrash() {
       <div style="text-align:center;padding:80px 20px;color:var(--gray-400)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin-bottom:16px;opacity:.4"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V4h6v2"/></svg>
         <div style="font-size:15px;font-weight:600;color:var(--gray-500);margin-bottom:6px">Thùng rác trống</div>
-        <div style="font-size:13px">Không có biểu mẫu nào khớp với tìm kiếm hoặc thùng rác đã trống</div>
+        <div style="font-size:13px">Không có ${labelText} nào khớp với tìm kiếm hoặc thùng rác đã trống</div>
       </div>`;
     countEl.textContent = '';
     document.getElementById('trash-pagination').innerHTML = '';
@@ -205,7 +209,10 @@ function renderTrash() {
 function renderTrashTableOnly() {
   const valid = trashItems.filter(f => daysLeft(f.deletedAt) > 0);
   const countEl = document.getElementById('trash-count');
-  countEl.textContent = `Tìm thấy ${valid.length} biểu mẫu trong thùng rác`;
+  const labelText = trashActiveTab === 'forms' ? 'biểu mẫu' : 'phản hồi';
+  const headerCol2 = trashActiveTab === 'forms' ? 'Tên biểu mẫu' : 'Chi tiết phản hồi';
+  
+  countEl.textContent = `Tìm thấy ${valid.length} ${labelText} trong thùng rác`;
 
   // Pagination
   const totalPages = Math.ceil(valid.length / trashItemsPerPage) || 1;
@@ -222,7 +229,7 @@ function renderTrashTableOnly() {
         <thead>
           <tr style="border-bottom:1px solid var(--gray-200);background:var(--gray-50);">
             <th style="padding:12px 16px;width:40px"><input type="checkbox" onchange="toggleSelectAllTrash(event)" ${allSelectedOnPage ? 'checked' : ''}></th>
-            <th style="padding:12px 16px;font-weight:600;color:var(--gray-600);font-size:13px">Tên biểu mẫu</th>
+            <th style="padding:12px 16px;font-weight:600;color:var(--gray-600);font-size:13px">${headerCol2}</th>
             <th style="padding:12px 16px;font-weight:600;color:var(--gray-600);font-size:13px">Người xóa</th>
             <th style="padding:12px 16px;font-weight:600;color:var(--gray-600);font-size:13px">Thời gian xóa</th>
             <th style="padding:12px 16px;font-weight:600;color:var(--gray-600);font-size:13px">Thời hạn còn lại</th>
@@ -237,6 +244,9 @@ function renderTrashTableOnly() {
             const safeId = String(f.id).replace(/'/g, '');
             const safeName = (f.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
             const isChecked = trashSelectedIds.has(safeId);
+            const d = new Date(f.deletedAt);
+            const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const dateStr = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
             return `
               <tr style="border-bottom:1px solid var(--gray-100);transition:background 0.2s;${isChecked ? 'background:#eef2ff' : ''}" onmouseenter="if(!${isChecked})this.style.background='var(--gray-50)'" onmouseleave="if(!${isChecked})this.style.background='transparent'">
                 <td style="padding:12px 16px;"><input type="checkbox" onchange="toggleTrashItem('${safeId}', this.checked)" ${isChecked ? 'checked' : ''}></td>
@@ -245,7 +255,10 @@ function renderTrashTableOnly() {
                   <div style="font-size:12px;color:var(--gray-400);margin-top:2px;">${f.cat || 'Chưa phân loại'}</div>
                 </td>
                 <td style="padding:12px 16px;color:var(--gray-700);font-size:13px;">${f.deletedBy}</td>
-                <td style="padding:12px 16px;color:var(--gray-700);font-size:13px;">${new Date(f.deletedAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                <td style="padding:12px 16px;">
+                  <div style="font-weight:600; color:var(--gray-800); margin-bottom:2px;">${timeStr}</div>
+                  <div style="font-size:12px; color:var(--gray-500);">${dateStr}</div>
+                </td>
                 <td style="padding:12px 16px;" class="${isUrgent ? 'text-danger' : ''}">
                   <div style="font-size:13px;font-weight:600;">${days === 0 ? 'Hôm nay' : 'Còn ' + days + ' ngày'}</div>
                 </td>
@@ -277,7 +290,7 @@ function renderTrashTableOnly() {
     const startIdx = valid.length === 0 ? 0 : (trashCurrentPage - 1) * trashItemsPerPage + 1;
     const endIdx = Math.min(trashCurrentPage * trashItemsPerPage, valid.length);
     
-    let html = `<span style="font-size:13px;color:var(--gray-500)">Hiển thị <strong>${startIdx}-${endIdx}</strong> / <strong>${valid.length}</strong> biểu mẫu</span>`;
+    let html = `<span style="font-size:13px;color:var(--gray-500)">Hiển thị <strong>${startIdx}-${endIdx}</strong> / <strong>${valid.length}</strong> ${labelText}</span>`;
     html += `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">`;
     html += `<button class="pag-btn" ${trashCurrentPage <= 1 ? 'disabled' : ''} onclick="trashCurrentPage--;renderTrashTableOnly();window.scrollTo({ top: 0, behavior: 'smooth' });">Trước</button>`;
     for (let i = 1; i <= totalPages; i++) {
@@ -292,58 +305,73 @@ function renderTrashTableOnly() {
 // ── Actions ───────────────────────────────────────────────────────
 async function restoreForm(id) {
   const item = trashItems.find(x => String(x.id) === String(id));
-  const itemName = item ? item.name : 'Biểu mẫu';
+  const itemName = item ? item.name : (trashActiveTab === 'forms' ? 'Biểu mẫu' : 'Phản hồi');
+  const endpoint = trashActiveTab === 'forms' ? `${API_BASE}/forms/${id}/restore` : `${API_BASE}/feedback/${id}/restore`;
+  const labelText = trashActiveTab === 'forms' ? 'biểu mẫu' : 'phản hồi';
+
   try { 
-    await fetch(`${API_BASE}/forms/${id}/restore`, { method: 'PATCH', headers: authHeaders() });
+    await fetch(endpoint, { method: 'PATCH', headers: authHeaders() });
     await loadTrashData();
     trashSelectedIds.delete(String(id));
     updateTrashActionButtons();
     
     if (typeof logActivityAction === 'function') {
-      logActivityAction('restore', 'Khôi phục', itemName, 'Khôi phục biểu mẫu từ thùng rác', id);
+      logActivityAction('restore', 'Khôi phục', itemName, `Khôi phục ${labelText} từ thùng rác`, id);
     }
     
-    showToast('Đã khôi phục biểu mẫu', 'success');
+    showToast(`Đã khôi phục ${labelText}`, 'success');
   } catch(e) {
-    showToast('Lỗi khi khôi phục biểu mẫu', 'error');
+    showToast(`Lỗi khi khôi phục ${labelText}`, 'error');
   }
 }
 
 async function permanentDelete(id, name) {
-  if (!confirm(`Xóa vĩnh viễn biểu mẫu "${name}"?\nHành động này không thể hoàn tác.`)) return;
+  const labelText = trashActiveTab === 'forms' ? 'biểu mẫu' : 'phản hồi';
+  if (!confirm(`Xóa vĩnh viễn ${labelText} "${name}"?\nHành động này không thể hoàn tác.`)) return;
+  const endpoint = trashActiveTab === 'forms' ? `${API_BASE}/forms/${id}/permanent` : `${API_BASE}/feedback/${id}/permanent`;
+
   try { 
-    await fetch(`${API_BASE}/forms/${id}/permanent`, { method: 'DELETE', headers: authHeaders() }); 
-    removeApprovalsByForm(id);
+    await fetch(endpoint, { method: 'DELETE', headers: authHeaders() }); 
+    if (trashActiveTab === 'forms') {
+      removeApprovalsByForm(id);
+    }
     await loadTrashData();
     trashSelectedIds.delete(String(id));
     updateTrashActionButtons();
     
     if (typeof logActivityAction === 'function') {
-      logActivityAction('delete', 'Xóa vĩnh viễn', name, 'Xóa vĩnh viễn biểu mẫu khỏi hệ thống', id);
+      logActivityAction('delete', 'Xóa vĩnh viễn', name, `Xóa vĩnh viễn ${labelText} khỏi hệ thống`, id);
     }
     
     showToast(`Đã xóa vĩnh viễn "${name}"`, 'error');
   } catch(e) {
-    showToast('Lỗi khi xóa biểu mẫu', 'error');
+    showToast(`Lỗi khi xóa ${labelText}`, 'error');
   }
 }
 
 async function restoreSelected() {
   if (!trashSelectedIds.size) return;
-  if (!confirm(`Khôi phục ${trashSelectedIds.size} biểu mẫu đã chọn?`)) return;
+  const labelText = trashActiveTab === 'forms' ? 'biểu mẫu' : 'phản hồi';
+  
+  if (!confirm(`Khôi phục ${trashSelectedIds.size} ${labelText} đã chọn?`)) return;
   const ids = Array.from(trashSelectedIds);
   const restoredNames = ids.map(id => trashItems.find(x => String(x.id) === String(id))?.name).filter(Boolean).join(', ');
+  
   try {
-    await Promise.all(ids.map(id => fetch(`${API_BASE}/forms/${id}/restore`, { method: 'PATCH', headers: authHeaders() })));
+    const promises = ids.map(id => {
+      const endpoint = trashActiveTab === 'forms' ? `${API_BASE}/forms/${id}/restore` : `${API_BASE}/feedback/${id}/restore`;
+      return fetch(endpoint, { method: 'PATCH', headers: authHeaders() });
+    });
+    await Promise.all(promises);
     await loadTrashData();
     trashSelectedIds.clear();
     updateTrashActionButtons();
     
     if (typeof logActivityAction === 'function') {
-      logActivityAction('restore', 'Khôi phục', `${ids.length} biểu mẫu`, `Khôi phục các biểu mẫu: ${restoredNames}`);
+      logActivityAction('restore', 'Khôi phục', `${ids.length} ${labelText}`, `Khôi phục các ${labelText}: ${restoredNames}`);
     }
     
-    showToast('Đã khôi phục các biểu mẫu được chọn', 'success');
+    showToast(`Đã khôi phục các ${labelText} được chọn`, 'success');
   } catch(e) {
     showToast('Có lỗi xảy ra', 'error');
   }
@@ -351,21 +379,31 @@ async function restoreSelected() {
 
 async function deleteSelected() {
   if (!trashSelectedIds.size) return;
-  if (!confirm(`Xóa vĩnh viễn ${trashSelectedIds.size} biểu mẫu đã chọn?\nHành động này không thể hoàn tác.`)) return;
+  const labelText = trashActiveTab === 'forms' ? 'biểu mẫu' : 'phản hồi';
+  
+  if (!confirm(`Xóa vĩnh viễn ${trashSelectedIds.size} ${labelText} đã chọn?\nHành động này không thể hoàn tác.`)) return;
   const ids = Array.from(trashSelectedIds);
   const deletedNames = ids.map(id => trashItems.find(x => String(x.id) === String(id))?.name).filter(Boolean).join(', ');
+  
   try {
-    await Promise.all(ids.map(id => fetch(`${API_BASE}/forms/${id}/permanent`, { method: 'DELETE', headers: authHeaders() })));
-    ids.forEach(id => removeApprovalsByForm(id));
+    const promises = ids.map(id => {
+      const endpoint = trashActiveTab === 'forms' ? `${API_BASE}/forms/${id}/permanent` : `${API_BASE}/feedback/${id}/permanent`;
+      return fetch(endpoint, { method: 'DELETE', headers: authHeaders() });
+    });
+    await Promise.all(promises);
+    
+    if (trashActiveTab === 'forms') {
+      ids.forEach(id => removeApprovalsByForm(id));
+    }
     await loadTrashData();
     trashSelectedIds.clear();
     updateTrashActionButtons();
     
     if (typeof logActivityAction === 'function') {
-      logActivityAction('delete', 'Xóa vĩnh viễn', `${ids.length} biểu mẫu`, `Xóa vĩnh viễn các biểu mẫu: ${deletedNames}`);
+      logActivityAction('delete', 'Xóa vĩnh viễn', `${ids.length} ${labelText}`, `Xóa vĩnh viễn các ${labelText}: ${deletedNames}`);
     }
     
-    showToast('Đã xóa vĩnh viễn các biểu mẫu được chọn', 'error');
+    showToast(`Đã xóa vĩnh viễn các ${labelText} được chọn`, 'error');
   } catch(e) {
     showToast('Có lỗi xảy ra', 'error');
   }
