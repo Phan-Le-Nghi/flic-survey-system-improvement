@@ -56,6 +56,12 @@ document.getElementById("page-content").innerHTML = `
 
 // ── DATA LOADING ──────────────────────────────────────────────────
 let auditLogsData = [];
+const ITEMS_PER_PAGE = 10;
+
+function authHeaders() {
+  const token = localStorage.getItem('token') || '';
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function loadAuditLogs() {
   const tbody = document.getElementById('log-table-body');
