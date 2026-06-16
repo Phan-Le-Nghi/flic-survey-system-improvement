@@ -129,23 +129,38 @@ document.getElementById('filter-action').addEventListener('change', handleFilter
 document.getElementById('filter-start-date').addEventListener('change', handleFilterChange);
 document.getElementById('filter-end-date').addEventListener('change', handleFilterChange);
 
-// Hàm trả về mã HTML của Badge màu tương ứng với class có sẵn trong main.css
 function getActionBadge(type) {
   let bgColor = '#e5e7eb';
   let color = '#374151';
-  let label = 'Không xác định';
+  let label = type || 'Không xác định';
 
-  switch (type) {
-    case 'create': bgColor = '#e0e7ff'; color = '#00008B'; label = 'Tạo mới'; break;
-    case 'edit': bgColor = '#ffedd5'; color = '#c2410c'; label = 'Chỉnh sửa'; break;
-    case 'delete': bgColor = '#fee2e2'; color = '#b91c1c'; label = 'Xóa'; break;
-    case 'restore': bgColor = '#e0e7ff'; color = '#00008B'; label = 'Khôi phục'; break;
-    case 'approve': bgColor = '#dcfce7'; color = '#166534'; label = 'Phê duyệt'; break;
-    case 'reject': bgColor = '#fee2e2'; color = '#991b1b'; label = 'Từ chối'; break;
-    case 'close': bgColor = '#f1f5f9'; color = '#475569'; label = 'Đóng biểu mẫu'; break;
+  const t = (type || '').toLowerCase();
+
+  if (t === 'create' || t.includes('tạo')) {
+    bgColor = '#e0e7ff'; color = '#00008B'; label = 'Tạo mới';
+  } else if (t === 'edit' || t.includes('sửa') || t.includes('trả lời')) {
+    bgColor = '#ffedd5'; color = '#c2410c'; 
+    if(t === 'edit') label = 'Chỉnh sửa';
+  } else if (t === 'delete' || t.includes('xóa')) {
+    bgColor = '#fee2e2'; color = '#b91c1c';
+    if(t === 'delete') label = 'Xóa';
+  } else if (t === 'restore' || t.includes('khôi phục')) {
+    bgColor = '#e0e7ff'; color = '#00008B';
+    if(t === 'restore') label = 'Khôi phục';
+  } else if (t === 'approve' || t.includes('duyệt')) {
+    bgColor = '#dcfce7'; color = '#166534';
+    if(t === 'approve') label = 'Phê duyệt';
+  } else if (t === 'reject' || t.includes('từ chối')) {
+    bgColor = '#fee2e2'; color = '#991b1b';
+    if(t === 'reject') label = 'Từ chối';
+  } else if (t === 'close' || t.includes('đóng')) {
+    bgColor = '#f1f5f9'; color = '#475569';
+    if(t === 'close') label = 'Đóng biểu mẫu';
+  } else if (t.includes('lưu trữ')) {
+    bgColor = '#f3e8ff'; color = '#7e22ce';
   }
 
-  return `<span style="display:inline-block; width:120px; text-align:center; padding:5px 8px; border-radius:6px; background-color:${bgColor}; color:${color}; font-size:13px; font-weight:600;">${label}</span>`;
+  return `<span style="display:inline-block; padding:5px 10px; border-radius:6px; background-color:${bgColor}; color:${color}; font-size:13px; font-weight:600; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px;" title="${label}">${label}</span>`;
 }
 
 function viewLogForm(formId, formName, actionType, detailStr) {
@@ -197,7 +212,7 @@ function renderLogs(data) {
   }
 
   tbody.innerHTML = data.map(log => {
-    const dateObj = new Date(log.time);
+    const dateObj = new Date(typeof log.time === 'string' ? log.time.replace('Z', '') : log.time);
     const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -286,3 +301,4 @@ window.goToAuditPage = function (page) {
 document.addEventListener('DOMContentLoaded', () => {
   loadAuditLogs().catch(console.error);
 });
+
