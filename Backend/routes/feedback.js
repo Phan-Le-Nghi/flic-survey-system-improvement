@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
     const formRequest = new sql.Request();
     formRequest.input('form_id', sql.Int, formId);
     const formResult = await formRequest.query(`
-      SELECT TOP 1 id, trang_thai, ngay_dong
+      SELECT TOP 1 id, trang_thai, ngay_dong, nhan_vien_id, ten_form
       FROM Form
       WHERE id = @form_id
     `);
@@ -90,6 +90,15 @@ router.post('/', async (req, res) => {
       VALUES (${values.join(', ')})
     `);
     const newId = result.recordset[0].id;
+
+    // Ghi nhật ký
+    try {
+      await sql.query`
+        INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
+        VALUES (NULL, N'Nộp phản hồi', 'form', ${formId}, N'Người dùng nộp phản hồi mới')
+      `;
+    } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
+
     res.status(201).json({ id: newId, message: 'Đã lưu phản hồi' });
   } catch (err) {
     err500(res, err, 'Lỗi khi lưu phản hồi');
@@ -135,15 +144,16 @@ router.get('/', authMiddleware, authorize('view_feedback'), async (req, res) => 
     const select  = buildFeedbackSelect(columns);
 
     const req2 = new sql.Request();
-    let where = 'WHERE 1=1';
+    let where = "WHERE ph.trang_thai != 'deleted'";
+
+    if (trang_thai) {
+      where = "WHERE ph.trang_thai = @trang_thai";
+      req2.input('trang_thai', sql.NVarChar, trang_thai);
+    }
 
     if (form_id) {
       req2.input('form_id', sql.Int, Number(form_id));
       where += ' AND ph.form_id = @form_id';
-    }
-    if (trang_thai) {
-      req2.input('trang_thai', sql.NVarChar, trang_thai);
-      where += ' AND ph.trang_thai = @trang_thai';
     }
     if (cam_xuc) {
       req2.input('cam_xuc', sql.NVarChar, cam_xuc);
@@ -210,9 +220,18 @@ router.get('/:id/chitiet', authMiddleware, authorize('view_feedback'), async (re
 // ── PATCH /api/feedback/:id/archive ─────────────────────────────
 router.patch('/:id/archive', authMiddleware, authorize('delete_feedback'), async (req, res) => {
   const id = Number(req.params.id);
+  const nhan_vien_id = req.user ? req.user.id : null;
   if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
     await sql.query`UPDATE PhanHoi SET trang_thai='archived' WHERE id=${id}`;
+    
+    try {
+      await sql.query`
+        INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
+        VALUES (${nhan_vien_id}, N'Lưu trữ phản hồi', 'feedback', ${id}, N'Lưu trữ phản hồi')
+      `;
+    } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
+
     res.json({ message: 'Đã lưu trữ phản hồi' });
   } catch (err) {
     err500(res, err);
@@ -222,6 +241,7 @@ router.patch('/:id/archive', authMiddleware, authorize('delete_feedback'), async
 // ── PATCH /api/feedback/:id (trả lời phản hồi) ──────────────────
 router.patch('/:id', authMiddleware, authorize('view_feedback'), async (req, res) => {
   const id = Number(req.params.id);
+  const nhan_vien_id = req.user ? req.user.id : null;
   if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   const { tra_loi, trang_thai } = req.body;
   try {
@@ -233,6 +253,12 @@ router.patch('/:id', authMiddleware, authorize('view_feedback'), async (req, res
           trang_thai='replied'
         WHERE id=${id}
       `;
+      try {
+        await sql.query`
+          INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
+          VALUES (${nhan_vien_id}, N'Trả lời phản hồi', 'feedback', ${id}, N'Ghi chú hoặc trả lời phản hồi')
+        `;
+      } catch(e) { console.error('Lỗi khi lưu nhật ký:', e); }
     } else if (trang_thai) {
       await sql.query`UPDATE PhanHoi SET trang_thai=${trang_thai} WHERE id=${id}`;
     }
@@ -245,10 +271,90 @@ router.patch('/:id', authMiddleware, authorize('view_feedback'), async (req, res
 // ── DELETE /api/feedback/:id ─────────────────────────────────────
 router.delete('/:id', authMiddleware, authorize('delete_feedback'), async (req, res) => {
   const id = Number(req.params.id);
+  const nhan_vien_id = req.user ? req.user.id : null;
+  const { ly_do_xoa } = req.body || {};
   if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
-    await sql.query`DELETE FROM PhanHoi WHERE id=${id}`;
-    res.json({ message: 'Đã xóa phản hồi' });
+    // Đổi thành xóa mềm (vào thùng rác)
+    await sql.query`
+      UPDATE PhanHoi 
+      SET trang_thai='deleted', 
+          ngay_xoa=GETDATE(), 
+          nguoi_xoa_id=${nhan_vien_id}, 
+          ly_do_xoa=${ly_do_xoa || 'Không có lý do'} 
+      WHERE id=${id}
+    `;
+    
+    try {
+      await sql.query`
+        INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
+        VALUES (${nhan_vien_id}, N'Xóa phản hồi', 'feedback', ${id}, N'Đưa phản hồi vào thùng rác')
+      `;
+    } catch(e){ console.error('Lỗi khi lưu nhật ký:', e); }
+
+    res.json({ message: 'Đã xóa phản hồi (đưa vào thùng rác)' });
+  } catch (err) {
+    err500(res, err);
+  }
+});
+
+// ── GET /api/feedback/trash/list ─────────────────────────────────
+router.get('/trash/list', authMiddleware, authorize('view_feedback'), async (req, res) => {
+  try {
+    const columns = await getPhanHoiColumns(sql);
+    const select  = buildFeedbackSelect(columns);
+    const result = await sql.query`
+      SELECT ${select},
+             nx.ho_ten AS nguoi_xoa_ten
+      FROM PhanHoi ph
+      JOIN Form f ON f.id = ph.form_id
+      LEFT JOIN NhanVien nx ON ph.nguoi_xoa_id = nx.id
+      WHERE ph.trang_thai = 'deleted'
+      ORDER BY ph.ngay_xoa DESC
+    `;
+    res.json(result.recordset);
+  } catch (err) {
+    err500(res, err);
+  }
+});
+
+// ── PATCH /api/feedback/:id/restore ─────────────────────────────
+router.patch('/:id/restore', authMiddleware, authorize('delete_feedback'), async (req, res) => {
+  const id = Number(req.params.id);
+  const nhan_vien_id = req.user ? req.user.id : null;
+  if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
+  try {
+    await sql.query`
+      UPDATE PhanHoi 
+      SET trang_thai='active', ngay_xoa=NULL, nguoi_xoa_id=NULL, ly_do_xoa=NULL 
+      WHERE id=${id} AND trang_thai='deleted'
+    `;
+    try {
+      await sql.query`
+        INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
+        VALUES (${nhan_vien_id}, N'Khôi phục phản hồi', 'feedback', ${id}, N'Khôi phục phản hồi từ thùng rác')
+      `;
+    } catch(e) { console.error('Lỗi khi lưu nhật ký:', e); }
+    res.json({ message: 'Đã khôi phục phản hồi' });
+  } catch (err) {
+    err500(res, err);
+  }
+});
+
+// ── DELETE /api/feedback/:id/permanent ──────────────────────────
+router.delete('/:id/permanent', authMiddleware, authorize('delete_feedback'), async (req, res) => {
+  const id = Number(req.params.id);
+  const nhan_vien_id = req.user ? req.user.id : null;
+  if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
+  try {
+    await sql.query`DELETE FROM PhanHoi WHERE id=${id} AND trang_thai='deleted'`;
+    try {
+      await sql.query`
+        INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
+        VALUES (${nhan_vien_id}, N'Xóa vĩnh viễn phản hồi', 'feedback', ${id}, N'Xóa vĩnh viễn phản hồi khỏi hệ thống')
+      `;
+    } catch(e) { console.error('Lỗi khi lưu nhật ký:', e); }
+    res.json({ message: 'Đã xóa vĩnh viễn phản hồi' });
   } catch (err) {
     err500(res, err);
   }
