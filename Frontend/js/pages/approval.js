@@ -325,7 +325,7 @@ function isApprovalFormHidden(item) {
     const hiddenName = normalizeApprovalFormName(form?.name);
     return (
       (hiddenId && hiddenId === approvalId) ||
-      (hiddenName && hiddenName === approvalName)
+      (!approvalId && hiddenName && hiddenName === approvalName)
     );
   });
 }
@@ -362,7 +362,7 @@ function isApprovalFormInTrash(item) {
       trashId === String(item?.form_id ?? "") ||
       trashId === String(item?._dbId ?? "") ||
       trashId === String(item?.id ?? "") ||
-      (trashName && trashName === approvalName)
+      (!(item?.form_id || item?._dbId || item?.id) && trashName && trashName === approvalName)
     );
   });
 }
@@ -767,43 +767,45 @@ async function confirmApprove() {
 
   // Gửi thông báo tự động đến người tạo biểu mẫu
   sendApproveNotification(item);
-
+  if (typeof window.logActivity === 'function') {
+    window.logActivity('approve', item.form_id || id, item.form || '', 'Chuyển từ trạng thái chờ duyệt sang trạng thái phê duyệt');
+  }
   closeModal("approve-modal");
   renderApproval(currentApprovalTab);
+  showToast(`Đã duyệt biểu mẫu "${item.form}"`, "success");
   showToast("✅ Đã phê duyệt và lưu vào database!", "success");
 
   btn.disabled = false;
   btn.innerHTML = btnOriginal;
 }
 
-function sendApproveNotification(item) {
-  const LS_NOTIFS = "flic_notifications";
+async function sendApproveNotification(item) {
   try {
-    const raw = localStorage.getItem(LS_NOTIFS);
-    const notifs = raw ? JSON.parse(raw) : [];
-
-    const dateStr = item.processedDate || item.date || formatApprovalDateTime(new Date());
-
-    const newNotif = {
-      id: "approve_" + Date.now(),
-      title: "Yêu cầu tạo biểu mẫu đã được phê duyệt",
-      msg: `Yêu cầu "${item.form}" của bạn đã được phê duyệt. Biểu mẫu đã được xuất bản và có thể sử dụng ngay lập tức.`,
-      type: "success",
-      recipients: item.by || "Người gửi",
-      status: "sent",
-      date: dateStr,
-      form: item.form || "",
-      form_id: item.form_id || null,
-      approval_id: item._dbId || item.id || null,
-      read: 0,
-      total: 1,
-      _bellNew: true,
+    const body = {
+      tieu_de: "Yêu cầu tạo biểu mẫu đã được phê duyệt",
+      noi_dung: `Yêu cầu "${item.form}" của bạn đã được phê duyệt. Biểu mẫu đã được xuất bản và có thể sử dụng ngay lập tức.`,
+      loai: "success",
+      nguoi_nhan: item.by || "Người gửi",
+      trang_thai: "sent",
+      tong_nguoi_nhan: 1
     };
 
-    notifs.unshift(newNotif);
-    localStorage.setItem(LS_NOTIFS, JSON.stringify(notifs));
+    const res = await fetch(`${API_BASE}/notifications`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    
+    if (!res.ok) {
+      console.error("Không thể gửi thông báo phê duyệt qua API", await res.text());
+    } else {
+      // Trigger header bell update if possible
+      if (typeof fetchUnreadNotifications === 'function') {
+        fetchUnreadNotifications();
+      }
+    }
   } catch (e) {
-    console.error("Không thể gửi thông báo phê duyệt:", e);
+    console.error("Lỗi khi gửi thông báo phê duyệt:", e);
   }
 }
 
@@ -837,9 +839,9 @@ async function confirmReject() {
   }
 
   const id = document.getElementById("reject-modal").dataset.pendingId;
-  const reason = document.getElementById("reject-reason").value.trim();
+  const reasonText = document.getElementById("reject-reason").value.trim();
 
-  if (!reason) {
+  if (!reasonText) {
     document.getElementById("reject-reason-error").style.display = "flex";
     document.getElementById("reject-reason").focus();
     return;
@@ -863,7 +865,7 @@ async function confirmReject() {
     const res = await fetch(`${API_APPROVALS}/${dbId}/reject`, {
       method: "PATCH",
       headers: getAuthHeaders(),
-      body: JSON.stringify({ ghi_chu: reason, ly_do_tu_choi: reason }),
+      body: JSON.stringify({ ghi_chu: reasonText, ly_do_tu_choi: reasonText }),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -887,48 +889,50 @@ async function confirmReject() {
 
   // ✅ DB đã lưu → cập nhật cache local
   item.status = "rejected";
-  item.reject_reason = reason;
-  item.note = reason;
+  item.reject_reason = reasonText;
+  item.note = reasonText;
   item.processed_at = updatedApproval?.ngay_xu_ly || item.processed_at || null;
   item.processedDate = formatApprovalDateTime(item.processed_at) || item.date;
   saveApprovals(approvalData);
 
   // Gửi thông báo tự động đến người tạo biểu mẫu
-  sendRejectNotification(item, reason);
-
+  sendRejectNotification(item, reasonText);
+  if (typeof window.logActivity === 'function') {
+    window.logActivity('reject', item.form_id || id, item.form || '', `Chuyển từ trạng thái chờ duyệt sang trạng thái từ chối (Lý do: ${reasonText})`);
+  }
   closeModal("reject-modal");
   renderApproval(currentApprovalTab);
+  showToast(`Đã từ chối biểu mẫu "${item.form}"`, "error");
   if (btn) { btn.disabled = false; btn.innerHTML = btnOriginal; }
 }
 
-function sendRejectNotification(item, reason) {
-  const LS_NOTIFS = "flic_notifications";
+async function sendRejectNotification(item, reason) {
   try {
-    const raw = localStorage.getItem(LS_NOTIFS);
-    const notifs = raw ? JSON.parse(raw) : [];
-
-    const dateStr = item.processedDate || item.date || formatApprovalDateTime(new Date());
-
-    const newNotif = {
-      id: "reject_" + Date.now(),
-      title: "Yêu cầu tạo biểu mẫu bị từ chối",
-      msg: `Yêu cầu "${item.form}" của bạn đã bị từ chối.\nLý do: ${reason}`,
-      type: "error",
-      recipients: item.by || "Người gửi",
-      status: "sent",
-      date: dateStr,
-      form: item.form || "",
-      form_id: item.form_id || null,
-      approval_id: item._dbId || item.id || null,
-      read: 0,
-      total: 1,
-      _bellNew: true,
+    const body = {
+      tieu_de: "Yêu cầu tạo biểu mẫu bị từ chối",
+      noi_dung: `Yêu cầu "${item.form}" của bạn đã bị từ chối.\nLý do: ${reason}`,
+      loai: "error",
+      nguoi_nhan: item.by || "Người gửi",
+      trang_thai: "sent",
+      tong_nguoi_nhan: 1
     };
 
-    notifs.unshift(newNotif);
-    localStorage.setItem(LS_NOTIFS, JSON.stringify(notifs));
+    const res = await fetch(`${API_BASE}/notifications`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    
+    if (!res.ok) {
+      console.error("Không thể gửi thông báo từ chối qua API", await res.text());
+    } else {
+      // Trigger header bell update if possible
+      if (typeof fetchUnreadNotifications === 'function') {
+        fetchUnreadNotifications();
+      }
+    }
   } catch (e) {
-    console.error("Không thể gửi thông báo từ chối:", e);
+    console.error("Lỗi khi gửi thông báo từ chối:", e);
   }
 }
 

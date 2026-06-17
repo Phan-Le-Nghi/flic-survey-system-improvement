@@ -19,12 +19,18 @@ document.getElementById("page-content").innerHTML = `
       <option value="all">Tất cả hành động</option>
       <option value="create">Tạo mới</option>
       <option value="edit">Chỉnh sửa</option>
-      <option value="delete">Xóa / Thùng rác</option>
+      <option value="delete">Xóa</option>
       <option value="restore">Khôi phục</option>
-      <option value="approve">Phê duyệt / Đổi trạng thái</option>
+      <option value="approve">Phê duyệt</option>
+      <option value="reject">Từ chối</option>
     </select>
 
-    <input type="date" id="filter-date" class="input" style="width:160px;" onchange="filterLogs()">
+    <div id="filter-date-range" style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:13px; font-weight:700; color:var(--gray-600); text-transform:uppercase;">TỪ:</span>
+      <input type="date" id="filter-start-date" class="input" style="width:140px; padding:6px 12px" onchange="filterLogs()">
+      <span style="font-size:13px; font-weight:700; color:var(--gray-600); text-transform:uppercase; margin-left:8px;">ĐẾN:</span>
+      <input type="date" id="filter-end-date" class="input" style="width:140px; padding:6px 12px" onchange="filterLogs()">
+    </div>
   </div>
 
   <div class="card">
@@ -44,34 +50,156 @@ document.getElementById("page-content").innerHTML = `
         </tbody>
       </table>
     </div>
+    <div id="pagination-container" style="display:flex; justify-content:space-between; align-items:center; padding:16px; border-top:1px solid var(--gray-200); background:#fff; border-bottom-left-radius:12px; border-bottom-right-radius:12px;"></div>
   </div>
 `;
 
-// MOCK DATA: Chú ý chỉ track thao tác Biểu Mẫu, không track Nhân Viên
-const mockLogs = [
-  { id: 1, time: '2026-05-01T14:30:00', user: 'Nguyễn Văn A', role: 'Nhân viên', actionType: 'create', actionLabel: 'Tạo mới', formName: 'Khảo sát Tiếng Anh đầu vào', detail: 'Tạo bản nháp biểu mẫu mới (Lý do: Chuẩn bị cho kỳ thi sắp tới)' },
-  { id: 2, time: '2026-05-01T15:00:00', user: 'Trần Thị B', role: 'Nhân viên', actionType: 'edit', actionLabel: 'Chỉnh sửa', formName: 'Đánh giá giảng viên Tin học', detail: 'Cập nhật nội dung câu hỏi số 3 và số 4 (Lý do: Câu hỏi bị sai chính tả và thiếu lựa chọn)' },
-  { id: 3, time: '2026-05-02T09:15:00', user: 'Lê Văn C', role: 'Quản lý', actionType: 'approve', actionLabel: 'Phê duyệt', formName: 'Đánh giá giảng viên Tin học', detail: 'Chuyển trạng thái từ Chờ duyệt sang Đã duyệt (Lý do: Nội dung đã đạt yêu cầu)' },
-  { id: 4, time: '2026-05-02T10:05:00', user: 'Nguyễn Văn A', role: 'Nhân viên', actionType: 'delete', actionLabel: 'Xóa', formName: 'Khảo sát sự kiện ngoại khóa', detail: 'Đưa biểu mẫu vào thùng rác (Lý do: Biểu mẫu bị trùng lặp)' },
-  { id: 5, time: '2026-05-02T10:30:00', user: 'Lê Văn C', role: 'Quản lý', actionType: 'restore', actionLabel: 'Khôi phục', formName: 'Khảo sát sự kiện ngoại khóa', detail: 'Khôi phục biểu mẫu từ thùng rác về trạng thái Nháp (Lý do: Cần tái sử dụng lại)' },
-  { id: 6, time: '2026-05-03T11:00:00', user: 'Phạm Thị D', role: 'Quản lý', actionType: 'close', actionLabel: 'Đóng biểu mẫu', formName: 'Đăng ký thi MOS Tháng 5', detail: 'Chủ động đóng biểu mẫu ngừng nhận phản hồi (Lý do: Đã đủ số lượng đăng ký)' },
-];
+// ── DATA LOADING ──────────────────────────────────────────────────
+let auditLogsData = [];
+const ITEMS_PER_PAGE = 10;
 
-// Hàm trả về mã HTML của Badge màu tương ứng với class có sẵn trong main.css
-function getActionBadge(type, label) {
-  let bgColor = '#e5e7eb';
-  let color = '#374151';
+function authHeaders() {
+  const token = localStorage.getItem('token') || '';
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
-  switch (type) {
-    case 'create': bgColor = '#dcfce7'; color = '#15803d'; break; // Xanh lá
-    case 'edit': bgColor = '#ffedd5'; color = '#c2410c'; break; // Cam
-    case 'delete': bgColor = '#fee2e2'; color = '#b91c1c'; break; // Đỏ
-    case 'restore': bgColor = '#ccfbf1'; color = '#0f766e'; break; // Xanh lơ mòng két
-    case 'approve': bgColor = '#e0e7ff'; color = '#00008B'; break; // Xanh logo
-    case 'close': bgColor = '#f1f5f9'; color = '#475569'; break; // Xám
+async function loadAuditLogs() {
+  const tbody = document.getElementById('log-table-body');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400)">Đang tải dữ liệu...</td></tr>';
+
+  try {
+    const search = document.getElementById('filter-search').value.trim();
+    const action = document.getElementById('filter-action').value;
+    const startDate = document.getElementById('filter-start-date').value;
+    const endDate = document.getElementById('filter-end-date').value;
+
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (action && action !== 'all') params.append('action', action);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+
+    // Call the real backend API
+    const res = await fetch(`${API_BASE}/audit-logs?${params.toString()}`, {
+      headers: authHeaders()
+    });
+
+    if (res.ok) {
+      auditLogsData = await res.json();
+    } else {
+      auditLogsData = [];
+    }
+  } catch (err) {
+    console.error('Failed to load audit logs:', err);
+    auditLogsData = [];
   }
 
-  return `<span style="display:inline-block; width:120px; text-align:center; padding:5px 8px; border-radius:6px; background-color:${bgColor}; color:${color}; font-size:13px; font-weight:600;">${label}</span>`;
+  currentFilteredData = auditLogsData;
+  currentAuditPage = 1;
+  renderLogsPage();
+}
+
+// (logActivity has been moved to main.js)
+
+let filterTimeout = null;
+function handleFilterChange() {
+  if (filterTimeout) clearTimeout(filterTimeout);
+  filterTimeout = setTimeout(() => {
+    loadAuditLogs();
+  }, 300);
+}
+
+// Bind events to filter inputs
+document.getElementById('filter-search').addEventListener('input', handleFilterChange);
+document.getElementById('filter-action').addEventListener('change', handleFilterChange);
+document.getElementById('filter-start-date').addEventListener('change', handleFilterChange);
+document.getElementById('filter-end-date').addEventListener('change', handleFilterChange);
+
+function getActionBadge(type) {
+  let bgColor = '#e5e7eb';
+  let color = '#374151';
+  let label = type || 'Không xác định';
+
+  const t = (type || '').toLowerCase();
+
+  if (t === 'create' || t.includes('tạo')) {
+    bgColor = '#e0e7ff'; color = '#00008B'; label = '+ Tạo mới';
+  } else if (t === 'edit' || t === 'update' || t.includes('sửa') || t.includes('trả lời')) {
+    bgColor = '#ffedd5'; color = '#c2410c';
+    if (t === 'edit' || t === 'update') label = '✎ Chỉnh sửa';
+  } else if (t === 'delete' || t === 'hard_delete' || t.includes('xóa')) {
+    bgColor = '#fee2e2'; color = '#b91c1c';
+    label = '🗑 Xóa';
+  } else if (t === 'restore' || t.includes('khôi phục')) {
+    bgColor = '#eff6ff'; color = '#1e40af';
+    if (t === 'restore') label = '↺ Khôi phục';
+  } else if (t === 'approve' || t.includes('duyệt')) {
+    bgColor = '#dcfce7'; color = '#166534';
+    if (t === 'approve') label = '✓ Phê duyệt';
+  } else if (t === 'reject' || t.includes('từ chối')) {
+    bgColor = '#fee2e2'; color = '#991b1b';
+    if (t === 'reject') label = '× Từ chối';
+  } else if (t === 'login' || t.includes('đăng nhập')) {
+    bgColor = '#e0f2fe'; color = '#0369a1';
+    label = 'Đăng nhập';
+  } else if (t === 'export' || t.includes('xuất')) {
+    bgColor = '#fef08a'; color = '#854d0e';
+    label = '⬇ Xuất dữ liệu';
+  } else if (t === 'close' || t.includes('đóng')) {
+    bgColor = '#f1f5f9'; color = '#475569';
+    if (t === 'close') label = 'Đóng biểu mẫu';
+  } else if (t.includes('lưu trữ')) {
+    bgColor = '#f3e8ff'; color = '#7e22ce';
+  }
+
+  return `<span style="display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:4px 12px; border-radius:999px; background-color:${bgColor}; color:${color}; font-size:12.5px; font-weight:600; white-space:nowrap; width:115px; overflow:hidden; text-overflow:ellipsis;" title="${label.replace(/"/g, '&quot;')}">${label}</span>`;
+}
+
+// Global click listener for view log form links to avoid inline onclick syntax errors
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.view-log-form-btn');
+  if (btn) {
+    viewLogForm(btn.dataset.formid, btn.dataset.formname, btn.dataset.action, btn.dataset.detail);
+  }
+});
+
+function viewLogForm(formId, formName, actionType, detailStr) {
+  if (formName === 'Biểu mẫu đã xóa' || formName === 'Phản hồi từ biểu mẫu đã xóa' || formName === 'Nhiều biểu mẫu' || formName === 'Hệ thống' || formName === 'Thư viện câu hỏi') {
+    if (typeof showToast === 'function') {
+      showToast('Không thể mở liên kết này!', 'error');
+    } else {
+      alert('Không thể mở liên kết này!');
+    }
+    return;
+  }
+
+  if (!formId || formId === 'undefined' || formId === 'null') {
+    const forms = JSON.parse(localStorage.getItem('flic_forms') || '[]');
+    const approvals = JSON.parse(localStorage.getItem('flic_approvals') || '[]');
+
+    let found = forms.find(f => f.name === formName);
+    if (!found) found = approvals.find(f => f.form === formName);
+
+    if (found) formId = found.id || found.form_id || found._dbId;
+  }
+
+  if (formId && formId !== 'undefined' && formId !== 'null') {
+    window.open('form-builder.html?form_id=' + formId, '_blank');
+  } else {
+    // Generate a dummy form so it doesn't show an error for mock data
+    const newForm = {
+      id: 'mock_form_' + Date.now(),
+      name: formName,
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      responses: 0
+    };
+    const forms = JSON.parse(localStorage.getItem('flic_forms') || '[]');
+    forms.push(newForm);
+    localStorage.setItem('flic_forms', JSON.stringify(forms));
+    window.open('form-builder.html?form_id=' + newForm.id, '_blank');
+  }
 }
 
 // Render dữ liệu ra bảng
@@ -84,53 +212,140 @@ function renderLogs(data) {
   }
 
   tbody.innerHTML = data.map(log => {
-    const dateObj = new Date(log.time);
-    const timeString = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const dateString = dateObj.toLocaleDateString('vi-VN');
+    const dateObj = new Date(typeof log.time === 'string' ? log.time.replace('Z', '') : log.time);
+    const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    let displayDetail = log.detail || '';
+    if (displayDetail.includes(' - lý do: ')) {
+      displayDetail = displayDetail.replace(' - lý do: ', ' (Lý do: ') + ')';
+    }
+
+    const tAct = (log.actionType || '').toLowerCase();
+    if (tAct === 'approve' || tAct.includes('duyệt')) {
+      displayDetail = 'Chuyển từ trạng thái chờ duyệt sang trạng thái phê duyệt';
+    } else if (tAct === 'reject' || tAct.includes('từ chối')) {
+      if (!displayDetail.includes('Chuyển từ trạng thái chờ duyệt sang trạng thái từ chối')) {
+        let reasonMatch = displayDetail.match(/lý do:\s*(.*)/i);
+        let reason = reasonMatch ? reasonMatch[1].replace(/\)$/, '').trim() : '';
+        displayDetail = `Chuyển từ trạng thái chờ duyệt sang trạng thái từ chối${reason ? ` (Lý do: ${reason})` : ''}`;
+      }
+    } else if (tAct === 'create' || tAct.includes('tạo')) {
+      if ((log.formName || '').includes('(bản sao)')) {
+        let originalName = log.formName.replace(/\s*\(bản sao\)$/i, '');
+        displayDetail = `Tạo bản sao từ biểu mẫu "${originalName}"`;
+      } else {
+        displayDetail = 'Tạo biểu mẫu mới';
+      }
+    } else if (tAct === 'delete' || tAct === 'hard_delete' || tAct.includes('xóa')) {
+      let isHard = displayDetail.toLowerCase().includes('vĩnh viễn') || tAct === 'hard_delete';
+      let isFeedback = displayDetail.toLowerCase().includes('phản hồi');
+      let reasonMatch = displayDetail.match(/lý do:\s*(.*)/i);
+      let reason = reasonMatch ? reasonMatch[1].replace(/\)$/, '').trim() : '';
+      
+      if (isFeedback) {
+        if (displayDetail.toLowerCase().includes('tất cả')) {
+          displayDetail = isHard ? 'Xóa vĩnh viễn tất cả phản hồi' : 'Xóa tất cả các phản hồi của biểu mẫu';
+        } else {
+          displayDetail = isHard ? 'Xóa vĩnh viễn 1 phản hồi' : 'Xóa 1 phản hồi';
+        }
+      } else {
+        displayDetail = isHard ? 'Xóa vĩnh viễn' : 'Xóa biểu mẫu';
+      }
+      
+      if (reason && reason !== 'Không có lý do') {
+        displayDetail += ` (Lý do: ${reason})`;
+      }
+    }
+
+    const formNameSafe = (log.formName || '').replace(/"/g, '&quot;');
+    const detailSafe = (log.detail || '').replace(/"/g, '&quot;');
+    const formLinkHtml = `<a href="javascript:void(0)" class="view-log-form-btn" data-formid="${log.formId || ''}" data-formname="${formNameSafe}" data-action="${log.actionType}" data-detail="${detailSafe}" style="color:#00008B; text-decoration:none; font-size:14.5px; font-weight:600;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${log.formName}</a>`;
 
     return `
-      <tr>
-        <td>
-          <div style="font-weight: 600; color: var(--gray-800)">${timeString}</div>
-          <div style="font-size: 13px; color: var(--gray-600); margin-top: 4px">Ngày ${dateString}</div>
-        </td>
-        <td>
-          <div style="font-weight: 500; color: var(--gray-900)">${log.user}</div>
-          <div style="font-size: 12px; color: var(--gray-500); margin-top: 2px">${log.role}</div>
-        </td>
-        <td>
-          ${getActionBadge(log.actionType, log.actionLabel)}
-        </td>
-        <td>
-          <a href="form-management.html" style="font-weight: 600; color: #00008B; text-decoration: none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${log.formName}</a>
-        </td>
-        <td>
-          <div style="font-size: 13px; color: var(--gray-700); line-height: 1.4">${log.detail}</div>
-        </td>
-      </tr>
-    `;
+        <tr>
+          <td style="padding:16px;">
+            <div style="font-weight:600; color:var(--gray-800); margin-bottom:2px;">${timeStr}</div>
+            <div style="font-size:12px; color:var(--gray-500);">${dateStr}</div>
+          </td>
+          <td style="padding:16px;">
+            <div style="font-weight:600; color:var(--gray-800); margin-bottom:2px;">${log.user}</div>
+            <div style="font-size:12px; color:var(--gray-500);">${log.role === 'admin' || log.role === 'manager' ? 'Quản lý' : log.role === 'staff' ? 'Nhân viên' : log.role}</div>
+          </td>
+          <td style="padding:16px;">
+            ${getActionBadge(log.actionType)}
+          </td>
+          <td style="padding:16px;">
+            ${formLinkHtml}
+          </td>
+          <td style="padding:16px; color:var(--gray-600); line-height:1.5;">
+            ${displayDetail}
+          </td>
+        </tr>
+      `;
   }).join('');
 }
 
-// Logic lọc dữ liệu nhanh trên FE
-function filterLogs() {
-  const search = document.getElementById('filter-search').value.toLowerCase();
-  const action = document.getElementById('filter-action').value;
-  const date = document.getElementById('filter-date').value;
+function renderLogsPage() {
+  const startIdx = (currentAuditPage - 1) * ITEMS_PER_PAGE;
+  const endIdx = startIdx + ITEMS_PER_PAGE;
+  const pageData = currentFilteredData.slice(startIdx, endIdx);
 
-  const filtered = mockLogs.filter(log => {
-    const matchSearch = log.user.toLowerCase().includes(search) || log.formName.toLowerCase().includes(search);
-    const matchAction = action === 'all' || log.actionType === action;
-
-    // So sánh ngày
-    const logDate = log.time.split('T')[0]; // Cắt chuỗi lấy YYYY-MM-DD
-    const matchDate = !date || logDate === date;
-
-    return matchSearch && matchAction && matchDate;
-  });
-
-  renderLogs(filtered);
+  renderLogs(pageData);
+  renderAuditPagination(currentFilteredData.length);
 }
 
-// Khởi chạy khi load trang (Sau này bạn thay bằng gọi API fetch /audit-logs từ backend)
-renderLogs(mockLogs);
+function renderAuditPagination(totalItems) {
+  const container = document.getElementById('pagination-container');
+  if (!container) return;
+
+  if (totalItems === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const startIdx = (currentAuditPage - 1) * ITEMS_PER_PAGE + 1;
+  const endIdx = Math.min(currentAuditPage * ITEMS_PER_PAGE, totalItems);
+
+  let html = `<span style="font-size:13px;color:var(--gray-500)">Hiển thị <strong>${startIdx}-${endIdx}</strong> / <strong>${totalItems}</strong> nhật ký</span>`;
+
+  html += `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">`;
+  html += `<button class="pag-btn" ${currentAuditPage <= 1 ? 'disabled' : ''} onclick="changeAuditPage(-1);window.scrollTo({ top: 0, behavior: 'smooth' });">Trước</button>`;
+
+  for (let i = 1; i <= totalPages; i++) {
+    if (totalPages <= 7) {
+      html += `<button class="pag-btn ${i === currentAuditPage ? 'active' : ''}" onclick="goToAuditPage(${i});window.scrollTo({ top: 0, behavior: 'smooth' });">${i}</button>`;
+    } else {
+      if (i === 1 || i === totalPages || (i >= currentAuditPage - 2 && i <= currentAuditPage + 2)) {
+        html += `<button class="pag-btn ${i === currentAuditPage ? 'active' : ''}" onclick="goToAuditPage(${i});window.scrollTo({ top: 0, behavior: 'smooth' });">${i}</button>`;
+      } else if (i === currentAuditPage - 3 || i === currentAuditPage + 3) {
+        html += `<span style="color:var(--gray-400)">...</span>`;
+      }
+    }
+  }
+
+  html += `<button class="pag-btn" ${currentAuditPage >= totalPages ? 'disabled' : ''} onclick="changeAuditPage(1);window.scrollTo({ top: 0, behavior: 'smooth' });">Sau</button>`;
+  html += `</div>`;
+
+  container.innerHTML = html;
+}
+
+window.changeAuditPage = function (dir) {
+  const totalPages = Math.ceil(currentFilteredData.length / ITEMS_PER_PAGE);
+  const newPage = currentAuditPage + dir;
+  if (newPage >= 1 && newPage <= totalPages) {
+    currentAuditPage = newPage;
+    renderLogsPage();
+  }
+};
+
+window.goToAuditPage = function (page) {
+  currentAuditPage = page;
+  renderLogsPage();
+};
+
+// Khởi chạy khi load trang
+document.addEventListener('DOMContentLoaded', () => {
+  loadAuditLogs().catch(console.error);
+});

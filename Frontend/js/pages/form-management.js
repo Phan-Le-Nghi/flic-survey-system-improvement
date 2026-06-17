@@ -1,4 +1,4 @@
-﻿// --- FORM MANAGEMENT - State (mirrors React source) ---
+// --- FORM MANAGEMENT - State (mirrors React source) ---
 
 // -- Thông rác helpers ----------------------------------
 // loadTrash / saveTrash được định nghĩa trong trash.js (dùng chung key 'flic_trash_forms')
@@ -240,11 +240,11 @@ const ALL_SURVEY_TYPES = Object.values(SURVEY_TYPES_BY_CATEGORY).flat();
 const UNTITLED_FORM_NAME = 'Biểu mẫu không có tiêu đề';
 const DEFAULT_DRAFT_CATEGORY = 'Ngoại ngữ';
 const DEFAULT_FORM_THEME = {
-  headerFont: 'Roboto',
+  headerFont: 'Be Vietnam Pro',
   headerSize: 24,
-  questionFont: 'Roboto',
+  questionFont: 'Be Vietnam Pro',
   questionSize: 14,
-  textFont: 'Roboto',
+  textFont: 'Be Vietnam Pro',
   textSize: 13,
   color: '#00008B',
   background: '#ffffff',
@@ -328,6 +328,8 @@ function normalizeLocalItemsForPreview(items) {
       video_url: q.video_url || q.video || '',
       rows: getGridRows(q),
       cols: getGridCols(q),
+      allowOther: questionAllowsOther({ ...q, type }),
+      allow_other: questionAllowsOther({ ...q, type }),
     };
   });
 }
@@ -374,16 +376,20 @@ function normalizeLibraryQuestion(raw) {
   const category = normalizeLibraryCategory(raw.bo_mon || raw.category);
   const surveyType = normalizeLibrarySurveyType(raw.loai_khao_sat || raw.survey_type || raw.ten_loai || raw.ten_loai_khao_sat || raw.loaiKhaoSat);
   const target = normalizeSurveyTarget(raw.doi_tuong || raw.target || raw.doiTuong);
+  const type = normalizeQuestionType(raw.type || raw.loai || 'choice');
+  const allowOther = questionAllowsOther({ ...raw, type });
   return {
     ...raw,
     id: raw.id,
     text: raw.text || raw.noi_dung || '',
-    type: normalizeQuestionType(raw.type || raw.loai || 'choice'),
+    type,
     opts: Array.isArray(raw.opts) ? raw.opts : Array.isArray(raw.lua_chon) ? raw.lua_chon : [],
     rows: Array.isArray(raw.rows) ? raw.rows : Array.isArray(raw.hang) ? raw.hang : [],
     cols: Array.isArray(raw.cols) ? raw.cols : Array.isArray(raw.cot) ? raw.cot : [],
     required: !!(raw.required || raw.bat_buoc),
     bat_buoc: !!(raw.required || raw.bat_buoc),
+    allowOther,
+    allow_other: allowOther,
     bo_mon: category,
     category,
     loai_khao_sat: surveyType,
@@ -488,7 +494,7 @@ async function loadForms() {
         desc: f.mo_ta || '',
         loi_ket: f.loi_ket || '',
         vai_tro: f.vai_tro || 'staff',
-        doi_tuong: f.doi_tuong || 'Tất cả',
+        doi_tuong: normalizeSurveyTarget(f.doi_tuong || 'Tất cả'),
         approval_priority: f.approval_priority || f.do_uu_tien || '',
         approval_deadline: f.approval_deadline || f.han_chot_duyet || '',
         anh_bia: f.anh_bia || '',
@@ -799,6 +805,70 @@ document.getElementById('page-content').innerHTML = `
       text-decoration-thickness: from-font;
       text-underline-offset: 2px;
     }
+    #create-form-modal .create-desc-wrap, #edit-form-modal .create-desc-wrap {
+      margin-top: 4px;
+      max-width: calc(100% - 230px);
+    }
+    #create-form-modal .create-desc-editor, #edit-form-modal .create-desc-editor {
+      max-height: none;
+      overflow: hidden !important;
+    }
+    #create-form-modal .create-desc-wrap:not(.is-expanded) .create-desc-editor, #edit-form-modal .create-desc-wrap:not(.is-expanded) .create-desc-editor {
+      max-height: 70px;
+    }
+    #create-form-modal .create-desc-wrap.is-expanded .create-desc-editor, #edit-form-modal .create-desc-wrap.is-expanded .create-desc-editor {
+      max-height: none;
+    }
+    #create-form-modal .modal-header.is-desc-expanded, #edit-form-modal .modal-header.is-desc-expanded {
+      max-height: none !important;
+      overflow: visible !important;
+      padding-bottom: 18px !important;
+    }
+    #create-form-modal .modal-header.is-desc-expanded .create-desc-wrap, #edit-form-modal .modal-header.is-desc-expanded .create-desc-wrap {
+      padding-bottom: 4px;
+    }
+    #create-form-modal .create-desc-toggle, #edit-form-modal .create-desc-toggle {
+      position: absolute;
+      right: 24px;
+      bottom: 14px;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 1px solid rgba(255,255,255,.75);
+      border-radius: 50%;
+      background: #fff;
+      color: #00008B;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 18px rgba(0,0,0,.14);
+      transition: background .15s, transform .15s, box-shadow .15s;
+    }
+    #create-form-modal .create-desc-toggle:hover, #edit-form-modal .create-desc-toggle:hover {
+      background: #eef5ff;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(0,0,0,.18);
+    }
+    #create-form-modal .create-desc-toggle svg, #edit-form-modal .create-desc-toggle svg {
+      width: 22px;
+      height: 22px;
+      color: #00008B;
+      stroke: #00008B !important;
+      display: block;
+    }
+    #create-form-modal .create-desc-toggle svg path, #edit-form-modal .create-desc-toggle svg path {
+      stroke: #00008B !important;
+    }
+    #create-form-modal .create-desc-toggle[hidden], #edit-form-modal .create-desc-toggle[hidden] {
+      display: none !important;
+    }
+    #create-form-modal .modal-header.is-default-look .create-desc-toggle,
+    #edit-form-modal .create-desc-toggle {
+      background: #fff;
+      color: #00008B;
+      border-color: rgba(255,255,255,.75);
+    }
     .rich-title-toolbar,
     .field-format-toolbar {
       display: none;
@@ -814,7 +884,11 @@ document.getElementById('page-content').innerHTML = `
     #create-form-modal .modal-header.is-default-look .rich-title-toolbar button,
     #create-form-modal .modal-header.is-default-look .field-format-toolbar button,
     #create-form-modal .modal-header.is-default-look #collapse-form-btn,
-    #create-form-modal .modal-header.is-default-look #create-form-header-actions .icon-btn {
+    #create-form-modal .modal-header.is-default-look #create-form-header-actions .icon-btn,
+    #edit-form-modal .rich-title-toolbar button,
+    #edit-form-modal .field-format-toolbar button,
+    #edit-form-modal #collapse-edit-btn,
+    #edit-form-modal #edit-form-header-actions .icon-btn {
       background: #fff !important;
       color: #00008B !important;
       border-color: rgba(255,255,255,.75) !important;
@@ -823,18 +897,27 @@ document.getElementById('page-content').innerHTML = `
     #create-form-modal .modal-header.is-default-look .rich-title-toolbar button *,
     #create-form-modal .modal-header.is-default-look .field-format-toolbar button *,
     #create-form-modal .modal-header.is-default-look #collapse-form-btn *,
-    #create-form-modal .modal-header.is-default-look #create-form-header-actions .icon-btn * {
+    #create-form-modal .modal-header.is-default-look #create-form-header-actions .icon-btn *,
+    #edit-form-modal .rich-title-toolbar button *,
+    #edit-form-modal .field-format-toolbar button *,
+    #edit-form-modal #collapse-edit-btn *,
+    #edit-form-modal #edit-form-header-actions .icon-btn * {
       color: #00008B !important;
       stroke: currentColor !important;
     }
     #create-form-modal .modal-header.is-default-look .rich-title-toolbar button:hover,
     #create-form-modal .modal-header.is-default-look .field-format-toolbar button:hover,
     #create-form-modal .modal-header.is-default-look #collapse-form-btn:hover,
-    #create-form-modal .modal-header.is-default-look #create-form-header-actions .icon-btn:hover {
+    #create-form-modal .modal-header.is-default-look #create-form-header-actions .icon-btn:hover,
+    #edit-form-modal .rich-title-toolbar button:hover,
+    #edit-form-modal .field-format-toolbar button:hover,
+    #edit-form-modal #collapse-edit-btn:hover,
+    #edit-form-modal #edit-form-header-actions .icon-btn:hover {
       background: #eef5ff !important;
       color: #00008B !important;
     }
-    #create-form-modal .modal-header.is-default-look #create-form-header-actions .icon-btn:disabled {
+    #create-form-modal .modal-header.is-default-look #create-form-header-actions .icon-btn:disabled,
+    #edit-form-modal #edit-form-header-actions .icon-btn:disabled {
       opacity: .55;
     }
   </style>
@@ -859,12 +942,12 @@ document.getElementById('page-content').innerHTML = `
               onkeydown="if(event.key==='Enter'){event.preventDefault();}"
               onpaste="pastePlainTextIntoRichTitle(event)"></div>
             ${renderFormTitleFormatToolbar('new-form-name-editor')}
-            <div id="new-form-desc-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'new-form-desc')" style="margin-top:4px;max-height:126px;overflow-y:auto;scrollbar-gutter:stable">
+            <div id="new-form-desc-wrap" class="create-desc-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'new-form-desc')">
               <textarea id="new-form-desc" maxlength="1000" style="display:none"></textarea>
-              <div id="new-form-desc-editor" class="rich-title-editor" contenteditable="true" role="textbox" aria-label="Mô tả ngắn"
+              <div id="new-form-desc-editor" class="rich-title-editor create-desc-editor" contenteditable="true" role="textbox" aria-label="Mô tả ngắn"
                 data-sync-target="new-form-desc"
                 data-placeholder="Mô tả ngắn về biểu mẫu..."
-              style="min-height:22px;max-height:96px;overflow-y:auto;scrollbar-gutter:stable;line-height:1.4;outline:none;white-space:pre-wrap;word-break:break-word;color:#dbeafe;font-size:12.5px;font-weight:500;padding:0;border:0;background:transparent"
+              style="min-height:22px;line-height:1.4;outline:none;white-space:pre-wrap;word-break:break-word;color:#dbeafe;font-size:12.5px;font-weight:500;padding:0;border:0;background:transparent"
                 onfocus="showFieldToolbar('new-form-desc')"
                 oninput="syncRichTextFieldFromEditor('new-form-desc-editor')"
                 onblur="syncRichTextFieldFromEditor('new-form-desc-editor')"
@@ -872,6 +955,9 @@ document.getElementById('page-content').innerHTML = `
                 onclick="handleRichFieldClick(event, 'new-form-desc-editor')"
                 onpaste="pastePlainTextIntoRichField(event, 'new-form-desc-editor')"></div>
               ${renderTextFormatToolbar('new-form-desc-editor', { hidden: true, toolbarFor: 'new-form-desc' })}
+              <button type="button" id="new-form-desc-toggle" class="create-desc-toggle" onclick="toggleNewFormDescExpanded()" title="Mở rộng mô tả" aria-label="Mở rộng mô tả" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
             </div>
           </div>
         </div>
@@ -961,8 +1047,8 @@ document.getElementById('page-content').innerHTML = `
                 <input id="new-approval-deadline-display" type="text" class="input"
                   placeholder="dd/mm/yyyy hh:mm" readonly
                   style="width:100%;height:48px;background:#f8f9fb;cursor:pointer;font-size:13px"
-                  onclick="openApprovalDeadlinePicker()"
-                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openApprovalDeadlinePicker()}">
+                  class="flatpickr-input"
+                  >
               </div>
             </div>
           </div>
@@ -1118,6 +1204,27 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
 `);
 
 document.getElementById('page-content').insertAdjacentHTML('beforeend', `
+  <div class="modal-overlay" id="fm-confirm-modal" onclick="handleConfirmDialog(false)" style="z-index:1900">
+    <div class="modal" onclick="event.stopPropagation()" style="width:min(92vw,440px);border-radius:20px;overflow:hidden;box-shadow:0 28px 72px rgba(15,23,42,.28);background:#fff">
+      <div style="padding:22px 24px 12px;display:flex;gap:14px;align-items:flex-start">
+        <div id="fm-confirm-icon" style="width:46px;height:46px;border-radius:15px;background:#fee2e2;color:#dc2626;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="22" height="22" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        </div>
+        <div style="min-width:0;flex:1">
+          <div id="fm-confirm-title" style="font-size:19px;line-height:1.25;font-weight:900;color:#0f172a">Xác nhận thao tác</div>
+          <div id="fm-confirm-message" style="margin-top:8px;font-size:14px;line-height:1.55;color:#475569"></div>
+        </div>
+      </div>
+      <div id="fm-confirm-note" style="display:none;margin:4px 24px 0;padding:12px 14px;border-radius:14px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:13px;line-height:1.45;font-weight:700"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding:20px 24px 24px">
+        <button type="button" class="btn btn-outline" onclick="handleConfirmDialog(false)" id="fm-confirm-cancel" style="height:40px;min-width:96px">Hủy</button>
+        <button type="button" class="btn btn-primary" onclick="handleConfirmDialog(true)" id="fm-confirm-ok" style="height:40px;min-width:128px;background:#dc2626;border-color:#dc2626">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+`);
+
+document.getElementById('page-content').insertAdjacentHTML('beforeend', `
   <aside id="create-theme-panel" style="position:fixed;right:0;top:0;height:100vh;width:min(360px,92vw);background:#fff;border-left:1px solid #dbe5f0;box-shadow:-18px 0 42px rgba(15,23,42,.14);z-index:1400;display:none;flex-direction:column;font-family:inherit">
     <div style="height:58px;padding:0 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:10px;font-weight:800;color:#0f172a;font-size:18px">
@@ -1126,41 +1233,41 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
       </div>
       <button class="icon-btn close-btn" onclick="toggleCreateThemePanel(false)" title="Đóng">${IC.close}</button>
     </div>
-    <div style="flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:22px">
+    <div style="flex:1;overflow:auto;padding:12px 18px;display:flex;flex-direction:column;gap:14px">
       <section>
-        <h3 style="margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:#334155">Kiểu văn bản</h3>
+        <h3 style="margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:#334155">Kiểu văn bản</h3>
         ${['header:Đầu trang:headerSize', 'question:Câu hỏi:questionSize', 'text:Văn bản:textSize'].map(row => {
           const [key, label, sizeKey] = row.split(':');
           const fontKey = key + 'Font';
-          return `<div style="margin-bottom:14px">
-            <label class="form-label" style="margin-bottom:6px">${label}</label>
+          return `<div style="margin-bottom:10px">
+            <label class="form-label" style="margin-bottom:4px">${label}</label>
             <div style="display:grid;grid-template-columns:1fr 74px;gap:8px">
-              <select class="input" data-theme-key="${fontKey}" onchange="setCreateTheme('${fontKey}', this.value)" style="height:40px;background:#fff">
+              <select class="input" data-theme-key="${fontKey}" onchange="setCreateTheme('${fontKey}', this.value)" style="height:36px;background:#fff">
                 <option>Roboto</option><option>Arial</option><option>Times New Roman</option><option>Georgia</option><option>Verdana</option><option>Be Vietnam Pro</option>
               </select>
-              <select class="input" data-theme-key="${sizeKey}" onchange="setCreateTheme('${sizeKey}', Number(this.value))" style="height:40px;background:#fff">
+              <select class="input" data-theme-key="${sizeKey}" onchange="setCreateTheme('${sizeKey}', Number(this.value))" style="height:36px;background:#fff">
                 ${[11,12,13,14,16,18,20,22,24,28,32,36].map(size => `<option value="${size}">${size}</option>`).join('')}
               </select>
             </div>
           </div>`;
         }).join('')}
       </section>
-      <section style="border-top:1px solid #e2e8f0;padding-top:18px">
-        <h3 style="margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:#334155">Đầu trang</h3>
+      <section style="border-top:1px solid #e2e8f0;padding-top:14px">
+        <h3 style="margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:#334155">Đầu trang</h3>
         <input type="file" id="create-theme-header-file" accept="image/*" style="display:none" onchange="handleCreateHeaderImage(this.files && this.files[0])">
-        <div id="create-theme-header-preview" style="height:88px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc center/cover no-repeat;margin-bottom:10px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12.5px;font-weight:700">Chưa chọn ảnh</div>
+        <div id="create-theme-header-preview" style="height:70px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc center/cover no-repeat;margin-bottom:10px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12.5px;font-weight:700">Chưa chọn ảnh</div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-outline" onclick="document.getElementById('create-theme-header-file')?.click()" style="height:38px;gap:6px">
+          <button class="btn btn-outline" onclick="document.getElementById('create-theme-header-file')?.click()" style="height:36px;gap:6px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
             Chọn hình ảnh
           </button>
-          <button class="btn btn-outline" onclick="setCreateTheme('headerImage','')" style="height:38px;color:#ef4444;border-color:#fecaca">Xóa</button>
+          <button class="btn btn-outline" onclick="setCreateTheme('headerImage','')" style="height:36px;color:#ef4444;border-color:#fecaca">Xóa</button>
         </div>
       </section>
-      <section style="border-top:1px solid #e2e8f0;padding-top:18px">
-        <h3 style="margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:#334155">Màu</h3>
-        <div id="create-theme-color-grid" style="display:grid;grid-template-columns:repeat(6,32px);gap:10px;margin-bottom:14px"></div>
-        <label class="form-label" style="margin-bottom:8px">Nền</label>
+      <section style="border-top:1px solid #e2e8f0;padding-top:14px">
+        <h3 style="margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:#334155">Màu</h3>
+        <div id="create-theme-color-grid" style="display:grid;grid-template-columns:repeat(6,32px);gap:10px;margin-bottom:10px"></div>
+        <label class="form-label" style="margin-bottom:6px">Nền</label>
         <div id="create-theme-bg-grid" style="display:grid;grid-template-columns:repeat(6,32px);gap:10px"></div>
       </section>
     </div>
@@ -1261,11 +1368,13 @@ function closeLibraryModal() {
 }
 
 function getLibraryQuestionClone(source) {
+  const type = normalizeQuestionType(source.type || source.loai || 'choice');
+  const allowOther = questionAllowsOther({ ...source, type });
   return {
     id: 'dq-lib-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
     thu_vien_id: Number(source.id) || null,
     text: source.text || source.noi_dung || '',
-    type: normalizeQuestionType(source.type || source.loai || 'choice'),
+    type,
     opts: Array.isArray(source.opts)
       ? [...source.opts]
       : Array.isArray(source.lua_chon)
@@ -1275,6 +1384,9 @@ function getLibraryQuestionClone(source) {
     cols: source.cols ? [...source.cols] : [],
     scale: source.scale ? { ...source.scale } : undefined,
     rating: source.rating ? { ...source.rating } : undefined,
+    validation_json: source.validation_json || source.validation || source.logic_json || '',
+    allowOther,
+    allow_other: allowOther,
     required: source.required || source.bat_buoc || false,
     bat_buoc: source.required || source.bat_buoc || false,
     image: source.image || source.hinh_anh_url || source.image_url || '',
@@ -1347,18 +1459,25 @@ function toggleEditFormFullscreen() {
   const modal = overlay ? overlay.querySelector('.modal') : null;
   const scroll = document.getElementById('edit-modal-scroll');
   const btn = document.getElementById('expand-edit-btn');
+  const backBtn = document.getElementById('collapse-edit-btn');
   if (!modal) return;
   _editFormFullscreen = !_editFormFullscreen;
   if (_editFormFullscreen) {
-    overlay.style.cssText = 'position:fixed;inset:0;background:#f1f5f9;display:flex;flex-direction:column;align-items:stretch;z-index:1000;padding:0;overflow:hidden;';
-    modal.style.cssText = 'width:100%;max-width:1120px;height:100vh;border-radius:0;margin:0 auto;display:flex;flex-direction:column;background:#fff;box-shadow:0 0 40px rgba(0,0,0,0.08);position:relative;';
-    if (scroll) { scroll.style.maxHeight = 'none'; scroll.style.flex = '1 1 auto'; scroll.style.overflowY = 'auto'; scroll.style.scrollbarGutter = 'stable'; }
-    if (btn) { btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>'; btn.title = 'Thu nhỏ'; }
+    document.body.style.overflow = 'hidden';
+    overlay.style.cssText = 'position:fixed;inset:0;background:#f8fafc;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;z-index:1200;padding:0;overflow:hidden;';
+    modal.style.cssText = 'width:100vw;max-width:none;height:100vh;max-height:none;border-radius:0;margin:0;display:flex;flex-direction:column;background:#fff;box-shadow:none;position:relative;';
+    if (scroll) { scroll.style.maxHeight = 'none'; scroll.style.flex = '1'; scroll.style.overflow = 'auto'; scroll.style.padding = '0 24px 12px'; }
+    if (btn) btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>';
+    if (btn) btn.title = 'Thu nhỏ';
+    if (backBtn) backBtn.style.display = 'inline-flex';
   } else {
+    document.body.style.overflow = '';
     overlay.removeAttribute('style');
-    modal.style.cssText = 'max-width:920px;width:min(92vw,920px);max-height:calc(100vh - 32px);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;';
-    if (scroll) { scroll.style.maxHeight = 'none'; scroll.style.flex = '1 1 auto'; scroll.style.overflowY = 'auto'; scroll.style.scrollbarGutter = 'stable'; }
-    if (btn) { btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'; btn.title = 'Phóng to'; }
+    modal.style.cssText = 'max-width:920px;width:min(92vw,920px);border-radius:16px;display:flex;flex-direction:column;';
+    if (scroll) { scroll.style.maxHeight = 'min(76vh,820px)'; scroll.style.flex = ''; scroll.style.overflow = 'auto'; scroll.style.padding = '0 24px 8px'; }
+    if (btn) btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+    if (btn) btn.title = 'Phóng to';
+    if (backBtn) backBtn.style.display = 'none';
   }
 }
 
@@ -1375,7 +1494,9 @@ const TYPE_LABEL_MAP = {
   grid_radio:'Lưới trắc nghiệm',
   grid_checkbox:'Lưới hộp kiểm',
   date:'Ngày',
-  time:'Giờ'
+  time:'Giờ',
+  presentation_image:'Hình ảnh',
+  presentation_video:'Video'
 };
 // Aliases for backward compat (from DB)
 const TYPE_LABEL_ALIASES = {text:'Trả lời ngắn', long_text:'Đoạn văn', star_rating:'Xếp hạng'};
@@ -1571,24 +1692,111 @@ function setQuestionRatingConfig(q, patch) {
   q._collapsed = false;
 }
 
+function supportsOtherOption(type) {
+  return ['choice', 'checkbox'].includes(normalizeQuestionType(type || ''));
+}
+
+function questionAllowsOther(q = {}) {
+  const type = normalizeQuestionType(q.type || q.loai || 'choice');
+  if (!supportsOtherOption(type)) return false;
+  const validation = parseJsonObject(q.validation_json || q.validation || q.logic_json);
+  return !!(
+    q.allowOther ||
+    q.allow_other ||
+    q.hasOtherOption ||
+    q.has_other_option ||
+    q.cho_phep_khac ||
+    validation.allow_other ||
+    validation.allowOther ||
+    validation.has_other_option
+  );
+}
+
+function setQuestionAllowOther(q, value) {
+  if (!q) return;
+  const enabled = !!value && supportsOtherOption(q.type || q.loai || 'choice');
+  q.allowOther = enabled;
+  q.allow_other = enabled;
+  if (!enabled) {
+    delete q.hasOtherOption;
+    delete q.has_other_option;
+    delete q.cho_phep_khac;
+  }
+  q._collapsed = false;
+}
+
 function getQuestionValidationJson(q = {}) {
   const validation = parseJsonObject(q.validation_json || q.validation || q.logic_json);
-  if (normalizeQuestionType(q.type || q.loai) === 'scale') {
+  const type = normalizeQuestionType(q.type || q.loai);
+  if (type === 'scale') {
     validation.scale_config = getQuestionScaleConfig(q);
   }
-  if (normalizeQuestionType(q.type || q.loai) === 'rating') {
+  if (type === 'rating') {
     validation.rating_config = getQuestionRatingConfig(q);
+  }
+  if (q.image_align && q.image_align !== 'left') {
+    validation.image_align = q.image_align;
+  } else {
+    delete validation.image_align;
+  }
+  if (q.image_width) {
+    validation.image_width = q.image_width;
+  } else {
+    delete validation.image_width;
+  }
+  if (supportsOtherOption(type) && questionAllowsOther(q)) {
+    validation.allow_other = true;
+  } else {
+    delete validation.allow_other;
+    delete validation.allowOther;
+    delete validation.has_other_option;
   }
   return Object.keys(validation).length ? JSON.stringify(validation) : null;
 }
 
+function renderOtherOptionIcon(type, color = '#94a3b8') {
+  const isCheckbox = normalizeQuestionType(type) === 'checkbox';
+  return `<span style="width:15px;height:15px;border-radius:${isCheckbox ? '3px' : '50%'};border:2px solid ${color};flex-shrink:0;display:inline-block;background:#fff"></span>`;
+}
+
+function renderOtherOptionEditor(q, normalizedType, mode, target) {
+  if (!supportsOtherOption(normalizedType)) return '';
+  const enabled = questionAllowsOther(q);
+  const safeTarget = String(target).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const addAction = mode === 'edit' ? `editQToggleOther(${Number(target)},true)` : `dqToggleOther('${safeTarget}',true)`;
+  const removeAction = mode === 'edit' ? `editQToggleOther(${Number(target)},false)` : `dqToggleOther('${safeTarget}',false)`;
+
+  if (enabled) {
+    return `
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <span style="width:12px;flex-shrink:0;display:inline-block"></span>
+        ${renderOtherOptionIcon(normalizedType)}
+        <input type="text" value="Khác..." readonly
+          style="flex:1;padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12.5px;background:#fff;color:#64748b;outline:none;cursor:default">
+        <button type="button" onclick="${removeAction}" title="Xóa lựa chọn khác"
+          style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;transition:all .15s"
+          onmouseenter="this.style.color='#ef4444'" onmouseleave="this.style.color='#cbd5e1'">X</button>
+      </div>`;
+  }
+
+  return `
+    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px;font-size:12px;color:#64748b">
+      <span>hoặc</span>
+      <button type="button" onclick="${addAction}"
+        style="padding:0;border:0;background:transparent;color:#2563eb;font-size:12px;font-weight:700;cursor:pointer">
+        thêm "Câu trả lời khác"
+      </button>
+    </div>`;
+}
+
 function renderRatingPreview(config, compact = false) {
   const rating = normalizeRatingConfig(config);
-  return `<div style="display:flex;align-items:flex-end;gap:${compact ? '12px' : '16px'};flex-wrap:wrap">
+  const uid = Math.random().toString(36).substring(2,9);
+  return `<div class="rating-preview-wrap-${uid}" style="display:flex;align-items:flex-end;gap:${compact ? '12px' : '16px'};flex-wrap:wrap">
     ${Array.from({ length: rating.count }, (_, i) => `
       <div style="display:flex;flex-direction:column;align-items:center;gap:${compact ? '4px' : '6px'};min-width:${compact ? '26px' : '34px'}">
         <span style="font-size:12px;font-weight:700;color:#475569">${i + 1}</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.7" width="${compact ? '24' : '30'}" height="${compact ? '24' : '30'}"><polygon points="12 2 15 9 22 9 16 14 18 21 12 17 6 21 8 14 2 9 9 9"/></svg>
+        <svg onclick="var w=this.closest('.rating-preview-wrap-${uid}');if(w){var svgs=w.querySelectorAll('svg');svgs.forEach((s,idx)=>{s.setAttribute('fill',idx<=${i}?'#f59e0b':'none');s.setAttribute('stroke',idx<=${i}?'#f59e0b':'#cbd5e1');});}" style="cursor:pointer;transition:all .15s" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.7" width="${compact ? '24' : '30'}" height="${compact ? '24' : '30'}"><polygon points="12 2 15 9 22 9 16 14 18 21 12 17 6 21 8 14 2 9 9 9"/></svg>
       </div>
     `).join('')}
   </div>`;
@@ -1681,7 +1889,7 @@ function sanitizeRichTitleNode(node) {
   const tag = node.tagName.toLowerCase();
   const content = Array.from(node.childNodes).map(sanitizeRichTitleNode).join('');
   if (tag === 'br') return '\n';
-  if (tag === 'div' || tag === 'p') return content ? `${content}\n` : '\n';
+  if (tag === 'div' || tag === 'p') return content ? `\n${content}` : '\n';
   if (tag === 'ol') {
     const items = Array.from(node.children)
       .filter(child => child.tagName?.toLowerCase() === 'li')
@@ -1742,10 +1950,61 @@ function syncRichTitleInputFromEditor() {
 
 function updateNewFormDescCount(value) {
   const c = document.getElementById('desc-count');
-  if (!c) return;
   const len = String(value || '').length;
-  c.textContent = len + '/1000';
-  c.style.color = len > 900 ? 'var(--red)' : 'var(--gray-400)';
+  if (c) {
+    c.textContent = len + '/1000';
+    c.style.color = len > 900 ? 'var(--red)' : 'var(--gray-400)';
+  }
+  updateNewFormDescCollapseState();
+}
+
+function setNewFormDescToggleIcon(expanded) {
+  const toggle = document.getElementById('new-form-desc-toggle');
+  if (!toggle) return;
+  toggle.title = expanded ? 'Thu gọn mô tả' : 'Mở rộng mô tả';
+  toggle.setAttribute('aria-label', toggle.title);
+  toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  toggle.innerHTML = expanded
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+}
+
+function updateNewFormDescCollapseState() {
+  const wrap = document.getElementById('new-form-desc-wrap');
+  const editor = document.getElementById('new-form-desc-editor');
+  const toggle = document.getElementById('new-form-desc-toggle');
+  const header = document.querySelector('#create-form-modal .modal-header');
+  if (!wrap || !editor || !toggle) return;
+
+  setTimeout(() => {
+    const wasExpanded = wrap.classList.contains('is-expanded');
+    if (wasExpanded) {
+      wrap.classList.remove('is-expanded');
+      header?.classList.remove('is-desc-expanded');
+    }
+    const shouldToggle = editor.scrollHeight > 74;
+    if (wasExpanded) {
+      wrap.classList.add('is-expanded');
+      header?.classList.add('is-desc-expanded');
+    }
+
+    if (!shouldToggle) {
+      wrap.classList.remove('is-expanded');
+      header?.classList.remove('is-desc-expanded');
+    }
+    toggle.hidden = !shouldToggle;
+    setNewFormDescToggleIcon(shouldToggle && wasExpanded);
+  }, 50);
+}
+
+function toggleNewFormDescExpanded() {
+  const wrap = document.getElementById('new-form-desc-wrap');
+  const toggle = document.getElementById('new-form-desc-toggle');
+  const header = document.querySelector('#create-form-modal .modal-header');
+  if (!wrap || !toggle) return;
+  const expanded = wrap.classList.toggle('is-expanded');
+  header?.classList.toggle('is-desc-expanded', expanded);
+  setNewFormDescToggleIcon(expanded);
 }
 
 function getRichTextPlainLength(value) {
@@ -1774,6 +2033,8 @@ function syncRichTextFieldFromEditor(editorId) {
   if (targetId === 'new-form-desc') updateNewFormDescCount(value);
   if (targetId === 'new-form-loi-ket') updateNewFormLoiKetDraft(value);
   if (targetId === 'edit-form-loi-ket') updateEditFormLoiKetCount(value);
+  if (editorId === 'new-form-desc-editor') updateNewFormDescCollapseState();
+  if (editorId === 'edit-form-desc-editor') updateEditFormDescCollapseState();
 }
 
 function setRichTextFieldValue(fieldId, value = '') {
@@ -1785,6 +2046,7 @@ function setRichTextFieldValue(fieldId, value = '') {
     updateRichEditorEmptyState(editor, value);
   }
   if (fieldId === 'new-form-desc') updateNewFormDescCount(value || '');
+  if (fieldId === 'edit-form-desc') updateEditFormDescCollapseState();
   if (fieldId === 'new-form-loi-ket') updateNewFormLoiKetDraft(value || '');
   if (fieldId === 'edit-form-loi-ket') updateEditFormLoiKetCount(value || '');
 }
@@ -2222,7 +2484,6 @@ function renderTextFormatToolbar(textareaId, options = {}) {
       <button type="button" title="Chèn liên kết" onmousedown="event.preventDefault()" onclick="formatTextareaSelection('${textareaId}','link')" style="width:30px;height:30px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font-size:15px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;cursor:pointer">↗</button>
       ${listButtons}
       <button type="button" title="Xóa định dạng" onmousedown="event.preventDefault()" onclick="formatTextareaSelection('${textareaId}','clear')" style="width:30px;height:30px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font-size:13px;font-weight:800;text-decoration:line-through;display:inline-flex;align-items:center;justify-content:center;cursor:pointer">T</button>
-      <span style="font-size:11.5px;color:#64748b">Chọn đoạn văn bản rồi bấm để định dạng</span>
     </div>
   `;
 }
@@ -2385,6 +2646,57 @@ function updateSelectedPreview() { renderDirectQList(); }
 
 // --- FORM PREVIEW MODAL ---
 let formPreviewHistoryActive = false;
+let formPreviewPageState = {
+  page: 0,
+  formInfo: null,
+  questions: [],
+  containerId: 'form-preview-body',
+};
+
+function buildFormPreviewPages(normalizedQuestions) {
+  const items = normalizedQuestions || [];
+  const hasSection = items.some(isSectionItem);
+
+  if (!hasSection) {
+    return [{
+      section: null,
+      sectionIndex: -1,
+      items: items.map((item, originalIndex) => ({ item, originalIndex })),
+    }];
+  }
+
+  const pages = [];
+  let current = { section: null, sectionIndex: -1, items: [] };
+
+  items.forEach((item, index) => {
+    if (isSectionItem(item)) {
+      if (current.section || current.items.length) pages.push(current);
+      current = { section: item, sectionIndex: index, items: [] };
+      return;
+    }
+
+    current.items.push({ item, originalIndex: index });
+  });
+
+  if (current.section || current.items.length || !pages.length) pages.push(current);
+  return pages;
+}
+
+function setFormPreviewPage(pageIndex) {
+  const state = formPreviewPageState || {};
+  const body = document.getElementById(state.containerId || 'form-preview-body');
+  if (!body || !state.formInfo) return;
+
+  const normalizedQuestions = (state.questions || []).map(normalizeQuestionForPreview);
+  const pageCount = buildFormPreviewPages(normalizedQuestions).length || 1;
+  const nextPage = Math.min(Math.max(Number(pageIndex) || 0, 0), pageCount - 1);
+  formPreviewPageState.page = nextPage;
+  body.innerHTML = renderFormPreviewSurface(
+    { ...state.formInfo, _previewPageIndex: nextPage },
+    state.questions || []
+  );
+  body.scrollTop = 0;
+}
 
 function pushFormPreviewHistory() {
   if (history.state?.formPreviewModal && formPreviewHistoryActive) return;
@@ -2611,13 +2923,13 @@ function applyCreateTheme() {
       : '#fff';
   }
   if (title) {
-    title.style.fontFamily = `'${theme.headerFont}', 'Segoe UI', sans-serif`;
+    title.style.fontFamily = `'${theme.headerFont}', 'Be Vietnam Pro', sans-serif`;
     title.style.fontSize = `${theme.headerSize}px`;
     title.style.color = useDefaultEditLook ? '#fff' : theme.color;
     title.style.fontWeight = '400';
   }
   if (desc) {
-    desc.style.fontFamily = `'${theme.textFont}', 'Segoe UI', sans-serif`;
+    desc.style.fontFamily = `'${theme.textFont}', 'Be Vietnam Pro', sans-serif`;
     desc.style.fontSize = `${theme.textSize}px`;
     desc.style.color = useDefaultEditLook ? '#dbeafe' : '#475569';
     desc.style.fontWeight = useDefaultEditLook ? '500' : '400';
@@ -2629,7 +2941,7 @@ function applyCreateTheme() {
     btn.style.boxShadow = useDefaultEditLook ? '0 8px 18px rgba(0,0,0,.14)' : '';
   });
   document.querySelectorAll('#direct-q-list input, #direct-q-list textarea, #direct-q-list select').forEach(el => {
-    el.style.fontFamily = `'${theme.questionFont}', 'Segoe UI', sans-serif`;
+    el.style.fontFamily = `'${theme.questionFont}', 'Be Vietnam Pro', sans-serif`;
   });
   const preview = document.getElementById('create-theme-header-preview');
   if (preview) {
@@ -2711,6 +3023,60 @@ window.addEventListener('popstate', (event) => {
 function isModalVisible(id) {
   const modal = document.getElementById(id);
   return !!modal && modal.classList.contains('open');
+}
+
+let confirmDialogResolver = null;
+
+function handleConfirmDialog(result) {
+  const resolver = confirmDialogResolver;
+  confirmDialogResolver = null;
+  closeModal('fm-confirm-modal');
+  if (resolver) resolver(!!result);
+}
+
+function showConfirmDialog({
+  title = 'Xác nhận thao tác',
+  message = '',
+  note = '',
+  confirmText = 'Xác nhận',
+  cancelText = 'Hủy',
+  variant = 'danger',
+} = {}) {
+  const modal = document.getElementById('fm-confirm-modal');
+  const titleEl = document.getElementById('fm-confirm-title');
+  const messageEl = document.getElementById('fm-confirm-message');
+  const noteEl = document.getElementById('fm-confirm-note');
+  const okBtn = document.getElementById('fm-confirm-ok');
+  const cancelBtn = document.getElementById('fm-confirm-cancel');
+  const iconEl = document.getElementById('fm-confirm-icon');
+  if (!modal || !titleEl || !messageEl || !okBtn || !cancelBtn) {
+    return Promise.resolve(window.confirm(`${title}\n\n${message}${note ? `\n\n${note}` : ''}`));
+  }
+
+  const palette = variant === 'warning'
+    ? { bg: '#fff7ed', fg: '#ea580c', btn: '#ea580c', border: '#ea580c' }
+    : { bg: '#fee2e2', fg: '#dc2626', btn: '#dc2626', border: '#dc2626' };
+
+  titleEl.textContent = title;
+  messageEl.innerHTML = message;
+  if (noteEl) {
+    noteEl.style.display = note ? 'block' : 'none';
+    noteEl.textContent = note;
+  }
+  if (iconEl) {
+    iconEl.style.background = palette.bg;
+    iconEl.style.color = palette.fg;
+  }
+  okBtn.textContent = confirmText;
+  okBtn.style.background = palette.btn;
+  okBtn.style.borderColor = palette.border;
+  cancelBtn.textContent = cancelText;
+
+  openModal('fm-confirm-modal');
+  setTimeout(() => okBtn.focus(), 0);
+  return new Promise(resolve => {
+    confirmDialogResolver = resolve;
+  });
 }
 
 function hideCreateFormModalVisual() {
@@ -2837,7 +3203,9 @@ function openFormPreview(pushHistory = true) {
 
   title.innerHTML = formatRichText(name);
 
-  body.innerHTML = renderFormPreviewSurface({ name, desc, cat, target: '', theme: createFormTheme }, sel);
+  const previewInfo = { name, desc, cat, target: '', theme: createFormTheme };
+  formPreviewPageState = { page: 0, formInfo: previewInfo, questions: sel, containerId: 'form-preview-body' };
+  body.innerHTML = renderFormPreviewSurface({ ...previewInfo, _previewPageIndex: 0 }, sel);
   openModal('form-preview-modal');
   if (pushHistory) pushFormPreviewHistory();
   return;
@@ -2856,23 +3224,24 @@ function openFormPreview(pushHistory = true) {
           ${cat ? `<span style="font-size:12px;background:rgba(255,255,255,0.5);padding:6px 12px;border-radius:999px;font-weight:700">${cat}</span>` : ''}
           <span style="font-size:12px;background:rgba(255,255,255,0.5);padding:6px 12px;border-radius:999px;font-weight:700">Tổng ${sel.length} câu hỏi</span>
         </div>
-        <div style="font-size:42px;font-weight:800;line-height:1.08;letter-spacing:-0.02em;margin-bottom:10px">${formatRichText(name)}</div>
-        ${desc ? `<div style="font-size:17px;line-height:1.6;max-width:820px">${formatRichText(desc)}</div>` : ''}
+        <div style="font-size:32px;font-weight:700;line-height:1.2;letter-spacing:-0.02em;margin-bottom:10px">${formatRichText(name)}</div>
+        ${desc ? `<div style="font-size:17px;line-height:1.6;width:100%">${formatRichText(desc)}</div>` : ''}
       </div>
 
       <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:24px">
         ${sel.map((q, i) => `
           <div style="border:1px solid #00008B;border-radius:22px;padding:20px 22px;background:rgba(255,255,255,.9);box-shadow:0 10px 26px rgba(0,0,139,.08)">
-            <div style="display:flex;align-items:flex-start;gap:14px">
-              <div style="width:36px;height:36px;border-radius:50%;background:#00008B;color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${i+1}</div>
-              <div style="flex:1;min-width:0">
-                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-                  <span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:700">${TYPE_LABEL_MAP[normalizeQuestionType(q.type)] || normalizeQuestionType(q.type)}</span>
-                  ${q.required ? '<span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:#fee2e2;color:#dc2626;font-size:12px;font-weight:700">Bắt buộc</span>' : '<span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:#f8fafc;color:#64748b;font-size:12px;font-weight:700">Không bắt buộc</span>'}
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+              <div style="display:flex;align-items:flex-start;gap:14px;flex:1;min-width:0">
+                <div style="width:36px;height:36px;border-radius:50%;background:#00008B;color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${i+1}</div>
+                <div style="flex:1;min-width:0">
+                <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:12px;line-height:1.5">${formatRichText(q.text, q.required)}</div>
+                  ${renderQuestionMedia(q)}
+                  ${renderQuestionPreview(q)}
                 </div>
-                <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:16px;line-height:1.45">${formatRichText(q.text)}</div>
-                ${renderQuestionMedia(q)}
-                ${renderQuestionPreview(q)}
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+                <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${TYPE_LABEL_MAP[normalizeQuestionType(q.type)] || normalizeQuestionType(q.type)}</span>
               </div>
             </div>
           </div>`).join('')}
@@ -2945,12 +3314,24 @@ function renderRichTextBlocks(value) {
     if (line) html += applyInlineRichText(line);
     if (index < lines.length - 1) html += '<br>';
   });
+
   flushList();
   return html;
 }
 
-function formatRichText(value) {
-  return renderRichTextBlocks(previewEsc(value));
+function formatRichText(value, isRequired = false) {
+  if (!value) return isRequired ? ' <span style="color:#ef4444;margin-left:2px">*</span>' : '';
+  let text = String(value);
+  if (isRequired) {
+    const lines = text.split('\n');
+    lines[0] = lines[0] + '__REQ_STAR__';
+    text = lines.join('\n');
+  }
+  let html = renderRichTextBlocks(previewEsc(text));
+  if (isRequired) {
+    html = html.replace('__REQ_STAR__', ' <span style="color:#ef4444;margin-left:2px">*</span>');
+  }
+  return html;
 }
 
 function renderRichTextBlocksForEditor(value) {
@@ -3022,9 +3403,11 @@ function renderQuestionMedia(q) {
   const videoUrl = getQuestionVideoUrl(q);
   if (!imageUrl && !videoUrl) return '';
 
+  const align = q.image_align || parseJsonObject(q.validation_json || q.validation || q.logic_json).image_align || 'left';
+  const width = q.image_width || parseJsonObject(q.validation_json || q.validation || q.logic_json).image_width || 'auto';
   const imageHtml = imageUrl ? `
-    <div style="margin-bottom:12px">
-      <img src="${previewEsc(imageUrl)}" alt="Hình ảnh câu hỏi" style="display:block;max-width:100%;max-height:260px;border-radius:12px;border:1px solid #dbe4f0;object-fit:contain;background:#f8fafc">
+    <div style="margin-bottom:12px;display:flex;justify-content:${align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'}">
+      <img src="${previewEsc(imageUrl)}" alt="Hình ảnh câu hỏi" style="width:${width};display:block;max-width:100%;max-height:400px;border-radius:12px;border:1px solid #dbe4f0;object-fit:contain;background:#f8fafc">
     </div>` : '';
 
   const embedUrl = getYoutubeEmbedUrl(videoUrl);
@@ -3044,40 +3427,122 @@ function renderQuestionMedia(q) {
 
 function previewQuestionChip(type) {
   const normalizedType = normalizeQuestionType(type);
-  if (normalizedType === 'choice' || normalizedType === 'checkbox' || normalizedType === 'dropdown') return 'L&#7921;a ch&#7885;n';
-  if (normalizedType === 'rating' || normalizedType === 'scale') return '&#272;&aacute;nh gi&aacute;';
-  if (normalizedType === 'short_text' || normalizedType === 'paragraph') return 'T&#7921; lu&#7853;n';
-  if (normalizedType === 'grid_radio' || normalizedType === 'grid_checkbox') return 'Ma tr&#7853;n';
-  if (normalizedType === 'upload') return 'T&#7879;p';
-  if (normalizedType === 'date' || normalizedType === 'time') return 'Ng&agrave;y gi&#7901;';
+  if (normalizedType === 'choice') return 'Lựa chọn';
+  if (normalizedType === 'checkbox') return 'Hộp kiểm';
+  if (normalizedType === 'dropdown') return 'Thả xuống';
+  if (normalizedType === 'rating') return 'Đánh giá';
+  if (normalizedType === 'scale') return 'Thang đo';
+  if (normalizedType === 'short_text') return 'Tự luận';
+  if (normalizedType === 'paragraph') return 'Tự luận dài';
+  if (normalizedType === 'grid_radio') return 'Lưới trắc nghiệm';
+  if (normalizedType === 'grid_checkbox') return 'Lưới hộp kiểm';
+  if (normalizedType === 'upload') return 'Tải tệp';
+  if (normalizedType === 'date') return 'Ngày';
+  if (normalizedType === 'time') return 'Giờ';
   return TYPE_LABEL_MAP[normalizedType] || normalizedType;
 }
 
-function renderPreviewOptionPills(options, kind = 'radio') {
+function getPreviewControlName(q, fallback = '') {
+  const raw = q?.id || q?.client_id || q?.ma_cau_hoi || q?.text || q?.noi_dung || fallback || 'preview';
+  return `preview_${String(raw).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+}
+
+function renderPreviewOptionPills(q, kind = 'radio', includeOther = false, controlName = 'preview_choice') {
+  const options = Array.isArray(q.opts) ? q.opts : [];
+  const list = [...options];
+  const type = kind === 'checkbox' ? 'checkbox' : 'radio';
+  const nameAttr = type === 'radio' ? `name="${previewEsc(controlName)}"` : '';
+  const otherId = `${controlName}_other`;
+  const otherTextId = `${controlName}_other_text`;
+  const controlStyle = `width:18px;height:18px;accent-color:#00008B;cursor:pointer;flex-shrink:0`;
+  
+  let vj = {}; try { vj = typeof q.validation_json === 'string' ? JSON.parse(q.validation_json) : q.validation_json; } catch(e){}
+  const optImgs = vj && vj.option_images ? vj.option_images : {};
+
   return `<div style="display:flex;flex-direction:column;gap:10px">
-    ${options.map((option, index) => `
-      <label style="display:flex;align-items:center;gap:8px;width:100%;min-height:50px;padding:12px 14px;border:1px solid #dbe4f0;border-radius:12px;background:rgba(255,255,255,.92);font-size:14px;font-weight:500;color:#334155;box-sizing:border-box">
-        <span style="width:16px;height:16px;border:${kind === 'checkbox' ? '1.8px solid #9ca3af;border-radius:4px' : '1.8px solid #9ca3af;border-radius:50%'};display:inline-block;flex-shrink:0;background:#fff"></span>
-        <span>${previewEsc(option || `Lựa chọn ${index + 1}`)}</span>
+    ${list.map((option, index) => {
+      const imgHtml = optImgs[index] ? `<img src="${optImgs[index]}" style="margin-top:8px;max-height:120px;object-fit:contain;border-radius:6px;border:1px solid #e2e8f0;align-self:flex-start">` : '';
+      return `<label style="display:flex;align-items:flex-start;gap:8px;width:100%;min-height:50px;padding:12px 14px;border:1px solid #dbe4f0;border-radius:12px;background:rgba(255,255,255,.92);font-size:14px;font-weight:500;color:#334155;box-sizing:border-box;cursor:pointer">
+        <input type="${type}" ${nameAttr} value="${previewEsc(option || `Lựa chọn ${index + 1}`)}" style="${controlStyle};margin-top:2px;">
+        <div style="display:flex;flex-direction:column;flex:1;word-break:break-word">
+          <span>${previewEsc(option || `Lựa chọn ${index + 1}`)}</span>
+          ${imgHtml}
+        </div>
+      </label>`;
+    }).join('')}
+    ${includeOther ? `
+      <label style="display:flex;align-items:center;gap:8px;width:100%;min-height:50px;padding:12px 14px;border:1px solid #dbe4f0;border-radius:12px;background:rgba(255,255,255,.92);font-size:14px;font-weight:500;color:#334155;box-sizing:border-box;cursor:pointer">
+        <input id="${previewEsc(otherId)}" type="${type}" ${nameAttr} value="__other__" onchange="const otherText=document.getElementById('${previewEsc(otherTextId)}');if(this.checked&&otherText){setTimeout(()=>otherText.focus(),0)}" style="${controlStyle}">
+        <span>Khác:</span>
+        <input id="${previewEsc(otherTextId)}" type="text" placeholder="Câu trả lời khác" onfocus="const el=document.getElementById('${previewEsc(otherId)}');if(el)el.checked=true" style="flex:1;min-width:160px;border:0;border-bottom:1.5px solid #cbd5e1;background:transparent;padding:6px 0;font:inherit;color:#334155;outline:none">
       </label>
-    `).join('')}
+    ` : ''}
+  </div>`;
+}
+
+function renderInteractiveScalePreview(q) {
+  const scale = normalizeScaleConfig(getQuestionScaleConfig(q));
+  const values = getScaleValues(scale);
+  const name = getPreviewControlName(q, 'scale');
+  const hasLabels = !!(scale.labelMin || scale.labelMax);
+  return `<div style="width:100%;overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;min-width:${Math.max(values.length * 56, 200)}px">
+      <thead>
+        <tr>
+          ${hasLabels ? `<td style="width:1%"></td>` : ''}
+          ${values.map(n => `<td style="padding:0 0 6px;text-align:center;font-size:13px;font-weight:700;color:#1e293b">${n}</td>`).join('')}
+          ${hasLabels ? `<td style="width:1%"></td>` : ''}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          ${hasLabels ? `<td style="padding:0 10px 0 0;white-space:nowrap;font-size:12.5px;font-weight:700;color:#64748b;text-align:left;width:1%">${previewEsc(scale.labelMin || '')}</td>` : ''}
+          ${values.map(n => `<td style="padding:4px 0;text-align:center">
+            <label style="display:flex;flex-direction:column;align-items:center;cursor:pointer">
+              <input type="radio" name="${previewEsc(name)}" value="${n}" style="width:20px;height:20px;accent-color:#00008B;cursor:pointer;margin:0">
+            </label>
+          </td>`).join('')}
+          ${hasLabels ? `<td style="padding:0 0 0 10px;white-space:nowrap;font-size:12.5px;font-weight:700;color:#64748b;text-align:right;width:1%">${previewEsc(scale.labelMax || '')}</td>` : ''}
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function renderInteractiveRatingPreview(q) {
+  const rating = normalizeRatingConfig(getQuestionRatingConfig(q));
+  const name = getPreviewControlName(q, 'rating');
+  const uid = previewEsc(name);
+  return `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap" id="rating-wrap-${uid}">
+    ${Array.from({ length: rating.count }, (_, i) => {
+      const value = i + 1;
+      return `<label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer" title="${value} sao">
+        <span style="font-size:12px;font-weight:700;color:#64748b">${value}</span>
+        <input type="radio" name="${previewEsc(name)}" value="${value}"
+          style="position:absolute;opacity:0;width:0;height:0"
+          onchange="(function(el){var wrap=el.closest('[id^=rating-wrap]');if(!wrap)return;var val=Number(el.value);wrap.querySelectorAll('.preview-star').forEach(function(s,idx){s.textContent=idx<val?'★':'☆';s.style.color=idx<val?'#f59e0b':'#cbd5e1';});})( this)">
+        <span class="preview-star" style="font-size:30px;line-height:1;color:#cbd5e1;cursor:pointer">☆</span>
+      </label>`;
+    }).join('')}
   </div>`;
 }
 
 function renderQuestionPreview(q) {
   const normalizedType = normalizeQuestionType(q.type);
+  if (normalizedType === 'presentation_image' || normalizedType === 'presentation_video') return '';
   const opts = Array.isArray(q.opts) ? q.opts : [];
+  const controlName = getPreviewControlName(q, normalizedType);
 
   if (normalizedType === 'short_text') {
-    return `<input disabled type="text" placeholder="Nh&#7853;p c&acirc;u tr&#7843; l&#7901;i ng&#7855;n" style="width:100%;max-width:460px;box-sizing:border-box;padding:12px 14px;border:0;border-bottom:2px solid #cbd5e1;border-radius:12px 12px 0 0;font:inherit;color:#94a3b8;background:#fff;outline:none">`;
+    return `<input type="text" placeholder="Nh&#7853;p c&acirc;u tr&#7843; l&#7901;i ng&#7855;n" style="width:100%;max-width:460px;box-sizing:border-box;padding:12px 14px;border:0;border-bottom:2px solid #cbd5e1;border-radius:12px 12px 0 0;font:inherit;color:#334155;background:#fff;outline:none">`;
   }
   if (normalizedType === 'paragraph') {
-    return `<textarea disabled rows="4" placeholder="Nh&#7853;p c&acirc;u tr&#7843; l&#7901;i c&#7911;a b&#7841;n" style="width:100%;box-sizing:border-box;min-height:120px;padding:12px 14px;border:1px solid #cbd5e1;border-radius:14px;font:inherit;color:#94a3b8;background:#fff;resize:none;outline:none"></textarea>`;
+    return `<textarea rows="4" placeholder="Nh&#7853;p c&acirc;u tr&#7843; l&#7901;i c&#7911;a b&#7841;n" style="width:100%;box-sizing:border-box;min-height:120px;padding:12px 14px;border:1px solid #cbd5e1;border-radius:14px;font:inherit;color:#334155;background:#fff;resize:vertical;outline:none"></textarea>`;
   }
-  if (normalizedType === 'choice') return renderPreviewOptionPills(opts, 'radio');
-  if (normalizedType === 'checkbox') return renderPreviewOptionPills(opts, 'checkbox');
+  if (normalizedType === 'choice') return renderPreviewOptionPills(q, 'radio', questionAllowsOther(q), controlName);
+  if (normalizedType === 'checkbox') return renderPreviewOptionPills(q, 'checkbox', questionAllowsOther(q), controlName);
   if (normalizedType === 'dropdown') {
-    return `<select disabled style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #cbd5e1;border-radius:14px;font:inherit;color:#64748b;background:#fff;outline:none">
+    return `<select style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #cbd5e1;border-radius:14px;font:inherit;color:#334155;background:#fff;outline:none;cursor:pointer">
       <option>Ch&#7885;n m&#7897;t m&#7909;c...</option>
       ${opts.map(option => `<option>${previewEsc(option)}</option>`).join('')}
     </select>`;
@@ -3090,7 +3555,7 @@ function renderQuestionPreview(q) {
     }
     const isRadio = normalizedType === 'grid_radio';
     return `<div style="overflow-x:auto">
-      <table style="border-collapse:separate;border-spacing:0;width:100%;min-width:420px;border:1px solid #00008B;border-radius:16px;overflow:hidden;background:#fff">
+      <table style="border-collapse:separate;border-spacing:0;width:100%;min-width:420px;table-layout:fixed;border:1px solid #00008B;border-radius:16px;overflow:hidden;background:#fff">
         <thead>
           <tr>
             <th style="padding:12px 14px;text-align:left;background:#00008B;color:#fff;font-size:13px;font-weight:700;border-bottom:1px solid #00008B"></th>
@@ -3101,8 +3566,8 @@ function renderQuestionPreview(q) {
           ${rows.map((row, rowIndex) => `
             <tr style="background:${rowIndex % 2 === 0 ? '#fff' : '#fcfdff'}">
               <td style="padding:14px;color:#0f172a;font-size:14px;font-weight:600;border-bottom:${rowIndex === rows.length - 1 ? 'none' : '1px solid #eef4ff'}">${previewEsc(row)}</td>
-              ${cols.map(() => `<td style="padding:14px;text-align:center;border-bottom:${rowIndex === rows.length - 1 ? 'none' : '1px solid #eef4ff'}">
-                <span style="display:inline-block;width:16px;height:16px;border:${isRadio ? '1.8px solid #9ca3af;border-radius:50%' : '1.8px solid #9ca3af;border-radius:4px'};background:#fff"></span>
+              ${cols.map((col, colIndex) => `<td style="padding:14px;text-align:center;border-bottom:${rowIndex === rows.length - 1 ? 'none' : '1px solid #eef4ff'}">
+                <input type="${isRadio ? 'radio' : 'checkbox'}" ${isRadio ? `name="${previewEsc(`${controlName}_${rowIndex}`)}"` : ''} value="${previewEsc(col)}" style="width:18px;height:18px;accent-color:#00008B;cursor:pointer">
               </td>`).join('')}
             </tr>
           `).join('')}
@@ -3111,16 +3576,16 @@ function renderQuestionPreview(q) {
     </div>`;
   }
   if (normalizedType === 'scale') {
-    return renderScalePreview(getQuestionScaleConfig(q));
+    return renderInteractiveScalePreview(q);
   }
   if (normalizedType === 'rating') {
-    return renderRatingPreview(getQuestionRatingConfig(q));
+    return renderInteractiveRatingPreview(q);
   }
   if (normalizedType === 'upload') {
-    return `<button disabled style="display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border:1.5px dashed #94a3b8;border-radius:12px;background:#f8fafc;color:#475569;font:inherit;font-weight:800"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M20 16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3"/></svg>T&#7843;i t&#7879;p l&ecirc;n</button>`;
+    return `<label style="display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border:1.5px dashed #94a3b8;border-radius:12px;background:#f8fafc;color:#475569;font:inherit;font-weight:800;cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M20 16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3"/></svg>T&#7843;i t&#7879;p l&ecirc;n<input type="file" style="display:none"></label>`;
   }
   if (normalizedType === 'date' || normalizedType === 'time') {
-    return `<input disabled type="${normalizedType === 'date' ? 'date' : 'time'}" style="width:220px;max-width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #bbf7d0;border-radius:12px;background:#f8fffb;color:#64748b;font:inherit">`;
+    return `<input type="${normalizedType === 'date' ? 'date' : 'time'}" style="width:220px;max-width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #bbf7d0;border-radius:12px;background:#f8fffb;color:#334155;font:inherit;outline:none">`;
   }
   return '';
 }
@@ -3166,13 +3631,26 @@ function renderFormPreviewSurface(formInfo, questions) {
   const headerBg = headerImage
     ? `linear-gradient(135deg,rgba(255,255,255,.92),rgba(255,255,255,.78)),url("${String(headerImage).replace(/"/g, '%22')}") center/cover`
     : `linear-gradient(135deg,${background} 0%,#ffffff 70%)`;
+  const previewPages = buildFormPreviewPages(normalizedQuestions);
+  const previewPageIndex = Math.min(
+    Math.max(Number(formInfo._previewPageIndex || 0), 0),
+    Math.max(previewPages.length - 1, 0)
+  );
+  const currentPreviewPage = previewPages[previewPageIndex] || previewPages[0] || { section: null, sectionIndex: -1, items: [] };
+  const previewQuestionItems = currentPreviewPage.items || [];
+  const hasPreviewPages = previewPages.length > 1;
 
   if (!normalizedQuestions.length) {
-    return `<div style="min-height:100%;background:${background};font-family:'${theme.textFont}','Segoe UI',sans-serif"><div style="text-align:center;padding:40px 0;color:#94a3b8;font-size:14px">Chưa có câu hỏi nào trong form.</div></div>`;
+    return `<div style="min-height:100%;background:${background};font-family:'Be Vietnam Pro','${theme.textFont}',sans-serif">
+      <div style="max-width:1080px;margin:0 auto;padding:52px 20px 64px">
+        <div style="text-align:center;padding:40px 0;color:#94a3b8;font-size:14px">Chưa có câu hỏi nào trong form.</div>
+        <div style="display:flex;justify-content:center"><button type="button" disabled style="min-width:210px;height:48px;padding:0 20px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-size:15px;font-weight:800;opacity:.72;cursor:not-allowed">Gửi phản hồi</button></div>
+      </div>
+    </div>`;
   }
 
   return `
-    <div style="min-height:100%;background:${background};font-family:'${theme.textFont}','Segoe UI',sans-serif;color:#0f172a">
+    <div style="min-height:100%;background:${background};font-family:'Be Vietnam Pro','${theme.textFont}',sans-serif;color:#0f172a">
     <div style="max-width:1080px;margin:0 auto;padding:52px 20px 64px">
       <section style="background:transparent;border:0;border-radius:0;padding:0;box-shadow:none">
         <div style="min-height:180px;margin-bottom:18px;position:relative;overflow:hidden;border-radius:30px;background:${headerBg};border-top:8px solid ${accent};box-shadow:0 24px 48px rgba(15,23,42,.12);display:flex;flex-direction:column;justify-content:flex-end;padding:28px 30px">
@@ -3182,35 +3660,46 @@ function renderFormPreviewSurface(formInfo, questions) {
               <span style="padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.72);color:${accent};font-size:12px;font-weight:700">${previewEsc(cat)}</span>
               <span style="padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.72);color:${accent};font-size:12px;font-weight:700">Tổng ${realCount} câu hỏi</span>
             </div>
-            <div style="font-family:'${theme.headerFont}','Segoe UI',sans-serif;font-size:${theme.headerSize + 18}px;line-height:1.06;font-weight:900;color:${accent}">${formatRichText(name)}</div>
-            ${desc ? `<div style="max-width:760px;margin-top:14px;font-size:${theme.textSize + 3}px;color:#334155;font-weight:600;line-height:1.55">${formatRichText(desc)}</div>` : ''}
+            <h1 style="margin:0;font-family:'${theme.headerFont}','Be Vietnam Pro',sans-serif;font-size:32px;line-height:1.2;font-weight:700;color:${accent}">${formatRichText(name)}</h1>
+            ${desc ? `<p style="margin:12px 0 0;width:100%;font-size:16px;color:${accent};line-height:1.55">${formatRichText(desc)}</p>` : ''}
           </div>
         </div>
       </section>
 
       <div style="display:flex;flex-direction:column;gap:16px;padding:12px 0 28px">
-        ${normalizedQuestions.map((q, i) => isSectionItem(q) ? `
+        ${currentPreviewPage.section ? `
           <div style="border:1px solid #fbbf24;border-left:6px solid #f59e0b;border-radius:20px;padding:20px 22px;background:linear-gradient(180deg,#fffbeb 0%,#fff7ed 100%);box-shadow:0 12px 26px rgba(180,83,9,.08)">
-            <div style="font-size:12px;font-weight:900;color:#b45309;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Phần ${getSectionNumber(normalizedQuestions, i)}</div>
-            <div style="font-size:24px;font-weight:900;color:#78350f;line-height:1.3">${formatRichText(q.text || `Phần ${getSectionNumber(normalizedQuestions, i)}`)}</div>
-            ${q.desc ? `<div style="font-size:14px;color:#92400e;line-height:1.55;margin-top:8px">${formatRichText(q.desc)}</div>` : ''}
+            <div style="font-size:12px;font-weight:900;color:#b45309;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Phần ${getSectionNumber(normalizedQuestions, currentPreviewPage.sectionIndex)} / ${getTotalSectionCount(normalizedQuestions)}</div>
+            <div style="font-size:24px;font-weight:900;color:#78350f;line-height:1.3">${formatRichText(currentPreviewPage.section.text || `Phần ${getSectionNumber(normalizedQuestions, currentPreviewPage.sectionIndex)}`)}</div>
+            ${currentPreviewPage.section.desc ? `<div style="font-size:14px;color:#92400e;line-height:1.55;margin-top:8px">${formatRichText(currentPreviewPage.section.desc)}</div>` : ''}
           </div>
-        ` : `
-          <div style="border:1px solid #bfdbfe;border-top:4px solid ${accent};border-radius:20px;padding:20px 20px 22px;background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);box-shadow:0 12px 26px rgba(30,64,175,.08)">
-            <div style="display:flex;align-items:flex-start;gap:14px">
-              <div style="width:36px;height:36px;border-radius:50%;background:${accent};color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;box-shadow:0 8px 18px rgba(15,23,42,.18)">${getQuestionNumberInSection(normalizedQuestions, i)}</div>
-              <div style="flex:1;min-width:0">
-                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-                  <span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:${accent};color:#fff;font-size:12px;font-weight:800">${previewQuestionChip(q.type)}</span>
-                  ${q.required ? '<span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:800">Bắt buộc</span>' : '<span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:#e0f2fe;color:#075985;font-size:12px;font-weight:800">Không bắt buộc</span>'}
-                </div>
-                <div style="font-family:'${theme.questionFont}','Segoe UI',sans-serif;font-size:${theme.questionSize + 7}px;font-weight:700;color:#0f172a;margin-bottom:14px;line-height:1.45">${formatRichText(q.text || 'Câu hỏi chưa có nội dung')}</div>
-                ${renderQuestionMedia(q)}
-                ${renderQuestionPreview(q)}
+        ` : (hasPreviewPages ? `
+          <div style="border:1px solid #fbbf24;border-left:6px solid #f59e0b;border-radius:20px;padding:14px 18px;background:linear-gradient(180deg,#fffbeb 0%,#fff7ed 100%);box-shadow:0 12px 26px rgba(180,83,9,.06)">
+            <div style="font-size:12px;font-weight:900;color:#b45309;text-transform:uppercase;letter-spacing:.6px">Phần ${previewPageIndex + 1} / ${previewPages.length}</div>
+          </div>
+        ` : '')}
+        ${previewQuestionItems.map(({ item: q, originalIndex: i }) => `
+          <div style="border:1px solid ${accent};border-radius:22px;padding:20px 20px 22px;background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,247,237,.95) 100%);box-shadow:0 12px 26px rgba(0,0,139,.08)">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px">
+              <div style="min-width:0;flex:1;display:flex;align-items:flex-start;gap:14px">
+                <div style="width:36px;height:36px;border-radius:50%;background:${accent};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${getQuestionNumberInSection(normalizedQuestions, i)}</div>
+                <p style="margin:0;font-size:16px;line-height:1.5;font-weight:600;color:#0f172a">${formatRichText(q.text || 'Câu hỏi chưa có nội dung', q.required)}</p>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+                <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:${accent};color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${previewQuestionChip(q.type)}</span>
               </div>
             </div>
+            ${renderQuestionMedia(q)}
+            ${renderQuestionPreview(q)}
           </div>
         `).join('')}
+      </div>
+      <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap">
+        ${hasPreviewPages && previewPageIndex > 0 ? `<button type="button" onclick="setFormPreviewPage(${previewPageIndex - 1})" style="min-width:118px;height:48px;padding:0 20px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;color:${accent};font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(15,23,42,.08)">Quay lại</button>` : ''}
+        ${hasPreviewPages && previewPageIndex < previewPages.length - 1
+          ? `<button type="button" onclick="setFormPreviewPage(${previewPageIndex + 1})" style="min-width:118px;height:48px;padding:0 20px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 12px 28px rgba(29,155,240,.24)">Tiếp</button>`
+          : `<button type="button" disabled title="Chỉ xem trước, không thể gửi phản hồi" style="min-width:210px;height:48px;padding:0 20px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-size:15px;font-weight:800;opacity:.72;cursor:not-allowed">Gửi phản hồi</button>`}
+        ${hasPreviewPages ? `<span style="font-size:13px;font-weight:800;color:#64748b">Phần ${previewPageIndex + 1}/${previewPages.length}</span>` : ''}
       </div>
     </div>
     </div>
@@ -3221,7 +3710,7 @@ function openFormPreview(pushHistory = true) {
   const name = document.getElementById('new-form-name')?.value?.trim() || '(Chưa đặt tên)';
   const desc = document.getElementById('new-form-desc')?.value?.trim() || '';
   const cat  = document.getElementById('new-form-cat')?.value || 'Khac';
-  const target = document.getElementById('new-form-target')?.value || 'Tất cả';
+  const target = normalizeSurveyTarget(document.getElementById('new-form-target')?.value || 'Tất cả');
   const sel  = typeof getAllFormItems === 'function' ? getAllFormItems() : getAllFormQuestions();
 
   const body = document.getElementById('form-preview-body');
@@ -3233,7 +3722,9 @@ function openFormPreview(pushHistory = true) {
 
   title.innerHTML = formatRichText(name);
 
-  body.innerHTML = renderFormPreviewSurface({ name, desc, cat, target, theme: createFormTheme }, sel);
+  const previewInfo = { name, desc, cat, target, theme: createFormTheme };
+  formPreviewPageState = { page: 0, formInfo: previewInfo, questions: sel, containerId: 'form-preview-body' };
+  body.innerHTML = renderFormPreviewSurface({ ...previewInfo, _previewPageIndex: 0 }, sel);
   openModal('form-preview-modal');
   if (pushHistory) pushFormPreviewHistory();
   return;
@@ -3248,7 +3739,7 @@ function openFormPreview(pushHistory = true) {
   const createdAt = new Date().toLocaleDateString('vi-VN');
 
   body.innerHTML = `
-    <div style="max-width:1080px;margin:0 auto;padding:52px 20px 64px;font-family:'Be Vietnam Pro','Segoe UI',sans-serif;color:#0f172a">
+    <div style="max-width:1080px;margin:0 auto;padding:52px 20px 64px;font-family:'Be Vietnam Pro',sans-serif;color:#0f172a">
       <section style="background:transparent;border:0;border-radius:0;padding:0;box-shadow:none">
         <div style="min-height:180px;margin-bottom:18px;position:relative;overflow:hidden;border-radius:30px;background:linear-gradient(135deg,#00008B 0%,#00008B 50%,#00008B 100%);box-shadow:0 24px 48px rgba(0,0,139,.16);display:flex;flex-direction:column;justify-content:flex-end;padding:28px 30px">
           <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(219,234,254,.92) 0%,rgba(224,242,254,.84) 42%,rgba(199,210,254,.9) 100%)"></div>
@@ -3258,7 +3749,7 @@ function openFormPreview(pushHistory = true) {
               <span style="padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.36);color:#00008B;font-size:12px;font-weight:700">${previewEsc(cat)}</span>
               <span style="padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.36);color:#00008B;font-size:12px;font-weight:700">Tổng ${sel.length} câu hỏi</span>
             </div>
-            <h1 style="margin:0;font-size:42px;font-weight:800;line-height:1.08;color:#00008B">${formatRichText(name)}</h1>
+            <h1 style="margin:0;font-size:32px;font-weight:700;line-height:1.2;color:#00008B">${formatRichText(name)}</h1>
             ${desc ? `<p style="margin:12px 0 0;color:#00008B;font-size:16px">${formatRichText(desc)}</p>` : ''}
           </div>
         </div>
@@ -3271,11 +3762,10 @@ function openFormPreview(pushHistory = true) {
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px">
                 <div style="min-width:0;flex:1;display:flex;align-items:flex-start;gap:14px">
                   <div style="width:36px;height:36px;border-radius:50%;background:#00008B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0">${i + 1}</div>
-                  <p style="margin:0;font-size:21px;line-height:1.45;font-weight:800;color:#0f172a">${formatRichText(q.text)}${q.required ? ' <span style="color:#dc2626">*</span>' : ''}</p>
+                  <p style="margin:0;font-size:16px;line-height:1.5;font-weight:600;color:#0f172a">${formatRichText(q.text, q.required)}</p>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
                   <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${previewQuestionChip(q.type)}</span>
-                  <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:${q.required ? '#fee2e2' : '#f1f5f9'};color:${q.required ? '#dc2626' : '#64748b'};font-size:12px;font-weight:700;white-space:nowrap">${q.required ? 'Bắt buộc' : 'Không bắt buộc'}</span>
                 </div>
               </div>
               ${renderQuestionMedia(q)}
@@ -3304,6 +3794,7 @@ function openFormModal(pushHistory = true) {
   createHistoryStack = [];
   createRedoStack = [];
   setRichTitleEditorValue('');
+  initCreateFormFlatpickr();
   setRichTextFieldValue('new-form-desc', '');
   const dc = document.getElementById('desc-count');
   if (dc) dc.textContent = '0/1000';
@@ -3578,7 +4069,7 @@ function toggleUrgentApprovalFields() {
     if (deadlineInput) deadlineInput.min = getCurrentDateTimeLocalValue();
   } else {
     if (deadlineInput) deadlineInput.value = '';
-    if (deadlineDisplay) deadlineDisplay.value = '';
+    if (deadlineDisplay) { deadlineDisplay.value = ''; if(deadlineDisplay._flatpickr) deadlineDisplay._flatpickr.clear(); }
     if (urgentReasonInput) urgentReasonInput.value = '';
     updateUrgentReasonCount();
   }
@@ -3613,13 +4104,24 @@ function formatDateTimeLocalToDisplay(value) {
 function syncApprovalDeadlineDisplay() {
   const input = document.getElementById('new-approval-deadline');
   const display = document.getElementById('new-approval-deadline-display');
-  if (display) display.value = formatDateTimeLocalToDisplay(input?.value || '');
+  if (display) { display.value = formatDateTimeLocalToDisplay(input?.value || ''); if(display._flatpickr && input?.value) display._flatpickr.setDate(new Date(input.value)); }
+}
+
+function getTodayEndDateTimeLocal() {
+  const d = new Date();
+  d.setHours(23, 59, 0, 0);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T23:59`;
 }
 
 function openApprovalDeadlinePicker() {
   const input = document.getElementById('new-approval-deadline');
   if (!input) return;
   input.min = getCurrentDateTimeLocalValue();
+  if (!input.value) {
+    input.value = getTodayEndDateTimeLocal();
+    syncApprovalDeadlineDisplay();
+  }
   if (typeof input.showPicker === 'function') input.showPicker();
   else {
     input.focus();
@@ -3636,7 +4138,7 @@ function resetApprovalRequestFields() {
     deadlineInput.value = '';
     deadlineInput.min = getCurrentDateTimeLocalValue();
   }
-  if (deadlineDisplay) deadlineDisplay.value = '';
+  if (deadlineDisplay) { deadlineDisplay.value = ''; if(deadlineDisplay._flatpickr) deadlineDisplay._flatpickr.clear(); }
   if (urgentInput) urgentInput.checked = false;
   if (urgentReasonInput) urgentReasonInput.value = '';
   updateUrgentReasonCount();
@@ -3846,12 +4348,14 @@ function toggleQ(id) {
 function insertLibraryQuestionAfter(questionId, afterId) {
   const source = libraryQuestions.find(q => sameQuestionId(q.id, questionId));
   if (!source) return;
+  const type = normalizeQuestionType(source.type || source.loai || 'choice');
+  const allowOther = questionAllowsOther({ ...source, type });
 
   const newQ = {
     id: 'dq-lib-' + Date.now(),
     thu_vien_id: Number(source.id) || null,
     text: source.text || source.noi_dung || '',
-    type: normalizeQuestionType(source.type || source.loai || 'choice'),
+    type,
     opts: Array.isArray(source.opts)
       ? [...source.opts]
       : Array.isArray(source.lua_chon)
@@ -3859,6 +4363,9 @@ function insertLibraryQuestionAfter(questionId, afterId) {
       : [],
     rows: source.rows ? [...source.rows] : [],
     cols: source.cols ? [...source.cols] : [],
+    validation_json: source.validation_json || source.validation || source.logic_json || '',
+    allowOther,
+    allow_other: allowOther,
     required: source.required || source.bat_buoc || false,
   };
 
@@ -3866,7 +4373,7 @@ function insertLibraryQuestionAfter(questionId, afterId) {
   if (dqIdx >= 0) {
     directQuestions.splice(dqIdx + 1, 0, newQ);
   } else {
-    directQuestions.push(newQ);
+    directQuestions.unshift(newQ);
   }
   activeDirectQuestionId = String(newQ.id);
   renderDirectQList();
@@ -3895,6 +4402,8 @@ function getLibraryQuestionForForm(q) {
     ...q,
     required,
     bat_buoc: required,
+    allowOther: questionAllowsOther(q),
+    allow_other: questionAllowsOther(q),
     thu_vien_id: Number(q.id) || q.thu_vien_id || null,
   };
 }
@@ -3947,8 +4456,13 @@ function isSectionItem(item) {
   return !!item?._isSection || normalizeQuestionType(item?.type || item?.loai) === 'section';
 }
 
+function isPresentationItem(item) {
+  const type = normalizeQuestionType(item?.type || item?.loai);
+  return type === 'presentation_image' || type === 'presentation_video';
+}
+
 function countRealQuestions(items) {
-  return (items || []).filter(item => !isSectionItem(item)).length;
+  return (items || []).filter(item => !isSectionItem(item) && !isPresentationItem(item)).length;
 }
 
 function getQuestionNumberInSection(items, index) {
@@ -3956,7 +4470,7 @@ function getQuestionNumberInSection(items, index) {
   for (let i = 0; i <= index; i++) {
     if (isSectionItem(items[i])) {
       number = 0;
-    } else {
+    } else if (!isPresentationItem(items[i])) {
       number += 1;
     }
   }
@@ -4054,6 +4568,7 @@ function loadImageElement(src) {
 }
 
 async function compressImageSource(src) {
+  if (!src || !src.startsWith('data:image/')) return src;
   const img = await loadImageElement(src);
   let best = src;
   for (const step of IMAGE_COMPRESSION_STEPS) {
@@ -4119,6 +4634,28 @@ async function normalizeQuestionMediaForSave(items) {
       next.video = '';
       next.video_url = '';
     }
+    
+    // Nén ảnh tùy chọn
+    if (next.validation_json) {
+      try {
+        const vj = typeof next.validation_json === 'string' ? JSON.parse(next.validation_json) : next.validation_json;
+        if (vj && vj.option_images) {
+          let hasChanges = false;
+          for (const key in vj.option_images) {
+            const optImg = vj.option_images[key];
+            if (isImageDataUrl(optImg) && optImg.length > MAX_MEDIA_PAYLOAD_BYTES) {
+              const compImg = await compressImageSource(optImg);
+              vj.option_images[key] = compImg;
+              hasChanges = true;
+            }
+          }
+          if (hasChanges) {
+            next.validation_json = JSON.stringify(vj);
+          }
+        }
+      } catch(e){}
+    }
+
     normalized.push(next);
   }
   return normalized;
@@ -4416,8 +4953,8 @@ function setActiveDirectSection(id, focus = true) {
 }
 
 function renderDirectQuestionCollapsedCard(q, questionNo, normalizedType) {
-  const title = formatRichText(q.text || 'Câu hỏi chưa có nội dung');
   const required = q.required || q.bat_buoc;
+  const title = formatRichText(q.text || 'Câu hỏi chưa có nội dung', required);
   return `
     <div id="dqcard-${q.id}"
       onclick="setActiveDirectQuestion('${q.id}')"
@@ -4439,15 +4976,16 @@ function renderDirectQuestionCollapsedCard(q, questionNo, normalizedType) {
       </div>
       <div style="flex:1;min-width:0;padding:18px 20px">
         <div style="display:flex;align-items:flex-start;gap:14px">
-          <div style="width:28px;height:28px;border-radius:50%;background:#00008B;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${questionNo}</div>
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-              <span style="padding:5px 11px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:800">${getTypeOptionLabel(normalizedType)}</span>
-              <span style="padding:5px 11px;border-radius:999px;background:#e0f2fe;color:#0369a1;font-size:12px;font-weight:800">${required ? 'Bắt buộc' : 'Không bắt buộc'}</span>
+          <div style="width:28px;height:28px;border-radius:50%;background:#00008B;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
+          <div style="flex:1;min-width:0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:18px;font-weight:800;color:#0f172a;line-height:1.35;margin-bottom:14px">${title}</div>
+              ${renderQuestionMedia(q)}
+              <div style="pointer-events:none">${renderQuestionPreview(q)}</div>
             </div>
-            <div style="font-size:18px;font-weight:800;color:#0f172a;line-height:1.35;margin-bottom:14px">${title}</div>
-            ${renderQuestionMedia(q)}
-            <div style="pointer-events:none">${renderQuestionPreview(q)}</div>
+            <div style="flex-shrink:0">
+              <span style="padding:5px 11px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:800;white-space:nowrap">${getTypeOptionLabel(normalizedType)}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -4680,32 +5218,68 @@ function renderDirectQList() {
       <div id="dq-text-${q.id}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'dq-text-${q.id}')">
         <!-- Row: số + input câu hỏi + dropdown loại -->
         <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:22px;height:22px;border-radius:50%;background:#00008B;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${questionNo}</div>
-          <div id="dq-text-${q.id}" class="dq-placeholder-gray rich-title-editor" contenteditable="true" role="textbox" aria-label="Nội dung câu hỏi"
+          <div style="width:22px;height:22px;border-radius:50%;background:#00008B;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
+          <div id="dq-text-${q.id}" class="dq-placeholder-gray rich-title-editor" contenteditable="true" role="textbox" aria-label="${normalizedType==='presentation_image'?'Tiêu đề hình ảnh':normalizedType==='presentation_video'?'Tiêu đề video':'Nội dung câu hỏi'}"
             data-direct-question-id="${q.id}"
             draggable="false"
-            data-placeholder="Nhập nội dung câu hỏi..."
+            data-placeholder="${normalizedType==='presentation_image'?'Tiêu đề hình ảnh (không bắt buộc)':normalizedType==='presentation_video'?'Tiêu đề video (không bắt buộc)':'Nhập nội dung câu hỏi...'}"
             style="flex:1;width:100%;min-height:35px;padding:7px 11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit;line-height:1.45;outline:none;background:#fafbff;transition:border .15s;min-width:0;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text"
             onmousedown="event.stopPropagation()"
             ondragstart="event.preventDefault()"
             onfocus="this.style.borderColor='#00008B';showFieldToolbar('dq-text-${q.id}')"
             onblur="this.style.borderColor='#e2e8f0';syncRichTextFieldFromEditor('dq-text-${q.id}')"
             oninput="syncRichTextFieldFromEditor('dq-text-${q.id}')"
-            onkeydown="if(event.key==='Enter'){event.preventDefault();}"
+            onkeydown="handleRichFieldKeydown(event, 'dq-text-${q.id}')"
             onpaste="pastePlainTextIntoRichField(event, 'dq-text-${q.id}')">${formatRichTextForEditor(q.text || '')}</div>
-          ${renderQuestionTypeDropdown(q.type, 'direct', q.id)}
+          ${isPresentationItem(q) ? '' : `<button onclick="dqChangeImage('${q.id}')" title="Thêm hình ảnh" style="width:40px;height:40px;border-radius:8px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;transition:background .15s" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='transparent'"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>`}
+          ${isPresentationItem(q) ? '' : renderQuestionTypeDropdown(q.type, 'direct', q.id)}
         </div>
         <div style="margin-left:30px">
           ${renderQuestionFormatToolbar(`dq-text-${q.id}`, { hidden: true })}
         </div>
       </div>
 
-      ${getQuestionImageUrl(q) ? `
-      <div style="margin-top:8px;padding-left:30px;position:relative">
-        <img src="${previewEsc(getQuestionImageUrl(q))}" style="max-width:100%;max-height:160px;border-radius:8px;object-fit:cover;border:1px solid #e2e8f0">
-        <button onclick="(function(){var q=_dqFindQ('${q.id}');if(q){delete q.image;delete q.hinh_anh_url;delete q.image_url;renderDirectQList();}})()" title="Xóa hình"
-          style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;cursor:pointer;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;line-height:1">×</button>
-      </div>` : ''}
+      ${getQuestionImageUrl(q) ? (() => {
+        const align = q.image_align || parseJsonObject(q.validation_json || q.validation || q.logic_json).image_align || 'left';
+        const width = q.image_width || parseJsonObject(q.validation_json || q.validation || q.logic_json).image_width || 'auto';
+        return `
+      <div style="margin-top:8px;padding-left:${isPresentationItem(q) ? '0' : '30px'};position:relative;display:flex;justify-content:${align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'}">
+        <div style="position:relative;display:inline-block"
+             onmouseenter="this.querySelector('.resize-overlay').style.display='block'"
+             onmouseleave="this.querySelector('.resize-overlay').style.display='none'">
+          <img id="dq-img-${q.id}" src="${previewEsc(getQuestionImageUrl(q))}" style="width:${width};max-width:100%;max-height:400px;border-radius:8px;object-fit:contain;border:1px solid #e2e8f0;background:#f8fafc">
+          <div class="resize-overlay" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;border:2px solid #3b82f6;pointer-events:none;z-index:40">
+            <div style="position:absolute;top:-5px;left:-5px;width:10px;height:10px;background:#fff;border:1px solid #3b82f6;pointer-events:auto;cursor:nwse-resize" onmousedown="startImageResize(event, '${q.id}', 'nw')"></div>
+            <div style="position:absolute;top:-5px;right:-5px;width:10px;height:10px;background:#fff;border:1px solid #3b82f6;pointer-events:auto;cursor:nesw-resize" onmousedown="startImageResize(event, '${q.id}', 'ne')"></div>
+            <div style="position:absolute;bottom:-5px;left:-5px;width:10px;height:10px;background:#fff;border:1px solid #3b82f6;pointer-events:auto;cursor:nesw-resize" onmousedown="startImageResize(event, '${q.id}', 'sw')"></div>
+            <div style="position:absolute;bottom:-5px;right:-5px;width:10px;height:10px;background:#fff;border:1px solid #3b82f6;pointer-events:auto;cursor:nwse-resize" onmousedown="startImageResize(event, '${q.id}', 'se')"></div>
+          </div>
+          <div style="position:absolute;top:4px;left:4px;z-index:50">
+            <button onclick="toggleImageMenu(event, '${q.id}')" title="Tùy chọn hình ảnh" style="width:28px;height:28px;border-radius:4px;background:#fff;border:1px solid #cbd5e1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,.1);color:#334155">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+            <div id="image-menu-${q.id}" class="image-dropdown-menu" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);min-width:140px;z-index:50;padding:4px 0">
+              <div onclick="dqSetImageAlign('${q.id}','left')" style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="19" y2="18"/></svg> Căn trái
+              </div>
+              <div onclick="dqSetImageAlign('${q.id}','center')" style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg> Căn giữa
+              </div>
+              <div onclick="dqSetImageAlign('${q.id}','right')" style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="5" y1="18" x2="21" y2="18"/></svg> Căn phải
+              </div>
+              <div style="height:1px;background:#e2e8f0;margin:4px 0"></div>
+              <div onclick="dqChangeImage('${q.id}')" style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Thay đổi
+              </div>
+              <div onclick="dqRemoveImage('${q.id}')" style="padding:8px 12px;font-size:13px;cursor:pointer;color:#ef4444;display:flex;align-items:center;gap:8px" onmouseenter="this.style.background='#fef2f2'" onmouseleave="this.style.background='none'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> Xóa
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+      })() : ''}
 
       ${getQuestionVideoUrl(q) ? `
       <div style="margin-top:8px;padding-left:30px;position:relative">
@@ -4739,13 +5313,18 @@ function renderDirectQList() {
               : `<span style="width:15px;height:15px;border-radius:50%;border:2px solid #94a3b8;flex-shrink:0;display:inline-block;background:#fff"></span>`;
             const dragHandle = '<span class="dq-opt-drag-handle" draggable="true" ondragstart="dqOptDragStart(event,\'' + q.id + '\',' + oi + ')" ondragend="dqOptDragEnd(event)" style="cursor:grab;color:#d1d5db;display:flex;align-items:center;flex-shrink:0;padding:0 2px" title="Kéo để đổi vị trí"><svg viewBox="0 0 8 12" width="8" height="12" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="2" cy="10" r="1.2"/><circle cx="6" cy="10" r="1.2"/></svg></span>';
             const removeBtn = opts.length > 1 ? `<button onclick="dqRemoveOpt('${q.id}',${oi})" title="Xóa lựa chọn" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;transition:all .15s" onmouseenter="this.style.color='#ef4444'" onmouseleave="this.style.color='#cbd5e1'">X</button>` : '';
-            return `<div ondragover="dqOptDragOver(event,'${q.id}',${oi})" ondrop="dqOptDrop(event,'${q.id}',${oi})" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;transition:opacity .15s">${dragHandle}${optIcon}<input type="text" value="${o.replace(/"/g,'&quot;')}" placeholder="Lựa chọn ${oi+1}" style="flex:1;padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s" onfocus="this.style.borderColor=this.dataset.duplicate==='1'?'#ef4444':'#00008B'" onblur="updateDirectOptionDuplicateState(this,'${q.id}',${oi},true);if(this.dataset.duplicate!=='1')this.style.borderColor='#e2e8f0'" oninput="dqSetOpt('${q.id}',${oi},this.value);updateDirectOptionDuplicateState(this,'${q.id}',${oi},false)">${removeBtn}</div>`;
+            let vj = {}; try { vj = typeof q.validation_json === 'string' ? JSON.parse(q.validation_json) : q.validation_json; } catch(e){}
+            const optImgUrl = vj && vj.option_images && vj.option_images[oi] ? vj.option_images[oi] : null;
+            const imgBtn = `<button onclick="dqChangeOptImage('${q.id}', ${oi})" title="Thêm hình ảnh" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#94a3b8;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='#94a3b8'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>`;
+            const imgPreview = optImgUrl ? `<div style="margin-top:6px;margin-left:27px;position:relative;display:inline-block"><img src="${optImgUrl}" style="height:60px;object-fit:contain;border-radius:6px;border:1px solid #e2e8f0;"><button onclick="dqRemoveOptImage('${q.id}', ${oi})" title="Xóa ảnh" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#ef4444;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;box-shadow:0 1px 3px rgba(0,0,0,0.2);">X</button></div>` : '';
+            return `<div ondragover="dqOptDragOver(event,'${q.id}',${oi})" ondrop="dqOptDrop(event,'${q.id}',${oi})" style="margin-bottom:6px;transition:opacity .15s"><div style="display:flex;align-items:center;gap:6px;">${dragHandle}${optIcon}<input type="text" value="${o.replace(/"/g,'&quot;')}" placeholder="Lựa chọn ${oi+1}" style="flex:1;padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s" onfocus="this.style.borderColor=this.dataset.duplicate==='1'?'#ef4444':'#00008B'" onblur="updateDirectOptionDuplicateState(this,'${q.id}',${oi},true);if(this.dataset.duplicate!=='1')this.style.borderColor='#e2e8f0'" oninput="dqSetOpt('${q.id}',${oi},this.value);updateDirectOptionDuplicateState(this,'${q.id}',${oi},false)" onkeydown="if(event.key==='Enter'){event.preventDefault();dqAddOpt('${q.id}');}">${imgBtn}${removeBtn}</div>${imgPreview}</div>`;
           }).join('')}
         </div>
         <button onclick="dqAddOpt('${q.id}')"
           style="padding:5px 14px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:12px;font-weight:600;transition:all .15s;margin-top:2px"
           onmouseenter="this.style.background='#00008B';this.style.borderColor='#fff'"
           onmouseleave="this.style.background='transparent';this.style.borderColor='#00008B'">+ Thêm lựa chọn</button>
+        ${renderOtherOptionEditor(q, normalizedType, 'direct', q.id)}
         `}
 
       </div>` : ''}
@@ -4765,7 +5344,7 @@ function renderDirectQList() {
               <input type="text" value="${r.replace(/"/g,'&quot;')}" placeholder="Hàng ${ri+1}"
                 style="flex:1;padding:5px 9px;border:1px solid #e2e8f0;border-radius:7px;font-size:12px;background:#fff;outline:none;transition:border .15s"
                 onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'"
-                oninput="dqSetRow('${q.id}',${ri},this.value)">
+                oninput="dqSetRow('${q.id}',${ri},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();dqAddRow('${q.id}');}">
               ${rows.length>1?`<button onclick="dqRemoveRow('${q.id}',${ri})"
                 style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;line-height:1;flex-shrink:0;transition:color .15s"
                 onmouseenter="this.style.color='#ef4444'" onmouseleave="this.style.color='#cbd5e1'">×</button>`:''}
@@ -4785,7 +5364,7 @@ function renderDirectQList() {
               <input type="text" value="${c.replace(/"/g,'&quot;')}" placeholder="Cột ${ci+1}"
                 style="flex:1;padding:5px 9px;border:1px solid #e2e8f0;border-radius:7px;font-size:12px;background:#fff;outline:none;transition:border .15s"
                 onfocus="this.style.borderColor='#00008B'" onblur="this.style.borderColor='#e2e8f0'"
-                oninput="dqSetCol('${q.id}',${ci},this.value)">
+                oninput="dqSetCol('${q.id}',${ci},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();dqAddCol('${q.id}');}">
               ${cols.length>1?`<button onclick="dqRemoveCol('${q.id}',${ci})"
                 style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;line-height:1;flex-shrink:0;transition:color .15s"
                 onmouseenter="this.style.color='#ef4444'" onmouseleave="this.style.color='#cbd5e1'">×</button>`:''}
@@ -4800,6 +5379,7 @@ function renderDirectQList() {
       <!-- Bottom bar: bắt buộc + hành động -->
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9;flex-wrap:wrap">
         <!-- Toggle bắt buộc -->
+        ${isPresentationItem(q) ? '<div></div>' : `
         <label style="display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none">
           <div style="position:relative;width:34px;height:18px">
             <input type="checkbox" ${q.required ? 'checked' : ''} onchange="dqSetRequired('${q.id}',this.checked)"
@@ -4808,18 +5388,13 @@ function renderDirectQList() {
             <span style="position:absolute;top:3px;left:${q.required ? '18px' : '3px'};width:12px;height:12px;background:#fff;border-radius:50%;transition:left .2s;pointer-events:none"></span>
           </div>
           <span style="font-size:12px;font-weight:600;color:${q.required ? '#00008B' : '#94a3b8'}">Bắt buộc</span>
-        </label>
+        </label>`}
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto">
-          <button onclick="dqSaveToLibrary('${q.id}', this)" title="Lưu vào thư viện"
-            style="height:34px;padding:0 13px;border:1px solid #bbf7d0;border-radius:8px;background:#fff;color:#059669;font-size:12px;font-weight:800;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap"
-            onmouseenter="this.style.background='#f0fdf4';this.style.borderColor='#6ee7b7'" onmouseleave="this.style.background='#fff';this.style.borderColor='#bbf7d0'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14"><path d="M19 21H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 5 7 9 15 9"/></svg>
-            Lưu vào thư viện
-          </button>
+          ${isPresentationItem(q) ? '' : renderLibrarySaveButton({ saved: isQuestionSavedInLibrary(q), onclick: `dqSaveToLibrary('${q.id}', this)` })}
           <button onclick="dqRemove('${q.id}')" title="Xóa câu hỏi"
             style="height:34px;padding:0 12px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#dc2626;font-size:12px;font-weight:800;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap"
             onmouseenter="this.style.background='#fef2f2';this.style.borderColor='#f87171'" onmouseleave="this.style.background='#fff';this.style.borderColor='#fecaca'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
             Xóa
           </button>
         </div>
@@ -4832,7 +5407,7 @@ function renderDirectQList() {
         <button onclick="toggleLibrary('${q.id}')" title="Nhập câu hỏi từ thư viện"
           style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
           onmouseenter="this.style.color='#00008B';this.style.background='#eef5ff'"
-          onmouseleave="this.style.color='#94a3b8';this.style.background='none'">
+          onmouseleave="this.style.color:#94a3b8;this.style.background='none'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4v15.5A2.5 2.5 0 006.5 22H20V6a2 2 0 00-2-2H6.5A2.5 2.5 0 004 6.5"/><path d="M8 8h8"/><path d="M8 12h6"/></svg>
         </button>
         <!-- Thêm hình ảnh -->
@@ -4878,16 +5453,17 @@ function renderDirectQList() {
 }
 
 function getAllFormQuestions() {
-  // Câu hỏi từ thư viện đã chọn
-  const libSel = libraryQuestions.filter(q => selectedQuestions.has(String(q.id))).map(getLibraryQuestionForForm);
-  // Câu hỏi mới tạo trực tiếp (chưa vào thư viện), loại bỏ section
-  return [...libSel, ...directQuestions.filter(q => !q._isSection)];
+  return getAllFormItems().filter(q => !q._isSection);
 }
 
 function getAllFormItems() {
-  // Toàn bộ items kể cả section (dùng cho render)
-  const libSel = libraryQuestions.filter(q => selectedQuestions.has(String(q.id))).map(getLibraryQuestionForForm);
-  return [...libSel, ...directQuestions];
+  if (selectedQuestions.size > 0) {
+    const libSel = libraryQuestions.filter(q => selectedQuestions.has(String(q.id))).map(getLibraryQuestionForForm);
+    const toAdd = libSel.filter(lq => !directQuestions.some(dq => sameQuestionId(dq.id, lq.id)));
+    directQuestions.unshift(...toAdd);
+    selectedQuestions.clear();
+  }
+  return [...directQuestions];
 }
 
 function addDirectQ(position = 'first-section') {
@@ -4936,12 +5512,86 @@ function showLibrarySavedNotice(isOffline = false) {
 
 function markLibrarySavedButton(btn) {
   if (!btn) return;
-  btn.textContent = '\u0110\u00e3 l\u01b0u';
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="14" height="14"><path d="M20 6L9 17l-5-5"/></svg> Đã lưu`;
   btn.disabled = true;
+  btn.removeAttribute('onclick');
   btn.style.background = '#ecfdf5';
   btn.style.borderColor = '#34d399';
   btn.style.color = '#047857';
   btn.style.cursor = 'default';
+  btn.onmouseenter = null;
+  btn.onmouseleave = null;
+}
+
+function getQuestionLibraryId(q) {
+  return q?.thu_vien_id || q?.library_id || q?.libraryQuestionId || q?.ma_thu_vien || null;
+}
+
+function normalizeQuestionSignatureText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function normalizeQuestionSignatureList(values) {
+  return (Array.isArray(values) ? values : [])
+    .map(normalizeQuestionSignatureText)
+    .filter(Boolean);
+}
+
+function getQuestionLibrarySignature(q) {
+  const normalizedType = normalizeQuestionType(q?.type || q?.loai || 'choice');
+  return {
+    text: normalizeQuestionSignatureText(q?.text || q?.noi_dung),
+    type: normalizedType,
+    opts: normalizeQuestionSignatureList(q?.opts || q?.lua_chon),
+    rows: normalizeQuestionSignatureList(q?.rows || q?.hang),
+    cols: normalizeQuestionSignatureList(q?.cols || q?.cot),
+    allowOther: !!questionAllowsOther({ ...q, type: normalizedType }),
+  };
+}
+
+function sameQuestionLibrarySignature(a, b) {
+  const left = getQuestionLibrarySignature(a);
+  const right = getQuestionLibrarySignature(b);
+  return left.text
+    && left.text === right.text
+    && left.type === right.type
+    && JSON.stringify(left.opts) === JSON.stringify(right.opts)
+    && JSON.stringify(left.rows) === JSON.stringify(right.rows)
+    && JSON.stringify(left.cols) === JSON.stringify(right.cols)
+    && left.allowOther === right.allowOther;
+}
+
+function findQuestionInLibrary(q) {
+  if (!q || isSectionItem(q)) return null;
+  const libraryId = getQuestionLibraryId(q);
+  if (libraryId) {
+    const byId = libraryQuestions.find(lq => sameQuestionId(lq.id, libraryId));
+    if (byId) return byId;
+  }
+  return libraryQuestions.find(lq => sameQuestionLibrarySignature(q, lq)) || null;
+}
+
+function isQuestionSavedInLibrary(q) {
+  return !!findQuestionInLibrary(q);
+}
+
+function renderLibrarySaveButton({ saved, onclick }) {
+  if (saved) {
+    return `
+      <button type="button" disabled title="Câu hỏi đã có trong thư viện"
+        style="height:34px;padding:0 13px;border:1px solid #34d399;border-radius:8px;background:#ecfdf5;color:#047857;font-size:12px;font-weight:800;cursor:default;display:inline-flex;align-items:center;gap:6px;white-space:nowrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="14" height="14"><path d="M20 6L9 17l-5-5"/></svg>
+        Đã lưu
+      </button>`;
+  }
+
+  return `
+    <button onclick="${onclick}" title="Lưu vào thư viện"
+      style="height:34px;padding:0 13px;border:1px solid #bbf7d0;border-radius:8px;background:#fff;color:#059669;font-size:12px;font-weight:800;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap"
+      onmouseenter="this.style.background='#f0fdf4';this.style.borderColor='#6ee7b7'" onmouseleave="this.style.background='#fff';this.style.borderColor='#bbf7d0'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14"><path d="M19 21H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 5 7 9 15 9"/></svg>
+      Lưu vào thư viện
+    </button>`;
 }
 
 function getFilledQuestionOptions(q) {
@@ -4968,6 +5618,64 @@ function validateQuestionBeforeLibrarySave(q) {
   return '';
 }
 
+function getLibraryContextFromForm(prefix) {
+  const category = normalizeLibraryCategory(document.getElementById(`${prefix}-form-cat`)?.value || 'Ngoại ngữ');
+  const surveyType = document.getElementById(`${prefix}-form-survey-type`)?.value || getDefaultSurveyType(category);
+  const target = normalizeSurveyTarget(document.getElementById(`${prefix}-form-target`)?.value || 'Tất cả');
+  return { category, surveyType, target };
+}
+
+function buildLibraryQuestionFallback(q, context, opts) {
+  return {
+    id: 'lib-' + Date.now(),
+    text: q.text.trim(),
+    type: q.type,
+    category: context.category,
+    bo_mon: context.category,
+    loai_khao_sat: context.surveyType,
+    survey_type: context.surveyType,
+    doi_tuong: context.target,
+    target: context.target,
+    opts,
+    validation_json: getQuestionValidationJson(q),
+    allowOther: questionAllowsOther(q),
+    allow_other: questionAllowsOther(q),
+    ...(q.rows?.length ? { rows: q.rows } : {}),
+    ...(q.cols?.length ? { cols: q.cols } : {}),
+    ...(getQuestionImageUrl(q) ? { image: getQuestionImageUrl(q), image_url: getQuestionImageUrl(q), hinh_anh_url: getQuestionImageUrl(q) } : {}),
+    ...(getQuestionVideoUrl(q) ? { video: getQuestionVideoUrl(q), video_url: getQuestionVideoUrl(q) } : {}),
+  };
+}
+
+async function postQuestionToLibrary(q, context, opts) {
+  const token = localStorage.getItem('token') || '';
+  const res = await fetch(`${API_BASE}/library`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({
+      text: q.text.trim(),
+      type: q.type,
+      bo_mon: context.category,
+      loai_khao_sat: context.surveyType,
+      survey_type: context.surveyType,
+      doi_tuong: context.target,
+      target: context.target,
+      opts,
+      required: !!q.required,
+      bat_buoc: !!q.required,
+      validation_json: getQuestionValidationJson(q),
+      allow_other: questionAllowsOther(q),
+      ...(q.rows?.length ? { rows: q.rows } : {}),
+      ...(q.cols?.length ? { cols: q.cols } : {}),
+      ...(getQuestionImageUrl(q) ? { image: getQuestionImageUrl(q), image_url: getQuestionImageUrl(q), hinh_anh_url: getQuestionImageUrl(q) } : {}),
+      ...(getQuestionVideoUrl(q) ? { video: getQuestionVideoUrl(q), video_url: getQuestionVideoUrl(q) } : {}),
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || data.message || 'Không lưu được câu hỏi vào thư viện');
+  return data;
+}
+
 async function dqSaveToLibrary(id, btn) {
   const q = _dqFindQ(id);
   if (!q) return;
@@ -4975,52 +5683,31 @@ async function dqSaveToLibrary(id, btn) {
   if (validationError) { showToast(validationError, 'error'); return; }
   const opts = getFilledQuestionOptions(q);
 
-  // Lấy danh mục từ form đang tạo
-  const cat = document.getElementById('new-form-cat')?.value || 'Ngoại ngữ';
+  const context = getLibraryContextFromForm('new');
 
-  // Kiểm tra đã có trong thư viện chưa (theo text)
-  const already = libraryQuestions.find(lq => lq.text?.trim() === q.text.trim());
-  if (already) { showToast('Câu hỏi này đã có trong thư viện!', 'warning'); return; }
+  const already = findQuestionInLibrary(q);
+  if (already) {
+    q.thu_vien_id = Number(already.id) || already.id;
+    markLibrarySavedButton(btn);
+    showToast('Câu hỏi này đã có trong thư viện!', 'warning');
+    return;
+  }
 
   // Gửi API lưu vào thư viện
   try {
-    const token = localStorage.getItem('token') || '';
-    const res = await fetch(`${API_BASE}/library`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({
-        text: q.text.trim(),
-        type: q.type,
-        bo_mon: cat,
-        opts,
-        ...(q.rows?.length ? { rows: q.rows } : {}),
-        ...(q.cols?.length ? { cols: q.cols } : {}),
-      }),
-    });
-    if (res.ok) {
-      const data = await res.json().catch(() => ({}));
-      // Thêm vào cache local
-      const newQ = normalizeLibraryQuestion(data.data || { id: String(data.id || ('lib-' + Date.now())), text: q.text.trim(), type: q.type, category: cat, bo_mon: cat, opts });
-      libraryQuestions.push(newQ);
-      localStorage.setItem('flic_lib_flat', JSON.stringify(libraryQuestions));
-      libraryCountReady = true;
-      updateLibraryCountLabel();
-      showLibrarySavedNotice(false);
-      markLibrarySavedButton(btn);
-      // Reload thư viện từ API để đồng bộ
-      fetchLibraryFromAPI().catch(() => {});
-      return;
-    }
-  } catch(e) {}
-
-  // Fallback: lưu local nếu API lỗi
-  const newQ = normalizeLibraryQuestion({ id: 'lib-' + Date.now(), text: q.text.trim(), type: q.type, category: cat, bo_mon: cat, opts });
-  libraryQuestions.push(newQ);
-  localStorage.setItem('flic_lib_flat', JSON.stringify(libraryQuestions));
-  libraryCountReady = true;
-  updateLibraryCountLabel();
-  showLibrarySavedNotice(true);
-  markLibrarySavedButton(btn);
+    const data = await postQuestionToLibrary(q, context, opts);
+    const newQ = normalizeLibraryQuestion(data.data || buildLibraryQuestionFallback(q, context, opts));
+    libraryQuestions.push(newQ);
+    q.thu_vien_id = Number(newQ.id) || newQ.id;
+    localStorage.setItem('flic_lib_flat', JSON.stringify(libraryQuestions));
+    libraryCountReady = true;
+    updateLibraryCountLabel();
+    showLibrarySavedNotice(false);
+    markLibrarySavedButton(btn);
+    fetchLibraryFromAPI().catch(() => {});
+  } catch(e) {
+    showToast(e.message || 'Không lưu được câu hỏi vào thư viện', 'error');
+  }
 }
 
 
@@ -5030,7 +5717,7 @@ function dqAddSection(afterId) {
   if (dqIdx >= 0) {
     directQuestions.splice(dqIdx + 1, 0, section);
   } else {
-    directQuestions.push(section);
+    directQuestions.unshift(section);
   }
   renderDirectQList();
   setTimeout(() => {
@@ -5184,9 +5871,11 @@ function dqExpandCard(id) {
 }
 
 function dqValidateCard(q) {
+  const normalizedType = normalizeQuestionType(q?.type);
+  if (normalizedType === 'presentation_image' || normalizedType === 'presentation_video') return '';
+
   if (!q?.text?.trim()) return 'Câu hỏi chưa có nội dung!';
 
-  const normalizedType = normalizeQuestionType(q.type);
   if (['choice', 'checkbox', 'dropdown'].includes(normalizedType)) {
     const filledOpts = (q.opts || []).filter(o => String(o || '').trim());
     if (!filledOpts.length) return 'Câu hỏi cần ít nhất 1 lựa chọn!';
@@ -5202,21 +5891,83 @@ function dqValidateCard(q) {
 }
 
 function dqAddImage(id) {
-  pickMediaFile('image/*', dataUrl => {
-    const q = _dqFindQ(id); if (!q) return;
-    q.image = dataUrl;
-    q.hinh_anh_url = dataUrl;
+  openImageSourceModal(dataUrl => {
+    const newQ = { id: 'dq-' + Date.now(), text: '', type: 'presentation_image', opts: [], required: false, image: dataUrl, hinh_anh_url: dataUrl };
+    const dqIdx = directQuestions.findIndex(x => sameQuestionId(x.id, id));
+    if (dqIdx >= 0) {
+      directQuestions.splice(dqIdx + 1, 0, newQ);
+    } else {
+      directQuestions.push(newQ);
+    }
+    activeDirectQuestionId = String(newQ.id);
     renderDirectQList();
+    setTimeout(() => {
+      const card = document.getElementById('dqcard-' + newQ.id);
+      focusDirectQuestionText(card, newQ.id);
+    }, 50);
   });
 }
 
 function dqAddVideo(id) {
-  const q = _dqFindQ(id); if (!q) return;
   const url = prompt('Nhập URL video (YouTube, Google Drive...):', '');
   if (!url?.trim()) return;
-  q.video = url.trim();
-  q.video_url = url.trim();
+  const newQ = { id: 'dq-' + Date.now(), text: '', type: 'presentation_video', opts: [], required: false, video: url.trim(), video_url: url.trim() };
+  const dqIdx = directQuestions.findIndex(x => sameQuestionId(x.id, id));
+  if (dqIdx >= 0) {
+    directQuestions.splice(dqIdx + 1, 0, newQ);
+  } else {
+    directQuestions.push(newQ);
+  }
+  activeDirectQuestionId = String(newQ.id);
   renderDirectQList();
+  setTimeout(() => {
+    const card = document.getElementById('dqcard-' + newQ.id);
+    focusDirectQuestionText(card, newQ.id);
+  }, 50);
+}
+
+function toggleImageMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById('image-menu-' + id);
+  if (!menu) return;
+  const isVisible = menu.style.display === 'block';
+  closeAllImageMenus();
+  if (!isVisible) {
+    menu.style.display = 'block';
+  }
+}
+
+function closeAllImageMenus() {
+  document.querySelectorAll('.image-dropdown-menu').forEach(m => m.style.display = 'none');
+}
+
+document.addEventListener('click', closeAllImageMenus);
+
+function dqSetImageAlign(id, align) {
+  const q = _dqFindQ(id);
+  if (q) {
+    q.image_align = align;
+    renderDirectQList();
+  }
+}
+
+function dqChangeImage(id) {
+  openImageSourceModal(dataUrl => {
+    const q = _dqFindQ(id);
+    if (q) {
+      q.image = dataUrl;
+      q.hinh_anh_url = dataUrl;
+      renderDirectQList();
+    }
+  });
+}
+
+function dqRemoveImage(id) {
+  const q = _dqFindQ(id);
+  if (q) {
+    delete q.image; delete q.hinh_anh_url; delete q.image_url; delete q.image_align;
+    renderDirectQList();
+  }
 }
 
 async function readMediaFileAsDataUrl(file, onDone) {
@@ -5268,6 +6019,7 @@ function dqSetType(id, val) {
   q._collapsed = false;
   if (DQ_NEEDS_OPTS.includes(val) && (!q.opts || !q.opts.length)) q.opts = getDefaultOptionsForType(val);
   else if (!DQ_NEEDS_OPTS.includes(val)) q.opts = [];
+  if (!supportsOtherOption(val)) setQuestionAllowOther(q, false);
   if (val === 'scale') setQuestionScaleConfig(q, getQuestionScaleConfig(q));
   if (val === 'rating') setQuestionRatingConfig(q, getQuestionRatingConfig(q));
   if (DQ_NEEDS_GRID.includes(val)) {
@@ -5298,7 +6050,23 @@ function dqSetRating(id, key, val) {
 }
 function dqAddOpt(id) {
   const q = _dqFindQ(id);
-  if (q) { q.opts.push(''); renderDirectQList(); }
+  if (q) {
+    q.opts.push('');
+    renderDirectQList();
+    setTimeout(() => {
+      const optsDiv = document.getElementById(`dq-opts-${id}`);
+      if (optsDiv) {
+        const inputs = optsDiv.querySelectorAll('input[type="text"]');
+        if (inputs.length > 0) inputs[inputs.length - 1].focus();
+      }
+    }, 50);
+  }
+}
+function dqToggleOther(id, enabled) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  setQuestionAllowOther(q, enabled);
+  renderDirectQList();
 }
 function dqRemoveOpt(id, oi) {
   const q = _dqFindQ(id);
@@ -5317,16 +6085,25 @@ function dqRemove(id) {
 // --- GRID ROW/COL HELPERS ---
 function _dqFindQ(id) { return directQuestions.find(q=>sameQuestionId(q.id,id))||libraryQuestions.find(q=>sameQuestionId(q.id,id)); }
 function dqSetRow(id,ri,val){ const q=_dqFindQ(id); if(q){if(!q.rows)q.rows=[];q.rows[ri]=val;} }
-function dqAddRow(id){ const q=_dqFindQ(id); if(q){if(!q.rows)q.rows=[];q.rows.push('');renderDirectQList();} }
+function dqAddRow(id){ const q=_dqFindQ(id); if(q){if(!q.rows)q.rows=[];q.rows.push('');renderDirectQList();setTimeout(()=>{const d=document.getElementById(`dq-rows-${id}`);if(d){const i=d.querySelectorAll('input[type="text"]');if(i.length)i[i.length-1].focus();}},50);} }
 function dqRemoveRow(id,ri){ const q=_dqFindQ(id); if(q&&q.rows&&q.rows.length>1){q.rows.splice(ri,1);renderDirectQList();} }
 function dqSetCol(id,ci,val){ const q=_dqFindQ(id); if(q){if(!q.cols)q.cols=[];q.cols[ci]=val;} }
-function dqAddCol(id){ const q=_dqFindQ(id); if(q){if(!q.cols)q.cols=[];q.cols.push('');renderDirectQList();} }
+function dqAddCol(id){ const q=_dqFindQ(id); if(q){if(!q.cols)q.cols=[];q.cols.push('');renderDirectQList();setTimeout(()=>{const d=document.getElementById(`dq-cols-${id}`);if(d){const i=d.querySelectorAll('input[type="text"]');if(i.length)i[i.length-1].focus();}},50);} }
 function dqRemoveCol(id,ci){ const q=_dqFindQ(id); if(q&&q.cols&&q.cols.length>1){q.cols.splice(ci,1);renderDirectQList();} }
 
-function deleteQ(id) {
+async function deleteQ(id) {
   // mirrors handleDeleteQuestion
   document.getElementById('qdm-'+id)?.classList.remove('open');
-  if (!confirm('Bạn có chắc muốn xóa câu hỏi này?')) return;
+  const q = libraryQuestions.find(item => sameQuestionId(item.id, id));
+  const ok = await showConfirmDialog({
+    title: 'Xóa câu hỏi khỏi thư viện?',
+    message: `Câu hỏi <strong>${escapeHtml(q?.text || 'chưa có nội dung')}</strong> sẽ bị xóa khỏi thư viện câu hỏi.`,
+    note: 'Các biểu mẫu đã thêm câu hỏi này sẽ không bị ảnh hưởng.',
+    confirmText: 'Xóa câu hỏi',
+    cancelText: 'Hủy',
+    variant: 'danger',
+  });
+  if (!ok) return;
   libraryQuestions = libraryQuestions.filter(q => !sameQuestionId(q.id, id));
   selectedQuestions.delete(id);
   saveLibraryQuestions(libraryQuestions);
@@ -5585,9 +6362,10 @@ function showFormMenu(btnEl, formId) {
   const divider = () => { const d = document.createElement('div'); d.style.cssText='height:1px;background:#f1f5f9;margin:3px 0'; return d; };
   const form = FORMS.find(f => String(f.id) === String(formId));
   const active = isActiveForm(form);
+  const pending = String(form?.status || form?.trang_thai || '').toLowerCase() === 'pending';
 
-  menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>', 'Xem form', '#374151', () => openViewModal(formId)));
-  if (!active) {
+  menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>', 'Xem trước', '#374151', () => openViewModal(formId)));
+  if (!active && !pending) {
     menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>', 'Chỉnh sửa', '#374151', () => openEditModal(formId)));
   }
   menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>', 'Tạo bản sao', '#374151', () => duplicateForm(formId)));
@@ -5784,8 +6562,7 @@ function renderGrid(list) {
         <div style="display:flex;gap:20px;font-size:12.5px;color:var(--gray-500);min-width:100px">
           <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="vertical-align:middle;margin-right:3px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${f.created}</span>
         </div>
-        // Đổi '??':'??' thành '❤️':'🤍'
-<button onclick="toggleFav('${f.id}',event)" style="background:none;border:none;cursor:pointer;padding:4px;font-size:18px;line-height:1;flex-shrink:0" title="Yêu thích">${favorites.has(String(f.id))?'❤️':'🤍'}</button>
+        <button onclick="toggleFav('${f.id}',event)" style="background:none;border:none;cursor:pointer;padding:4px;font-size:18px;line-height:1;flex-shrink:0" title="Yêu thích">${favorites.has(String(f.id))?'❤️':'🤍'}</button>
         ${dotsBtn(f.id)}
       </div>`;
     }).join('') : `<div style="padding:32px;text-align:center;color:var(--gray-400);font-weight:700">Không có biểu mẫu nào để hiển thị.</div>`;
@@ -6103,7 +6880,15 @@ async function closeActiveForm(id) {
     showToast('Chỉ biểu mẫu đang hoạt động mới cần đóng.', 'default');
     return;
   }
-  if (!confirm(`Đóng biểu mẫu "${f.name}"?\n\nSau khi đóng, biểu mẫu sẽ ngừng thu thập phản hồi.`)) return;
+  const ok = await showConfirmDialog({
+    title: 'Đóng biểu mẫu?',
+    message: `Biểu mẫu <strong>${escapeHtml(f.name || 'Biểu mẫu không có tiêu đề')}</strong> sẽ ngừng thu thập phản hồi.`,
+    note: 'Bạn vẫn có thể xem dữ liệu và mở lại biểu mẫu sau.',
+    confirmText: 'Đóng biểu mẫu',
+    cancelText: 'Hủy',
+    variant: 'warning',
+  });
+  if (!ok) return;
 
   try {
     await updateFormStatusOnly(Number(id), 'closed');
@@ -6126,17 +6911,35 @@ async function deleteForm(id) {
     showToast('Biểu mẫu đang hoạt động, vui lòng đóng biểu mẫu trước khi xóa.', 'error');
     return;
   }
-  if (!confirm(`Chuyển biểu mẫu "${f.name}" vào thùng rác?\n\nBiểu mẫu sẽ tự động xóa vĩnh viễn sau 30 ngày.`)) return;
+  const ok = await showConfirmDialog({
+    title: 'Chuyển vào thùng rác?',
+    message: `Chuyển biểu mẫu <strong>${escapeHtml(f.name || 'Biểu mẫu không có tiêu đề')}</strong> vào thùng rác.`,
+    note: 'Biểu mẫu sẽ tự động xóa vĩnh viễn sau 30 ngày.',
+    confirmText: 'Chuyển vào thùng rác',
+    cancelText: 'Hủy',
+    variant: 'danger',
+  });
+  if (!ok) return;
 
   // Ẩn card ngay lập tức
   const card = document.querySelector(`[onclick*="openViewModal('${id}')"], [onclick*='openViewModal("${id}")']`);
   if (card) card.style.display = 'none';
 
+  const reason = prompt(`Chuyển biểu mẫu "${f.name || 'Biểu mẫu không có tiêu đề'}" vào thùng rác?\n\nNhập lý do xóa (nếu có):`);
+  if (reason === null) {
+    if (card) card.style.display = '';
+    return;
+  }
+
   try {
     const token = localStorage.getItem('token') || '';
     const res = await fetch(`${API_BASE}/forms/${id}`, {
       method: 'DELETE',
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ ly_do_xoa: reason.trim() || 'Không có lý do' })
     });
     if (!res.ok) {
       let detail = '';
@@ -6155,7 +6958,7 @@ async function deleteForm(id) {
   }
 
   try {
-    moveToTrash(f);
+    moveToTrash(f, reason.trim() || 'Không có lý do');
   } catch (e) {
     console.warn('Không thể lưu bản ghi thùng rác local:', e);
   }
@@ -6164,6 +6967,7 @@ async function deleteForm(id) {
   FORMS.splice(FORMS.findIndex(f => f.id === id), 1);
   filtered = filtered.filter(f => f.id !== id);
   renderGrid(filtered);
+  // Backend now logs to NhatKyHoatDong, so we don't need window.logActivity here anymore.
   setTimeout(() => showToast(`Đã chuyển "${f.name}" vào thùng rác`, 'success'), 0);
 }
 
@@ -6200,7 +7004,7 @@ async function duplicateForm(id) {
       body: JSON.stringify({
         ten_form: copyName,
         danh_muc: f.cat || 'Khác',
-        doi_tuong: f.doi_tuong || 'Tất cả',
+        doi_tuong: normalizeSurveyTarget(f.doi_tuong || 'Tất cả'),
         trang_thai: 'draft',
         cau_hoi: sourceQuestions.map(q => ({
           noi_dung: q.text || q.noi_dung || '',
@@ -6255,11 +7059,15 @@ function mapFormItemsToEditItems(items) {
       scale: getQuestionScaleConfig(q),
       rating: getQuestionRatingConfig(q),
       validation_json: q.validation_json || q.validation || q.logic_json || '',
+      image_align: q.image_align || parseJsonObject(q.validation_json || q.validation || q.logic_json || '{}').image_align || 'left',
+      image_width: q.image_width || parseJsonObject(q.validation_json || q.validation || q.logic_json || '{}').image_width || '',
       image: imageUrl,
       hinh_anh_url: imageUrl,
       video: videoUrl,
       video_url: videoUrl,
       required: q.required || q.bat_buoc || false,
+      allowOther: questionAllowsOther(q),
+      allow_other: questionAllowsOther(q),
     };
   });
 }
@@ -6277,7 +7085,7 @@ function openEditModal(id) {
   document.getElementById('edit-form-cat').value = f.cat;
   syncEditSurveyTypes(f.loai_khao_sat || '');
   const editTarget = document.getElementById('edit-form-target');
-  if (editTarget) editTarget.value = f.doi_tuong || 'Tất cả';
+  if (editTarget) editTarget.value = normalizeSurveyTarget(f.doi_tuong || 'Tất cả');
   const editCloseValue = normalizeDateToInputValue(f.ngay_dong || f.closeDate || '');
   const editCloseInput = document.getElementById('edit-form-close');
   const editCloseDisplay = document.getElementById('edit-form-close-display');
@@ -6406,7 +7214,7 @@ function renderEditQuestions() {
         <button onclick="editQAddNew(${qi})" title="Thêm câu hỏi bên dưới"
           style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
           onmouseenter="this.style.color='#00008B';this.style.background='#00008B'"
-          onmouseleave="this.style.color='#94a3b8';this.style.background='none'">
+          onmouseleave="this.style.color:#94a3b8;this.style.background='none'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
         <button onclick="editFormQuestions.splice(${qi},1);renderEditQuestions()" title="Xóa phần"
@@ -6437,14 +7245,17 @@ function renderEditQuestions() {
         : 'Câu trả lời văn bản';
       return `
     <div onclick="editQExpand(${qi})" title="Bấm để mở câu hỏi" style="border:1.5px solid #00008B;border-left:5px solid #00008B;border-radius:14px;background:linear-gradient(180deg,#ffffff 0%,#00008B 100%);box-shadow:0 10px 24px rgba(15,23,42,.05);display:flex;align-items:center;gap:12px;margin:0 0 10px 0;padding:12px 14px;cursor:pointer">
-      <div style="width:26px;height:26px;border-radius:50%;background:#00008B;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${questionNo}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${formatRichText(q.text || 'Chưa có nội dung câu hỏi')}</div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
-          <span style="padding:3px 9px;border-radius:999px;background:#dcfce7;color:#15803d;font-size:11.5px;font-weight:800">Đã lưu</span>
-          <span style="padding:3px 9px;border-radius:999px;background:#00008B;color:#fff;font-size:11.5px;font-weight:700">${getTypeOptionLabel(q.type)}</span>
-          <span style="font-size:12px;color:#64748b">${summaryOpts}</span>
-          ${q.required ? '<span style="font-size:12px;color:#ef4444;font-weight:700">Bắt buộc</span>' : ''}
+      <div style="width:26px;height:26px;border-radius:50%;background:#00008B;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
+      <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${formatRichText(q.text || 'Chưa có nội dung câu hỏi', q.required)}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+            <span style="padding:3px 9px;border-radius:999px;background:#dcfce7;color:#15803d;font-size:11.5px;font-weight:800">Đã lưu</span>
+            <span style="font-size:12px;color:#64748b">${summaryOpts}</span>
+          </div>
+        </div>
+        <div style="flex-shrink:0">
+          <span style="padding:3px 9px;border-radius:999px;background:#00008B;color:#fff;font-size:11.5px;font-weight:700;white-space:nowrap">${getTypeOptionLabel(q.type)}</span>
         </div>
       </div>
     </div>`;
@@ -6472,7 +7283,7 @@ function renderEditQuestions() {
         <div id="edit-q-text-${qi}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'edit-q-text-${qi}')">
         <!-- Row: số + input câu hỏi + dropdown loại -->
         <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:22px;height:22px;border-radius:50%;background:#00008B;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${questionNo}</div>
+          <div style="width:22px;height:22px;border-radius:50%;background:#00008B;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
           <div id="edit-q-text-${qi}" class="dq-placeholder-gray rich-title-editor" contenteditable="true" role="textbox" aria-label="Nội dung câu hỏi"
             data-edit-question-index="${qi}"
             data-placeholder="Nhập nội dung câu hỏi..."
@@ -6490,12 +7301,26 @@ function renderEditQuestions() {
         </div>
         </div>
 
-        ${getQuestionImageUrl(q) ? `
-        <div style="margin-top:8px;padding-left:30px;position:relative">
-          <img src="${previewEsc(getQuestionImageUrl(q))}" style="max-width:100%;max-height:160px;border-radius:8px;object-fit:cover;border:1px solid #e2e8f0">
-          <button onclick="(function(){var q=editFormQuestions[${qi}];if(q){delete q.image;delete q.hinh_anh_url;delete q.image_url;renderEditQuestions();}})()" title="Xóa hình"
-            style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;cursor:pointer;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;line-height:1">×</button>
-        </div>` : ''}
+        ${getQuestionImageUrl(q) ? (() => {
+          const align = q.image_align || parseJsonObject(q.validation_json || q.validation || q.logic_json).image_align || 'left';
+          const width = q.image_width || parseJsonObject(q.validation_json || q.validation || q.logic_json).image_width || 'auto';
+          return `
+        <div style="margin-top:8px;padding-left:30px;position:relative;display:flex;justify-content:${align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'}">
+          <div style="position:relative;display:inline-block"
+               onmouseenter="this.querySelector('.resize-overlay').style.display='block'"
+               onmouseleave="this.querySelector('.resize-overlay').style.display='none'">
+            <img id="dq-img-${q.id}" src="${previewEsc(getQuestionImageUrl(q))}" style="width:${width};max-width:100%;max-height:400px;border-radius:8px;object-fit:contain;border:1px solid #e2e8f0;background:#f8fafc">
+            <div class="resize-overlay" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;border:2px solid #3b82f6;pointer-events:none;z-index:40">
+              <div style="position:absolute;top:-5px;left:-5px;width:10px;height:10px;background:#fff;border:1px solid #3b82f6;pointer-events:auto;cursor:nwse-resize" onmousedown="startImageResize(event, '${q.id}', 'nw')"></div>
+              <div style="position:absolute;top:-5px;right:-5px;width:10px;height:10px;background:#fff;border:1px solid #3b82f6;pointer-events:auto;cursor:nesw-resize" onmousedown="startImageResize(event, '${q.id}', 'ne')"></div>
+              <div style="position:absolute;bottom:-5px;left:-5px;width:10px;height:10px;background:#fff;border:1px solid #3b82f6;pointer-events:auto;cursor:nesw-resize" onmousedown="startImageResize(event, '${q.id}', 'sw')"></div>
+              <div style="position:absolute;bottom:-5px;right:-5px;width:10px;height:10px;background:#fff;border:1px solid #3b82f6;pointer-events:auto;cursor:nwse-resize" onmousedown="startImageResize(event, '${q.id}', 'se')"></div>
+            </div>
+            <button onclick="(function(){var eq=editFormQuestions[${qi}];if(eq){delete eq.image;delete eq.hinh_anh_url;delete eq.image_url;renderEditQuestions();}})()" title="Xóa hình"
+              style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;cursor:pointer;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;line-height:1;z-index:50">×</button>
+          </div>
+        </div>`;
+        })() : ''}
 
         ${getQuestionVideoUrl(q) ? `
         <div style="margin-top:8px;padding-left:30px;position:relative">
@@ -6525,12 +7350,17 @@ function renderEditQuestions() {
               :`<span style="width:15px;height:15px;border-radius:50%;border:2px solid #94a3b8;flex-shrink:0;display:inline-block;background:#fff"></span>`;
             const eqOptDragHandle = '<span style="cursor:grab;color:#d1d5db;display:flex;align-items:center;flex-shrink:0;padding:0 2px" title="Kéo để đổi vị trí"><svg viewBox="0 0 8 12" width="8" height="12" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="2" cy="10" r="1.2"/><circle cx="6" cy="10" r="1.2"/></svg></span>';
             const eqOptRemoveBtn = opts.length > 1 ? `<button onclick="editQRemoveOpt(${qi},${oi})" title="Xóa lựa chọn" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;transition:all .15s" onmouseenter="this.style.color='#ef4444'" onmouseleave="this.style.color='#cbd5e1'">X</button>` : '';
-            return `<div draggable="true" ondragstart="eqOptDragStart(event,${qi},${oi})" ondragover="eqOptDragOver(event,${qi},${oi})" ondrop="eqOptDrop(event,${qi},${oi})" ondragend="eqOptDragEnd()" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;transition:opacity .15s">${eqOptDragHandle}${optIcon}<input type="text" value="${o.replace(/"/g,'&quot;')}" placeholder="Lựa chọn ${oi+1}" style="flex:1;padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s" onfocus="this.style.borderColor=this.dataset.duplicate==='1'?'#ef4444':'#00008B'" onblur="updateEditOptionDuplicateState(this,${qi},${oi},true);if(this.dataset.duplicate!=='1')this.style.borderColor='#e2e8f0'" oninput="editQSetOpt(${qi},${oi},this.value);updateEditOptionDuplicateState(this,${qi},${oi},false)">${eqOptRemoveBtn}</div>`;
+            let vj = {}; try { vj = typeof q.validation_json === 'string' ? JSON.parse(q.validation_json) : q.validation_json; } catch(e){}
+            const optImgUrl = vj && vj.option_images && vj.option_images[oi] ? vj.option_images[oi] : null;
+            const imgBtn = `<button onclick="editQChangeOptImage(${qi}, ${oi})" title="Thêm hình ảnh" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#94a3b8;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='#94a3b8'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>`;
+            const imgPreview = optImgUrl ? `<div style="margin-top:6px;margin-left:27px;position:relative;display:inline-block"><img src="${optImgUrl}" style="height:60px;object-fit:contain;border-radius:6px;border:1px solid #e2e8f0;"><button onclick="editQRemoveOptImage(${qi}, ${oi})" title="Xóa ảnh" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#ef4444;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;box-shadow:0 1px 3px rgba(0,0,0,0.2);">X</button></div>` : '';
+            return `<div draggable="true" ondragstart="eqOptDragStart(event,${qi},${oi})" ondragover="eqOptDragOver(event,${qi},${oi})" ondrop="eqOptDrop(event,${qi},${oi})" ondragend="eqOptDragEnd()" style="margin-bottom:6px;transition:opacity .15s"><div style="display:flex;align-items:center;gap:6px;">${eqOptDragHandle}${optIcon}<input type="text" value="${o.replace(/"/g,'&quot;')}" placeholder="Lựa chọn ${oi+1}" style="flex:1;padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s" onfocus="this.style.borderColor=this.dataset.duplicate==='1'?'#ef4444':'#00008B'" onblur="updateEditOptionDuplicateState(this,${qi},${oi},true);if(this.dataset.duplicate!=='1')this.style.borderColor='#e2e8f0'" oninput="editQSetOpt(${qi},${oi},this.value);updateEditOptionDuplicateState(this,${qi},${oi},false)">${imgBtn}${eqOptRemoveBtn}</div>${imgPreview}</div>`;
           }).join('')}
           <button onclick="editQAddOpt(${qi})"
             style="padding:5px 14px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:12px;font-weight:600;transition:all .15s;margin-top:2px"
             onmouseenter="this.style.background='#00008B';this.style.borderColor='#fff'"
             onmouseleave="this.style.background='transparent';this.style.borderColor='#00008B'">+ Thêm lựa chọn</button>
+          ${renderOtherOptionEditor(q, normalizedType, 'edit', qi)}
           `}
         </div>` : ''}
 
@@ -6576,12 +7406,7 @@ function renderEditQuestions() {
             <span style="font-size:12px;font-weight:600;color:${editFormQuestions[qi].required ? '#00008B' : '#94a3b8'}">Bắt buộc</span>
           </label>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto">
-            <button onclick="editQSaveToLibrary(${qi}, this)"
-              style="height:34px;padding:0 13px;border:1px solid #bbf7d0;border-radius:8px;background:#fff;color:#059669;font-size:12px;font-weight:800;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap"
-              onmouseenter="this.style.background='#f0fdf4';this.style.borderColor='#6ee7b7'" onmouseleave="this.style.background='#fff';this.style.borderColor='#bbf7d0'">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14"><path d="M19 21H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 5 7 9 15 9"/></svg>
-              Lưu vào thư viện
-            </button>
+            ${renderLibrarySaveButton({ saved: isQuestionSavedInLibrary(editFormQuestions[qi]), onclick: `editQSaveToLibrary(${qi}, this)` })}
             <button onclick="editQRemove(${qi})"
               style="height:34px;padding:0 12px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#dc2626;font-size:12px;font-weight:800;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap"
               onmouseenter="this.style.background='#fef2f2';this.style.borderColor='#f87171'" onmouseleave="this.style.background='#fff';this.style.borderColor='#fecaca'">
@@ -6629,7 +7454,11 @@ function renderEditQuestions() {
     </div>`;
   }).join('');
   fixEditQuestionBottomBarLabels();
-  document.getElementById('edit-q-count').textContent = countRealQuestions(editFormQuestions);
+  const count = countRealQuestions(editFormQuestions);
+  const topCount = document.getElementById('edit-q-count');
+  const bottomCount = document.getElementById('edit-q-bottom-count');
+  if (topCount) topCount.textContent = count;
+  if (bottomCount) bottomCount.textContent = count;
 }
 
 function fixEditQuestionBottomBarLabels() {
@@ -6700,7 +7529,7 @@ function editQSetText(qi, val) { editFormQuestions[qi].text = val; }
 
 function editQAddImage(qi) {
   if (!editFormQuestions[qi]) return;
-  pickMediaFile('image/*', dataUrl => {
+  openImageSourceModal(dataUrl => {
     editFormQuestions[qi].image = dataUrl;
     editFormQuestions[qi].hinh_anh_url = dataUrl;
     renderEditQuestions();
@@ -6728,48 +7557,29 @@ async function editQSaveToLibrary(qi, btn) {
   if (validationError) { showToast(validationError, 'error'); return; }
   const opts = getFilledQuestionOptions(q);
 
-  // Kiểm tra trống trong thư viện (theo text)
-  const already = libraryQuestions.find(lq => lq.text?.trim() === q.text.trim());
-  if (already) { showToast('Câu hỏi này đã có trong thư viện!', 'warning'); return; }
+  const already = findQuestionInLibrary(q);
+  if (already) {
+    q.thu_vien_id = Number(already.id) || already.id;
+    markLibrarySavedButton(btn);
+    showToast('Câu hỏi này đã có trong thư viện!', 'warning');
+    return;
+  }
 
-  // Lấy danh mục từ form đang chỉnh sửa (hoặc fallback)
-  const cat = document.getElementById('edit-form-cat')?.value || 'Ngoại ngữ';
+  const context = getLibraryContextFromForm('edit');
 
   try {
-    const token = localStorage.getItem('token') || '';
-    const res = await fetch(`${API_BASE}/library`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({
-        text: q.text.trim(),
-        type: q.type,
-        bo_mon: cat,
-        opts,
-        ...(q.rows?.length ? { rows: q.rows } : {}),
-        ...(q.cols?.length ? { cols: q.cols } : {}),
-      })
-    });
-    if (res.ok) {
-      const data = await res.json().catch(() => ({}));
-      const newQ = normalizeLibraryQuestion(data.data || { id: String(data.id || ('lib-' + Date.now())), text: q.text.trim(), type: q.type, category: cat, bo_mon: cat, opts });
-      libraryQuestions.push(newQ);
-      localStorage.setItem('flic_lib_flat', JSON.stringify(libraryQuestions));
-      libraryCountReady = true;
-      updateLibraryCountLabel();
-      showLibrarySavedNotice(false);
-      markLibrarySavedButton(btn);
-      fetchLibraryFromAPI().catch(() => {});
-      return;
-    }
-    throw new Error('API lỗi');
-  } catch(e) {
-    const newQ = normalizeLibraryQuestion({ id: 'lib-' + Date.now(), text: q.text.trim(), type: q.type, category: cat, bo_mon: cat, opts });
+    const data = await postQuestionToLibrary(q, context, opts);
+    const newQ = normalizeLibraryQuestion(data.data || buildLibraryQuestionFallback(q, context, opts));
     libraryQuestions.push(newQ);
+    q.thu_vien_id = Number(newQ.id) || newQ.id;
     localStorage.setItem('flic_lib_flat', JSON.stringify(libraryQuestions));
     libraryCountReady = true;
     updateLibraryCountLabel();
-    showLibrarySavedNotice(true);
+    showLibrarySavedNotice(false);
     markLibrarySavedButton(btn);
+    fetchLibraryFromAPI().catch(() => {});
+  } catch(e) {
+    showToast(e.message || 'Không lưu được câu hỏi vào thư viện', 'error');
   }
 }
 function editQValidateCard(q) {
@@ -6809,6 +7619,7 @@ function editQSetType(qi, val) {
   } else if (!needsOpts.includes(val)) {
     editFormQuestions[qi].opts = [];
   }
+  if (!supportsOtherOption(val)) setQuestionAllowOther(editFormQuestions[qi], false);
   if (val === 'scale') setQuestionScaleConfig(editFormQuestions[qi], getQuestionScaleConfig(editFormQuestions[qi]));
   if (val === 'rating') setQuestionRatingConfig(editFormQuestions[qi], getQuestionRatingConfig(editFormQuestions[qi]));
   if (needsGrid.includes(val)) {
@@ -6838,6 +7649,11 @@ function editQSetRating(qi, key, val) {
   renderEditQuestions();
 }
 function editQAddOpt(qi) { editFormQuestions[qi].opts.push(''); renderEditQuestions(); }
+function editQToggleOther(qi, enabled) {
+  if (!editFormQuestions[qi]) return;
+  setQuestionAllowOther(editFormQuestions[qi], enabled);
+  renderEditQuestions();
+}
 function editQRemoveOpt(qi, oi) {
   if (editFormQuestions[qi].opts.length > 1) {
     editFormQuestions[qi].opts.splice(oi, 1);
@@ -6879,66 +7695,78 @@ function editQAdd(position = 'first-section') {
 
 document.getElementById('page-content').insertAdjacentHTML('beforeend', `
   <div class="modal-overlay" id="edit-form-modal">
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:920px;width:min(92vw,920px);max-height:calc(100vh - 32px);border-radius:16px;display:flex;flex-direction:column;overflow:hidden">
-      <div class="modal-header" style="background:linear-gradient(90deg,#00008B,#00008B);border-radius:16px 16px 0 0;padding:14px 20px">
-        <div>
-          <div class="modal-title" style="color:#fff">Chỉnh sửa biểu mẫu</div>
-          <div style="font-size:12.5px;color:rgba(255,255,255,0.82);margin-top:2px">Cập nhật thông tin và câu hỏi</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <button id="expand-edit-btn" class="icon-btn" title="Phóng to" onclick="toggleEditFormFullscreen()"
-            style="color:#fff;background:rgba(255,255,255,0.15);transition:all .15s"
-            onmouseenter="this.style.background='rgba(255,255,255,0.28)'" onmouseleave="this.style.background='rgba(255,255,255,0.15)'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:920px;width:min(92vw,920px);border-radius:16px;display:flex;flex-direction:column">
+      <div class="modal-header" style="position:relative;align-items:flex-start;padding:18px 260px 14px 24px;background:#00008B;color:#fff;border-bottom:0;border-radius:16px 16px 0 0">
+        <div style="display:flex;align-items:flex-start;gap:10px;width:100%;min-width:0">
+          <button id="collapse-edit-btn" class="btn btn-outline btn-sm" onclick="toggleEditFormFullscreen()" style="display:none;align-items:center;gap:6px;margin-top:2px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>
+            Quay lại
           </button>
-          <button class="icon-btn close-btn" onclick="closeModal('edit-form-modal')" style="color:#fff;background:rgba(255,255,255,0.15)">${IC.close}</button>
-        </div>
-      </div>
-
-      <div id="edit-modal-scroll" style="padding:0 20px 4px;flex:1 1 auto;overflow-y:auto;scrollbar-gutter:stable">
-
-        <!-- Thông tin cơ bản -->
-        <div style="padding:16px 0 14px;border-bottom:1px solid var(--gray-200)">
-          <input type="hidden" id="edit-form-id">
-          <div class="form-group" style="margin-bottom:12px">
-            <label class="form-label">Tên biểu mẫu <span style="color:var(--red)">*</span></label>
+          <div id="edit-form-title-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'edit-form-name')" style="min-width:0;max-width:100%;width:100%">
             <input id="edit-form-name" type="hidden" required>
-            <div id="edit-form-name-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'edit-form-name')">
-              <div id="edit-form-name-editor" class="input rich-title-editor" contenteditable="true" role="textbox" aria-label="Tên biểu mẫu"
-                data-sync-target="edit-form-name"
-                data-placeholder="Tên biểu mẫu"
-                style="background:#f8f9fb;min-height:46px;height:auto;display:block;line-height:1.5;outline:none;white-space:pre-wrap;word-break:break-word;font-weight:400;padding:10px 12px;overflow:auto"
-                onfocus="showFieldToolbar('edit-form-name')"
-                oninput="syncRichTextFieldFromEditor('edit-form-name-editor')"
-                onblur="syncRichTextFieldFromEditor('edit-form-name-editor')"
-                onkeydown="handleRichFieldKeydown(event, 'edit-form-name-editor')"
-                onclick="handleRichFieldClick(event, 'edit-form-name-editor')"
-                onpaste="pastePlainTextIntoRichField(event, 'edit-form-name-editor')"></div>
-              ${renderTextFormatToolbar('edit-form-name-editor', { hidden: true, toolbarFor: 'edit-form-name', hideLists: true })}
-            </div>
-            <div id="edit-form-desc-wrap" style="margin-top:10px" onfocusout="handleFieldToolbarFocusOut(event, 'edit-form-desc')">
+            <div id="edit-form-name-editor" class="modal-title rich-title-editor" contenteditable="true" role="textbox" aria-label="Tên biểu mẫu"
+              data-sync-target="edit-form-name"
+              data-placeholder="Chỉnh sửa biểu mẫu"
+              style="min-height:32px;max-height:100px;overflow-y:auto;scrollbar-gutter:stable;line-height:1.25;outline:none;white-space:pre-wrap;word-break:break-word;color:#fff;font-weight:400;padding:0;border:0;background:transparent"
+              onfocus="showFieldToolbar('edit-form-name')"
+              oninput="syncRichTextFieldFromEditor('edit-form-name-editor')"
+              onblur="syncRichTextFieldFromEditor('edit-form-name-editor')"
+              onkeydown="handleRichFieldKeydown(event, 'edit-form-name-editor')"
+              onclick="handleRichFieldClick(event, 'edit-form-name-editor')"
+              onpaste="pastePlainTextIntoRichField(event, 'edit-form-name-editor')"></div>
+            ${renderTextFormatToolbar('edit-form-name-editor', { hidden: true, toolbarFor: 'edit-form-name', hideLists: true, lightBg: true })}
+            <div id="edit-form-desc-wrap" class="create-desc-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'edit-form-desc')">
               <textarea id="edit-form-desc" maxlength="1000" style="display:none"></textarea>
-              <div id="edit-form-desc-editor" class="input rich-title-editor" contenteditable="true" role="textbox" aria-label="Mô tả ngắn"
+              <div id="edit-form-desc-editor" class="rich-title-editor create-desc-editor" contenteditable="true" role="textbox" aria-label="Mô tả ngắn"
                 data-sync-target="edit-form-desc"
                 data-placeholder="Mô tả ngắn về biểu mẫu..."
-                style="background:#f8f9fb;min-height:40px;height:auto;display:block;line-height:1.45;outline:none;white-space:pre-wrap;word-break:break-word;font-weight:400;padding:9px 12px;overflow:auto;color:#334155"
+                style="min-height:22px;line-height:1.4;outline:none;white-space:pre-wrap;word-break:break-word;color:#dbeafe;font-size:12.5px;font-weight:500;padding:0;border:0;background:transparent"
                 onfocus="showFieldToolbar('edit-form-desc')"
                 oninput="syncRichTextFieldFromEditor('edit-form-desc-editor')"
                 onblur="syncRichTextFieldFromEditor('edit-form-desc-editor')"
                 onkeydown="handleRichFieldKeydown(event, 'edit-form-desc-editor')"
                 onclick="handleRichFieldClick(event, 'edit-form-desc-editor')"
                 onpaste="pastePlainTextIntoRichField(event, 'edit-form-desc-editor')"></div>
-              ${renderTextFormatToolbar('edit-form-desc-editor', { hidden: true, toolbarFor: 'edit-form-desc' })}
+              ${renderTextFormatToolbar('edit-form-desc-editor', { hidden: true, toolbarFor: 'edit-form-desc', lightBg: true })}
+              <button type="button" id="edit-form-desc-toggle" class="create-desc-toggle" onclick="toggleEditFormDescExpanded()" title="Mở rộng mô tả" aria-label="Mở rộng mô tả" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">
-            <div>
-              <label class="form-label">Danh mục <span style="color:var(--red)">*</span></label>
-              <select id="edit-form-cat" class="input" required style="width:100%;background:#f8f9fb" onchange="syncEditSurveyTypes();var s=document.getElementById('edit-lib-cat-filter');if(s)s.value=this.value;renderEditLibraryList()">
-                <option value="">Chọn danh mục</option>
-                <option>Ngoại ngữ</option><option>Tin học</option>
-              </select>
-            </div>
+        </div>
+        <div id="edit-form-header-actions" style="position:absolute;right:24px;top:22px;z-index:3;display:flex;align-items:center;gap:6px">
+          <button class="icon-btn" title="Giao diện" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 3C7 3 3 6.8 3 11.5S7.1 20 12.2 20h1.3c1.3 0 2.3-1.1 2.1-2.4-.1-.7-.4-1.3-.8-1.8-.7-.9-.1-2.3 1.1-2.3H18c1.7 0 3-1.4 3-3.1C21 6.3 17 3 12 3z"/></svg>
+          </button>
+          <button id="edit-undo-btn" class="icon-btn" title="Hoàn tác" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
+          </button>
+          <button id="edit-redo-btn" class="icon-btn" title="Làm lại" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
+          </button>
+          <button class="icon-btn" title="Lấy liên kết" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"/></svg>
+          </button>
+          <button class="icon-btn" title="Thêm cộng tác viên" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          </button>
+          <button id="expand-edit-btn" class="icon-btn" title="Phóng to" onclick="toggleEditFormFullscreen()" style="color:var(--gray-400);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-400)'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+          <button class="icon-btn close-btn" onclick="closeModal('edit-form-modal')">${IC.close}</button>
+        </div>
+      </div>
+
+      <div id="edit-modal-scroll" style="padding:0 24px 8px;max-height:min(76vh,820px);overflow-y:auto">
+
+        <!-- Thông tin cơ bản -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:16px 0">
+          <input type="hidden" id="edit-form-id">
+          <div>
+            <label class="form-label">Danh mục <span style="color:var(--red)">*</span></label>
+            <select id="edit-form-cat" class="input" required style="width:100%;background:#f8f9fb" onchange="syncEditSurveyTypes();var s=document.getElementById('edit-lib-cat-filter');if(s)s.value=this.value;renderEditLibraryList()">
+              <option value="">Chọn danh mục</option>
+              <option>Ngoại ngữ</option><option>Tin học</option>
+            </select>
+          </div>
             <div>
               <label class="form-label">Loại khảo sát <span style="color:var(--red)">*</span></label>
               <select id="edit-form-survey-type" class="input" required style="width:100%;background:#f8f9fb">
@@ -6963,7 +7791,6 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
               </label>
             </div>
           </div>
-        </div>
 
         <!-- Khu vực câu hỏi -->
         <div style="padding:14px 0">
@@ -7030,13 +7857,21 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
 
       </div>
 
-      <div style="position:sticky;bottom:0;background:#fff;border-top:1px solid var(--gray-200);padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-radius:0 0 16px 16px;flex-wrap:wrap">
-        <button class="btn btn-outline" onclick="editQAdd('end')" title="Thêm câu hỏi" style="width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
+      <div style="position:sticky;bottom:0;background:#fff;border-top:1px solid var(--gray-200);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-radius:0 0 16px 16px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:13px;color:var(--gray-500)">Đã chọn <strong id="edit-q-bottom-count" style="color:var(--sky)">0</strong> câu hỏi</div>
+          <button type="button" onclick="openEditFormPreview()" title="Xem trước biểu mẫu"
+            style="height:38px;min-width:118px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 14px;border-radius:10px;border:1.5px solid #00008B;background:#fff;font-size:12.5px;font-weight:900;color:#00008B;cursor:pointer;transition:background .15s,border-color .15s,color .15s,box-shadow .15s;white-space:nowrap"
+            onmouseenter="this.style.background='#dbeafe';this.style.borderColor='#00008B';this.style.color='#00008B';this.style.boxShadow='0 6px 16px rgba(0,0,139,.16)'"
+            onmouseleave="this.style.background='#fff';this.style.borderColor='#00008B';this.style.color='#00008B';this.style.boxShadow='none'"
+            onmousedown="this.style.background='#bfdbfe';this.style.color='#00008B'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Xem trước
+          </button>
+        </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-outline" onclick="closeModal('edit-form-modal')">Hủy</button>
-        <button class="btn btn-primary" onclick="saveEditForm()">${IC.save}Lưu thay đổi</button>
+          <button class="btn btn-outline" onclick="closeModal('edit-form-modal')">Hủy bỏ</button>
+          <button class="btn btn-primary" onclick="saveEditForm()">${IC.save} Lưu thay đổi</button>
         </div>
       </div>
     </div>
@@ -7280,8 +8115,7 @@ async function openViewModal(id, manageHistory = true) {
   questions = mergeQuestionLocalFallback(questions, localPreviewItems);
   questions = mergeQuestionMediaCache(id, questions);
   const formDesc = (formDetail?.mo_ta || f.mo_ta || f.desc || '').trim();
-
-  document.getElementById('view-modal-body').innerHTML = renderFormPreviewSurface({
+  const viewFormInfo = {
     name: f.name,
     desc: formDesc,
     cat: f.cat || formDetail?.danh_muc || 'Khác',
@@ -7293,7 +8127,14 @@ async function openViewModal(id, manageHistory = true) {
       headerFont: formDetail?.font_family || f.font_family || DEFAULT_FORM_THEME.headerFont,
     },
     anh_bia: formDetail?.anh_bia || f.anh_bia || '',
-  }, questions);
+  };
+
+  formPreviewPageState = { page: 0, formInfo: viewFormInfo, questions, containerId: 'view-modal-body' };
+
+  document.getElementById('view-modal-body').innerHTML = renderFormPreviewSurface(
+    { ...viewFormInfo, _previewPageIndex: 0 },
+    questions
+  );
   return;
 
   const renderViewAnswer = (question) => {
@@ -7335,7 +8176,7 @@ async function openViewModal(id, manageHistory = true) {
       const control = normalizedType === 'grid_radio'
         ? '<span style="width:16px;height:16px;border-radius:50%;border:2px solid #00008B;display:inline-block"></span>'
         : '<span style="width:16px;height:16px;border-radius:4px;border:2px solid #f59e0b;display:inline-block"></span>';
-      return `<div style="overflow:auto"><table style="width:100%;min-width:520px;border-collapse:separate;border-spacing:0 8px"><thead><tr><th style="text-align:left;padding:0 12px 6px;color:#64748b;font-size:12px;font-weight:700"></th>${cols.map(col => `<th style="text-align:center;padding:0 12px 6px;color:#00008B;font-size:12px;font-weight:700">${col}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr><td style="padding:14px 12px;background:rgba(255,255,255,.92);border:1px solid #dbe4f0;border-right:none;border-radius:12px 0 0 12px;font-size:14px;font-weight:600;color:#334155">${row}</td>${cols.map(() => `<td style="padding:14px 12px;background:rgba(255,255,255,.92);border-top:1px solid #dbe4f0;border-bottom:1px solid #dbe4f0;text-align:center">${control}</td>`).join('')}<td style="width:1px;padding:0;background:transparent;border:none"></td></tr>`).join('')}</tbody></table></div>`;
+      return `<div style="overflow:auto"><table style="width:100%;min-width:520px;table-layout:fixed;border-collapse:separate;border-spacing:0 8px"><thead><tr><th style="text-align:left;padding:0 12px 6px;color:#64748b;font-size:12px;font-weight:700"></th>${cols.map(col => `<th style="text-align:center;padding:0 12px 6px;color:#00008B;font-size:12px;font-weight:700">${col}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr><td style="padding:14px 12px;background:rgba(255,255,255,.92);border:1px solid #dbe4f0;border-right:none;border-radius:12px 0 0 12px;font-size:14px;font-weight:600;color:#334155">${row}</td>${cols.map(() => `<td style="padding:14px 12px;background:rgba(255,255,255,.92);border-top:1px solid #dbe4f0;border-bottom:1px solid #dbe4f0;text-align:center">${control}</td>`).join('')}<td style="width:1px;padding:0;background:transparent;border:none"></td></tr>`).join('')}</tbody></table></div>`;
     }
     return `<div style="font-size:13px;color:#94a3b8">Không có dữ liệu xem trước.</div>`;
   };
@@ -7359,7 +8200,7 @@ async function openViewModal(id, manageHistory = true) {
             <span style="padding:6px 12px;border-radius:999px;background:#ffffff;border:1px solid #bfdbfe;font-size:12px;font-weight:800;color:#00008B">${f.cat || 'Khác'}</span>
             <span style="padding:6px 12px;border-radius:999px;background:#ffffff;border:1px solid #bfdbfe;font-size:12px;font-weight:800;color:#00008B">Tổng ${countRealQuestions(questions)} câu hỏi</span>
           </div>
-          <div style="font-size:42px;line-height:1.08;font-weight:800;letter-spacing:-0.02em;color:#00008B">${formatRichText(f.name)}</div>
+          <div style="font-size:32px;line-height:1.2;font-weight:700;letter-spacing:-0.02em;color:#00008B">${formatRichText(f.name)}</div>
           ${formDesc ? `<div style="font-size:16px;margin-top:12px;color:#334155;font-weight:600;line-height:1.55">${formatRichText(formDesc)}</div>` : ''}
         </div>
       </div>
@@ -7372,18 +8213,19 @@ async function openViewModal(id, manageHistory = true) {
         </div>
       ` : `
         <div style="border:1px solid #bfdbfe;border-radius:20px;padding:20px 20px 22px;background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);box-shadow:0 12px 26px rgba(30,64,175,.08)">
-          <div style="display:flex;align-items:flex-start;gap:14px">
-            <div style="width:36px;height:36px;border-radius:50%;background:#00008B;color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;box-shadow:0 8px 18px rgba(0,0,139,.18)">${getQuestionNumberInSection(questions, i)}</div>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-                <span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:800">${TYPE_LABEL_MAP[normalizeQuestionType(q.loai)] || normalizeQuestionType(q.loai)}</span>
-                ${q.bat_buoc ? '<span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:800">Bắt buộc</span>' : '<span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:#e0f2fe;color:#075985;font-size:12px;font-weight:800">Không bắt buộc</span>'}
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+            <div style="display:flex;align-items:flex-start;gap:14px;flex:1;min-width:0">
+              <div style="width:36px;height:36px;border-radius:50%;background:#00008B;color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;box-shadow:0 8px 18px rgba(0,0,139,.18)">${getQuestionNumberInSection(questions, i)}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:12px;line-height:1.5">
+                  ${formatRichText(q.noi_dung, q.bat_buoc)}
+                </div>
+                ${renderQuestionMedia(q)}
+                ${renderViewAnswer(q)}
               </div>
-              <div style="font-size:21px;font-weight:700;color:#0f172a;margin-bottom:14px;line-height:1.45">
-                ${formatRichText(q.noi_dung)}
-              </div>
-              ${renderQuestionMedia(q)}
-              ${renderViewAnswer(q)}
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+              <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:800;white-space:nowrap">${TYPE_LABEL_MAP[normalizeQuestionType(q.loai)] || normalizeQuestionType(q.loai)}</span>
             </div>
           </div>
         </div>
@@ -7401,7 +8243,7 @@ async function saveEditForm() {
   const desc = document.getElementById('edit-form-desc')?.value?.trim() || '';
   const cat = document.getElementById('edit-form-cat').value;
   const surveyType = document.getElementById('edit-form-survey-type')?.value || '';
-  const target = document.getElementById('edit-form-target')?.value || 'Tất cả';
+  const target = normalizeSurveyTarget(document.getElementById('edit-form-target')?.value || 'Tất cả');
   const editNoClose = document.getElementById('edit-form-no-close');
   const closeDate = editNoClose?.checked ? '' : (document.getElementById('edit-form-close')?.value || '');
   const loiKet = document.getElementById('edit-form-loi-ket')?.value?.trim() || '';
@@ -7542,6 +8384,7 @@ async function saveEditForm() {
         throw new Error(resubmitData.message || 'Không gửi lại được yêu cầu phê duyệt');
       }
       syncResubmittedApprovalLocal(rejectedCtx.approvalId, id, name, cat, chosenQuestions);
+      if (typeof window.logActivity === 'function') window.logActivity('edit', id, name, 'Chỉnh sửa biểu mẫu');
       closeModal('edit-form-modal');
       showToast(`Đã cập nhật biểu mẫu "${name}" và gửi duyệt lại`, 'success');
       setTimeout(() => {
@@ -7565,6 +8408,7 @@ async function saveEditForm() {
         note: '',
         questions: chosenQuestions,
       });
+      if (typeof window.logActivity === 'function') window.logActivity('edit', id, name, 'Chỉnh sửa biểu mẫu');
       closeModal('edit-form-modal');
       showToast(`Đã cập nhật biểu mẫu "${name}" và gửi duyệt`, 'success');
       return;
@@ -7713,3 +8557,463 @@ if (window.location.pathname.includes('form-create')) (function initStandaloneCr
   renderQList();
   renderDirectQList();
 })();
+
+function setEditFormDescToggleIcon(expanded) {
+  const toggle = document.getElementById('edit-form-desc-toggle');
+  if (!toggle) return;
+  toggle.title = expanded ? 'Thu gọn mô tả' : 'Mở rộng mô tả';
+  toggle.setAttribute('aria-label', toggle.title);
+  toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  toggle.innerHTML = expanded
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+}
+
+function updateEditFormDescCollapseState() {
+  const wrap = document.getElementById('edit-form-desc-wrap');
+  const editor = document.getElementById('edit-form-desc-editor');
+  const toggle = document.getElementById('edit-form-desc-toggle');
+  const header = document.querySelector('#edit-form-modal .modal-header');
+  if (!wrap || !editor || !toggle) return;
+
+  setTimeout(() => {
+    const wasExpanded = wrap.classList.contains('is-expanded');
+    if (wasExpanded) {
+      wrap.classList.remove('is-expanded');
+      header?.classList.remove('is-desc-expanded');
+    }
+    const shouldToggle = editor.scrollHeight > 74;
+    if (wasExpanded) {
+      wrap.classList.add('is-expanded');
+      header?.classList.add('is-desc-expanded');
+    }
+
+    if (!shouldToggle) {
+      wrap.classList.remove('is-expanded');
+      header?.classList.remove('is-desc-expanded');
+    }
+    toggle.hidden = !shouldToggle;
+    setEditFormDescToggleIcon(shouldToggle && wasExpanded);
+  }, 50);
+}
+
+function toggleEditFormDescExpanded() {
+  const wrap = document.getElementById('edit-form-desc-wrap');
+  const toggle = document.getElementById('edit-form-desc-toggle');
+  const header = document.querySelector('#edit-form-modal .modal-header');
+  if (!wrap || !toggle) return;
+  const expanded = wrap.classList.toggle('is-expanded');
+  header?.classList.toggle('is-desc-expanded', expanded);
+  setEditFormDescToggleIcon(expanded);
+}
+
+function openEditFormPreview(pushHistory = true) {
+  const name = document.getElementById('edit-form-name')?.value?.trim() || '(Chưa đặt tên)';
+  const desc = document.getElementById('edit-form-desc')?.value?.trim() || '';
+  const cat  = document.getElementById('edit-form-cat')?.value || 'Khác';
+  const target = typeof normalizeSurveyTarget === 'function' ? normalizeSurveyTarget(document.getElementById('edit-form-target')?.value || 'Tất cả') : (document.getElementById('edit-form-target')?.value || 'Tất cả');
+  const sel  = typeof editFormQuestions !== 'undefined' ? editFormQuestions : [];
+
+  const body = document.getElementById('form-preview-body');
+  const title = document.getElementById('form-preview-title');
+  if (!body || !title) return;
+
+  const previewOverlay = document.getElementById('form-preview-modal');
+  if (previewOverlay) previewOverlay.style.zIndex = '1300';
+
+  title.innerHTML = typeof formatRichText === 'function' ? formatRichText(name) : name;
+
+  const previewInfo = { name, desc, cat, target, theme: typeof createFormTheme !== 'undefined' ? createFormTheme : null };
+  if (typeof formPreviewPageState !== 'undefined') {
+    formPreviewPageState = { page: 0, formInfo: previewInfo, questions: sel, containerId: 'form-preview-body' };
+  }
+  
+  if (typeof renderFormPreviewSurface === 'function') {
+    body.innerHTML = renderFormPreviewSurface({ ...previewInfo, _previewPageIndex: 0 }, sel);
+  } else {
+    body.innerHTML = '<div style="padding:20px;text-align:center">Preview not available</div>';
+  }
+  
+  openModal('form-preview-modal');
+  if (pushHistory && typeof pushFormPreviewHistory === 'function') pushFormPreviewHistory();
+}
+
+// --- DRAG & DROP: Căn chỉnh/thay đổi kích thước hình ảnh ---
+let isResizingImage = false;
+let currentResizingImageId = null;
+let startX = 0;
+let startWidth = 0;
+let resizeDir = '';
+
+window.startImageResize = function(e, qid, dir) {
+  isResizingImage = true;
+  currentResizingImageId = qid;
+  resizeDir = dir;
+  startX = e.clientX;
+  const imgElement = document.getElementById(`dq-img-${qid}`);
+  if (!imgElement) return;
+  startWidth = imgElement.offsetWidth;
+  e.preventDefault();
+  e.stopPropagation();
+  
+  document.addEventListener('mousemove', onImageResizeMove);
+  document.addEventListener('mouseup', onImageResizeUp);
+};
+
+function onImageResizeMove(e) {
+  if (!isResizingImage) return;
+  let dx = e.clientX - startX;
+  if (resizeDir === 'nw' || resizeDir === 'sw') dx = -dx;
+  
+  let q = typeof directQuestions !== 'undefined' ? directQuestions.find(x => sameQuestionId(x.id, currentResizingImageId)) : null;
+  if (!q && typeof editFormQuestions !== 'undefined') q = editFormQuestions.find(x => sameQuestionId(x.id, currentResizingImageId));
+  const align = q?.image_align || 'left';
+  if (align === 'center') dx *= 2;
+
+  const newWidth = Math.max(100, startWidth + dx);
+  const imgElement = document.getElementById(`dq-img-${currentResizingImageId}`);
+  if (imgElement) {
+    imgElement.style.width = newWidth + 'px';
+  }
+}
+
+function onImageResizeUp(e) {
+  if (!isResizingImage) return;
+  isResizingImage = false;
+  document.removeEventListener('mousemove', onImageResizeMove);
+  document.removeEventListener('mouseup', onImageResizeUp);
+  const imgElement = document.getElementById(`dq-img-${currentResizingImageId}`);
+  if (imgElement) {
+    const finalWidth = imgElement.style.width;
+    dqSetImageWidth(currentResizingImageId, finalWidth);
+  }
+}
+
+window.dqSetImageWidth = function(qid, width) {
+  let q = typeof directQuestions !== 'undefined' ? directQuestions.find(x => sameQuestionId(x.id, qid)) : null;
+  if (q) {
+    q.image_width = width;
+    if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  } else {
+    q = typeof editFormQuestions !== 'undefined' ? editFormQuestions.find(x => sameQuestionId(x.id, qid)) : null;
+    if (q) {
+      q.image_width = width;
+    }
+  }
+};
+
+// --- Bổ sung tính năng chèn ảnh vào tùy chọn và câu hỏi ---
+function editQChangeImage(qi) {
+  openImageSourceModal(dataUrl => {
+    if (editFormQuestions[qi]) {
+      editFormQuestions[qi].image = dataUrl;
+      editFormQuestions[qi].hinh_anh_url = dataUrl;
+      renderEditQuestions();
+    }
+  });
+}
+
+function _setOptImage(q, oi, dataUrl) {
+  if (!q.validation_json) q.validation_json = "{}";
+  let vj = {};
+  try { vj = typeof q.validation_json === 'string' ? JSON.parse(q.validation_json) : q.validation_json; } catch(e){}
+  if (typeof vj !== 'object' || !vj) vj = {};
+  if (!vj.option_images) vj.option_images = {};
+  vj.option_images[oi] = dataUrl;
+  q.validation_json = JSON.stringify(vj);
+}
+
+function _removeOptImage(q, oi) {
+  if (!q.validation_json) return;
+  let vj = {};
+  try { vj = typeof q.validation_json === 'string' ? JSON.parse(q.validation_json) : q.validation_json; } catch(e){}
+  if (vj && vj.option_images && vj.option_images[oi]) {
+    delete vj.option_images[oi];
+    q.validation_json = JSON.stringify(vj);
+  }
+}
+
+function dqChangeOptImage(id, oi) {
+  openImageSourceModal(dataUrl => {
+    const q = _dqFindQ(id);
+    if (q) { _setOptImage(q, oi, dataUrl); renderDirectQList(); }
+  });
+}
+
+function dqRemoveOptImage(id, oi) {
+  const q = _dqFindQ(id);
+  if (q) { _removeOptImage(q, oi); renderDirectQList(); }
+}
+
+function editQChangeOptImage(qi, oi) {
+  openImageSourceModal(dataUrl => {
+    if (editFormQuestions[qi]) { _setOptImage(editFormQuestions[qi], oi, dataUrl); renderEditQuestions(); }
+  });
+}
+
+function editQRemoveOptImage(qi, oi) {
+  if (editFormQuestions[qi]) { _removeOptImage(editFormQuestions[qi], oi); renderEditQuestions(); }
+}
+
+// --- Advanced Image Source Modal ---
+let imageSourceModalCallback = null;
+let webcamStream = null;
+
+function closeImageSourceModal() {
+  const modal = document.getElementById('image-source-modal');
+  if (modal) modal.style.display = 'none';
+  if (webcamStream) {
+    webcamStream.getTracks().forEach(track => track.stop());
+    webcamStream = null;
+  }
+}
+
+function openImageSourceModal(callback) {
+  imageSourceModalCallback = callback;
+  let modal = document.getElementById('image-source-modal');
+  if (!modal) {
+    const modalHtml = `
+      <div id="image-source-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
+        <div style="background:#fff;border-radius:12px;width:100%;max-width:600px;box-shadow:0 10px 25px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden;animation:slideUp .2s ease-out">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid #e2e8f0">
+            <h3 style="margin:0;font-size:16px;color:#1e293b;font-weight:700">Chèn hình ảnh</h3>
+            <button onclick="closeImageSourceModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b">&times;</button>
+          </div>
+          <div style="display:flex;border-bottom:1px solid #e2e8f0;padding:0 24px">
+            <button class="ism-tab-btn active" data-tab="ism-upload" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid #00008B;color:#00008B;font-weight:600;cursor:pointer;font-size:14px">Tải lên</button>
+            <button class="ism-tab-btn" data-tab="ism-webcam" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#64748b;font-weight:600;cursor:pointer;font-size:14px">Webcam</button>
+            <button class="ism-tab-btn" data-tab="ism-url" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#64748b;font-weight:600;cursor:pointer;font-size:14px">Theo URL</button>
+          </div>
+          <div style="padding:24px;min-height:300px;display:flex;flex-direction:column">
+            
+            <!-- Tab Upload -->
+            <div id="ism-upload" class="ism-tab-content" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;border:2px dashed #cbd5e1;border-radius:8px;background:#f8fafc">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" width="48" height="48" style="margin-bottom:16px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <div style="color:#64748b;margin-bottom:16px;font-size:14px">Kéo tệp vào đây hoặc</div>
+              <button onclick="document.getElementById('ism-file-input').click()" style="padding:8px 16px;background:#00008B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">Duyệt qua máy tính</button>
+              <input type="file" id="ism-file-input" accept="image/*" style="display:none" onchange="handleIsmFileUpload(event)">
+            </div>
+            
+            <!-- Tab Webcam -->
+            <div id="ism-webcam" class="ism-tab-content" style="display:none;flex-direction:column;align-items:center;flex:1">
+              <div id="ism-webcam-error" style="display:none;color:#ef4444;margin-bottom:12px;font-size:13px;text-align:center">Không thể truy cập máy ảnh. Vui lòng kiểm tra quyền.</div>
+              <div style="position:relative;width:100%;max-width:400px;aspect-ratio:4/3;background:#0f172a;border-radius:8px;overflow:hidden;margin-bottom:16px;display:flex;align-items:center;justify-content:center">
+                <video id="ism-video" autoplay playsinline style="width:100%;height:100%;object-fit:cover;display:none;transform:scaleX(-1)"></video>
+                <canvas id="ism-canvas" style="display:none"></canvas>
+                <svg id="ism-webcam-placeholder" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" width="48" height="48"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </div>
+              <button id="ism-capture-btn" onclick="handleIsmCapture()" style="padding:10px 24px;background:#00008B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;display:none">Chụp ảnh</button>
+            </div>
+            
+            <!-- Tab URL -->
+            <div id="ism-url" class="ism-tab-content" style="display:none;flex-direction:column;flex:1">
+              <div style="font-size:14px;color:#334155;margin-bottom:8px;font-weight:600">Dán URL của hình ảnh:</div>
+              <input type="text" id="ism-url-input" placeholder="https://..." style="padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;outline:none;width:100%;box-sizing:border-box" oninput="handleIsmUrlInput()">
+              <div id="ism-url-preview-container" style="margin-top:16px;display:none;flex-direction:column;align-items:center">
+                <img id="ism-url-preview" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid #e2e8f0;object-fit:contain">
+              </div>
+              <div style="margin-top:auto;display:flex;justify-content:flex-end">
+                <button onclick="handleIsmUrlSubmit()" style="padding:10px 24px;background:#00008B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;margin-top:16px">Chèn hình ảnh</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    modal = document.getElementById('image-source-modal');
+
+    // Tab switching logic
+    document.querySelectorAll('.ism-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.ism-tab-btn').forEach(b => {
+          b.style.borderBottomColor = 'transparent';
+          b.style.color = '#64748b';
+          b.classList.remove('active');
+        });
+        e.target.style.borderBottomColor = '#00008B';
+        e.target.style.color = '#00008B';
+        e.target.classList.add('active');
+
+        document.querySelectorAll('.ism-tab-content').forEach(c => c.style.display = 'none');
+        const tabId = e.target.getAttribute('data-tab');
+        document.getElementById(tabId).style.display = 'flex';
+
+        // Manage webcam
+        if (tabId === 'ism-webcam') {
+          startWebcam();
+        } else {
+          stopWebcam();
+        }
+      });
+    });
+
+    // Drag drop logic
+    const dropZone = document.getElementById('ism-upload');
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.background = '#eef2ff'; dropZone.style.borderColor = '#00008B'; });
+    dropZone.addEventListener('dragleave', e => { e.preventDefault(); dropZone.style.background = '#f8fafc'; dropZone.style.borderColor = '#cbd5e1'; });
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.style.background = '#f8fafc'; dropZone.style.borderColor = '#cbd5e1';
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        processIsmFile(e.dataTransfer.files[0]);
+      }
+    });
+  }
+  
+  modal.style.display = 'flex';
+  // reset to default tab
+  document.querySelector('.ism-tab-btn[data-tab="ism-upload"]').click();
+  document.getElementById('ism-file-input').value = '';
+  document.getElementById('ism-url-input').value = '';
+  document.getElementById('ism-url-preview-container').style.display = 'none';
+}
+
+function processIsmFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    if (imageSourceModalCallback) imageSourceModalCallback(e.target.result);
+    closeImageSourceModal();
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleIsmFileUpload(e) {
+  if (e.target.files && e.target.files[0]) {
+    processIsmFile(e.target.files[0]);
+  }
+}
+
+async function startWebcam() {
+  const video = document.getElementById('ism-video');
+  const errorMsg = document.getElementById('ism-webcam-error');
+  const placeholder = document.getElementById('ism-webcam-placeholder');
+  const btn = document.getElementById('ism-capture-btn');
+  
+  errorMsg.style.display = 'none';
+  
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    video.srcObject = webcamStream;
+    video.style.display = 'block';
+    placeholder.style.display = 'none';
+    btn.style.display = 'block';
+  } catch(err) {
+    errorMsg.style.display = 'block';
+    video.style.display = 'none';
+    placeholder.style.display = 'block';
+    btn.style.display = 'none';
+  }
+}
+
+function stopWebcam() {
+  if (webcamStream) {
+    webcamStream.getTracks().forEach(track => track.stop());
+    webcamStream = null;
+  }
+  const video = document.getElementById('ism-video');
+  if(video) video.style.display = 'none';
+  const placeholder = document.getElementById('ism-webcam-placeholder');
+  if(placeholder) placeholder.style.display = 'block';
+  const btn = document.getElementById('ism-capture-btn');
+  if(btn) btn.style.display = 'none';
+}
+
+function handleIsmCapture() {
+  const video = document.getElementById('ism-video');
+  const canvas = document.getElementById('ism-canvas');
+  if (!video || video.style.display === 'none') return;
+  
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  // mirror the image if video is mirrored
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+  const dataUrl = canvas.toDataURL('image/png');
+  if (imageSourceModalCallback) imageSourceModalCallback(dataUrl);
+  closeImageSourceModal();
+}
+
+function handleIsmUrlInput() {
+  const val = document.getElementById('ism-url-input').value.trim();
+  const preview = document.getElementById('ism-url-preview');
+  const container = document.getElementById('ism-url-preview-container');
+  if (val) {
+    preview.src = val;
+    preview.onload = () => container.style.display = 'flex';
+    preview.onerror = () => container.style.display = 'none';
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+function handleIsmUrlSubmit() {
+  const val = document.getElementById('ism-url-input').value.trim();
+  if (val && imageSourceModalCallback) {
+    imageSourceModalCallback(val);
+    closeImageSourceModal();
+  }
+}
+
+function initCreateFormFlatpickr() {
+  if (typeof flatpickr !== 'undefined') {
+    const customVnLocale = (flatpickr.l10ns && flatpickr.l10ns.vn) ? { ...flatpickr.l10ns.vn } : {};
+    customVnLocale.months = {
+      shorthand: ["Thg 01", "Thg 02", "Thg 03", "Thg 04", "Thg 05", "Thg 06", "Thg 07", "Thg 08", "Thg 09", "Thg 10", "Thg 11", "Thg 12"],
+      longhand: [
+        "Tháng 01", "Tháng 02", "Tháng 03", "Tháng 04", "Tháng 05", "Tháng 06",
+        "Tháng 07", "Tháng 08", "Tháng 09", "Tháng 10", "Tháng 11", "Tháng 12"
+      ]
+    };
+
+    flatpickr("#new-approval-deadline-display", {
+      enableTime: true,
+      dateFormat: "d/m/Y H:i",
+      time_24hr: true,
+      defaultHour: 23,
+      defaultMinute: 59,
+      locale: customVnLocale,
+      minDate: "today",
+      onChange: function(selectedDates, dateStr) {
+        const hidden = document.getElementById('new-approval-deadline');
+        if (hidden) {
+          if (selectedDates.length > 0) {
+            const d = selectedDates[0];
+            const pad = n => String(n).padStart(2, '0');
+            hidden.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          } else {
+            hidden.value = '';
+          }
+          validateApprovalDeadlineField();
+        }
+      }
+    });
+
+    flatpickr("#new-form-close-display", {
+      enableTime: true,
+      dateFormat: "d/m/Y H:i",
+      time_24hr: true,
+      defaultHour: 23,
+      defaultMinute: 59,
+      locale: customVnLocale,
+      minDate: "today",
+      onChange: function(selectedDates, dateStr) {
+        const hidden = document.getElementById('new-form-close');
+        if (hidden) {
+          if (selectedDates.length > 0) {
+            const d = selectedDates[0];
+            const pad = n => String(n).padStart(2, '0');
+            hidden.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          } else {
+            hidden.value = '';
+          }
+        }
+      }
+    });
+  }
+}
