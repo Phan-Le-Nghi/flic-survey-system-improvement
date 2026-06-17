@@ -13,7 +13,7 @@
       font-family: "Be Vietnam Pro", sans-serif;
       color: #0f172a;
       background:
-        radial-gradient(circle at top left, rgba(59,130,246,.12), transparent 28%),
+        radial-gradient(circle at top left, rgba(0,0,139,.12), transparent 28%),
         linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%);
     }
     .public-shell {
@@ -34,8 +34,9 @@
       position: relative;
       overflow: hidden;
       border-radius: 30px;
-      background: linear-gradient(135deg,#bae6fd 0%,#dbeafe 50%,#c7d2fe 100%);
-      box-shadow: 0 24px 48px rgba(59,130,246,.16);
+      background: linear-gradient(135deg,#eef5ff 0%,#ffffff 70%);
+      border-top: 8px solid #00008B;
+      box-shadow: 0 24px 48px rgba(15,23,42,.12);
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
@@ -45,7 +46,7 @@
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(135deg,rgba(219,234,254,.92) 0%,rgba(224,242,254,.84) 42%,rgba(199,210,254,.9) 100%);
+      background: transparent;
     }
     .form-head::after {
       content: "";
@@ -66,26 +67,30 @@
     .form-badge {
       padding: 6px 12px;
       border-radius: 999px;
-      background: rgba(255,255,255,.36);
-      color: #1d4ed8;
+      background: #ffffff;
+      border: 1px solid #bfdbfe;
+      color: #00008B;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
     }
     .form-title {
       margin: 0;
-      font-size: 42px;
-      font-weight: 800;
-      line-height: 1.08;
-      color: #1e3a8a;
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      color: #00008B;
     }
     .form-sub {
       margin: 12px 0 0;
-      color: #1d4ed8;
+      color: #334155;
       font-size: 16px;
+      font-weight: 600;
+      line-height: 1.55;
     }
     .form-created {
       padding: 8px 8px 14px;
-      color: #1d4ed8;
+      color: #00008B;
       font-size: 14px;
     }
     .form-created strong {
@@ -124,7 +129,7 @@
     .field-block input:focus,
     .field-block select:focus,
     .field-block textarea:focus {
-      border-color: #38bdf8;
+      border-color: #00008B;
       box-shadow: 0 0 0 4px rgba(56,189,248,.12);
     }
     .question-list {
@@ -135,10 +140,10 @@
     }
     .question-card {
       border: 1px solid #bfdbfe;
-      border-radius: 22px;
+      border-radius: 20px;
       padding: 20px 20px 22px;
-      background: linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,247,237,.95) 100%);
-      box-shadow: 0 12px 26px rgba(37,99,235,.08);
+      background: linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+      box-shadow: 0 12px 26px rgba(30,64,175,.08);
     }
     .question-head {
       display: flex;
@@ -158,30 +163,33 @@
       width: 36px;
       height: 36px;
       border-radius: 50%;
-      margin-bottom: 10px;
-      background: #dbeafe;
-      color: #1d4ed8;
+      margin-top: 2px;
+      margin-bottom: 0;
+      background: #00008B;
+      color: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 800;
+      box-shadow: 0 8px 18px rgba(0,0,139,.18);
     }
     .question-text {
       margin: 0;
-      font-size: 21px;
-      line-height: 1.45;
-      font-weight: 800;
+      font-size: 16px;
+      line-height: 1.5;
+      font-weight: 600;
       color: #0f172a;
     }
     .question-chip {
       flex-shrink: 0;
       padding: 6px 12px;
       border-radius: 999px;
-      background: #dbeafe;
-      color: #1d4ed8;
+      background: #00008B;
+      color: #fff;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
       white-space: nowrap;
     }
     .option-list {
@@ -201,12 +209,25 @@
       background: rgba(255,255,255,.92);
       cursor: pointer;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 400;
       color: #334155;
     }
     .option-item input {
       margin: 0;
-      accent-color: #0ea5e9;
+      accent-color: #00008B;
+    }
+    .option-item .other-answer {
+      flex: 1;
+      min-width: 160px;
+      border: 0;
+      border-bottom: 1px solid #cbd5e1;
+      background: transparent;
+      padding: 6px 0;
+      font: inherit;
+      outline: none;
+    }
+    .option-item .other-answer:focus {
+      border-bottom-color: #00008B;
     }
     .text-answer,
     .select-answer {
@@ -244,7 +265,7 @@
     }
     .rating-pill input {
       margin: 0;
-      accent-color: #0ea5e9;
+      accent-color: #00008B;
     }
     .star-wrap {
       display: flex;
@@ -348,7 +369,7 @@
         padding: 24px 22px;
       }
       .form-title {
-        font-size: 34px;
+        font-size: 26px;
       }
       .prefill-grid,
       .prefill-grid.three {
@@ -375,36 +396,9 @@
           <span class="form-badge" id="public-form-count">0 c&acirc;u h&#7887;i</span>
         </div>
         <h1 class="form-title" id="public-form-title">Đang tải biểu mẫu...</h1>
-        <p class="form-sub" id="public-form-sub">Vui lòng điền thông tin và trả lời biểu mẫu.</p>
+        <p class="form-sub" id="public-form-sub" style="display:none"></p>
       </div>
 
-      <div class="form-created">Ng&agrave;y t&#7841;o: <strong id="public-form-created">--</strong></div>
-
-      <div class="prefill-grid">
-        <div class="field-block">
-          <label for="prefill-full-name">Họ và tên</label>
-          <input id="prefill-full-name" placeholder="Nhập họ tên của bạn">
-        </div>
-        <div class="field-block">
-          <label for="prefill-email">Email</label>
-          <input id="prefill-email" type="email" placeholder="Nhập email của bạn">
-        </div>
-      </div>
-
-      <div class="prefill-grid three">
-        <div class="field-block">
-          <label for="prefill-class-name">Lớp</label>
-          <input id="prefill-class-name" placeholder="VD: 49K01">
-        </div>
-        <div class="field-block">
-          <label for="prefill-khoa">Khoa</label>
-          <input id="prefill-khoa" placeholder="VD: Ngoại ngữ">
-        </div>
-        <div class="field-block">
-          <label for="prefill-teacher-name">Giáo viên</label>
-          <input id="prefill-teacher-name" placeholder="Tự động điền giáo viên">
-        </div>
-      </div>
 
       <div id="public-question-list" class="question-list">
         <div class="question-card" style="text-align:center;color:#64748b">Đang tải câu hỏi...</div>
@@ -428,6 +422,42 @@
   <script>
     // API_BASE đã được khai báo trong main.js
     let currentForm = null;
+    let currentPublicPageIndex = 0;
+    let publicFormPages = [];
+    let publicQuestionsRaw = [];
+
+    function isSectionItem(item) {
+      return !!item?._isSection || String(item?.type || item?.loai || "").toLowerCase() === "section";
+    }
+
+    function countRealQuestions(items) {
+      return (items || []).filter(item => !isSectionItem(item)).length;
+    }
+
+    function getQuestionNumberInSection(items, index) {
+      const sliced = (items || []).slice(0, index + 1);
+      return countRealQuestions(sliced);
+    }
+
+    function buildFormPages(items) {
+      const questions = items || [];
+      const hasSection = questions.some(isSectionItem);
+      if (!hasSection) {
+        return [{ section: null, sectionIndex: -1, items: questions.map((item, i) => ({ item, originalIndex: i })) }];
+      }
+      const pages = [];
+      let current = { section: null, sectionIndex: -1, items: [] };
+      questions.forEach((item, index) => {
+        if (isSectionItem(item)) {
+          if (current.section || current.items.length) pages.push(current);
+          current = { section: item, sectionIndex: index, items: [] };
+          return;
+        }
+        current.items.push({ item, originalIndex: index });
+      });
+      if (current.section || current.items.length) pages.push(current);
+      return pages;
+    }
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -438,34 +468,115 @@
         .replace(/'/g, "&#39;");
     }
 
+    const DEFAULT_PUBLIC_THEME = {
+      color: "#00008B",
+      background: "#eef5ff",
+      headerImage: "",
+      fontFamily: "Be Vietnam Pro"
+    };
+    const LEGACY_DEFAULT_BACKGROUNDS = new Set(["", "#ffffff", "#fff", "#f0f4f9"]);
+
+    function hasCustomPublicTheme(data = {}) {
+      const image = String(data.anh_bia || "").trim();
+      const bg = String(data.mau_nen || "").trim().toLowerCase();
+      const font = String(data.font_family || "").trim();
+      return !!image || (!!bg && !LEGACY_DEFAULT_BACKGROUNDS.has(bg)) || (!!font && font !== "Be Vietnam Pro");
+    }
+
+    function applyPublicTheme(data = {}) {
+      const custom = hasCustomPublicTheme(data);
+      const accent = DEFAULT_PUBLIC_THEME.color;
+      const background = custom && data.mau_nen ? data.mau_nen : DEFAULT_PUBLIC_THEME.background;
+      const font = custom && data.font_family ? data.font_family : DEFAULT_PUBLIC_THEME.fontFamily;
+      const headerImage = custom ? String(data.anh_bia || "").trim() : "";
+      document.body.style.fontFamily = `"${font}", "Be Vietnam Pro", sans-serif`;
+      document.body.style.background = custom && data.mau_nen
+        ? data.mau_nen
+        : "radial-gradient(circle at top left, rgba(0,0,139,.12), transparent 28%), linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%)";
+
+      const head = document.querySelector(".form-head");
+      if (head) {
+        head.style.borderTopColor = accent;
+        head.style.background = headerImage
+          ? `linear-gradient(135deg,rgba(255,255,255,.92),rgba(255,255,255,.78)),url("${headerImage.replace(/"/g, "%22")}") center/cover`
+          : `linear-gradient(135deg,${background} 0%,#ffffff 70%)`;
+      }
+    }
+
+    function formatRichText(value, isRequired = false) {
+      if (!value) return isRequired ? ' <span style="color:#ef4444;margin-left:2px">*</span>' : '';
+      let text = String(value);
+      if (isRequired) {
+        const lines = text.split('\n');
+        lines[0] = lines[0] + '__REQ_STAR__';
+        text = lines.join('\n');
+      }
+      let html = escapeHtml(text)
+        .replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/g, "<u>$1</u>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
+        .replace(/\n/g, "<br>");
+      if (isRequired) {
+        html = html.replace('__REQ_STAR__', ' <span style="color:#ef4444;margin-left:2px">*</span>');
+      }
+      return html;
+    }
+
+    function getYoutubeEmbedUrl(url) {
+      const text = String(url || "").trim();
+      if (!text) return "";
+      try {
+        const parsed = new URL(text);
+        let id = "";
+        if (parsed.hostname.includes("youtu.be")) id = parsed.pathname.split("/").filter(Boolean)[0] || "";
+        if (parsed.hostname.includes("youtube.com")) id = parsed.searchParams.get("v") || parsed.pathname.split("/").filter(Boolean).pop() || "";
+        return id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}` : "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function renderQuestionMedia(question) {
+      const imageUrl = question.hinh_anh_url || question.image_url || question.image || "";
+      const videoUrl = question.video_url || question.video || "";
+      if (!imageUrl && !videoUrl) return "";
+
+      const imageHtml = imageUrl ? `
+        <div style="margin:0 0 16px 52px">
+          <img src="${escapeHtml(imageUrl)}" alt="Hình ảnh câu hỏi" style="display:block;max-width:100%;max-height:280px;border-radius:14px;border:1px solid #dbe4f0;object-fit:contain;background:#f8fafc">
+        </div>` : "";
+
+      const embedUrl = getYoutubeEmbedUrl(videoUrl);
+      const videoHtml = videoUrl ? (embedUrl ? `
+        <div style="margin:0 0 16px 52px;max-width:620px;aspect-ratio:16/9;border-radius:14px;overflow:hidden;border:1px solid #dbe4f0;background:#0f172a">
+          <iframe src="${escapeHtml(embedUrl)}" title="Video câu hỏi" style="width:100%;height:100%;border:0" allowfullscreen></iframe>
+        </div>` : `
+        <div style="margin:0 0 16px 52px">
+          <a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener" style="display:inline-flex;padding:10px 13px;border-radius:12px;background:#f5f3ff;border:1px solid #ddd6fe;color:#6d28d9;font-size:13px;font-weight:700;text-decoration:none;word-break:break-all">Video: ${escapeHtml(videoUrl)}</a>
+        </div>`) : "";
+
+      return imageHtml + videoHtml;
+    }
+
     function getFormIdFromUrl() {
       const params = new URLSearchParams(window.location.search);
       return params.get("form_id") || "";
-    }
-
-    function setPrefillDefaults() {
-      const params = new URLSearchParams(window.location.search);
-      const prefills = {
-        "prefill-full-name": params.get("full_name") || "",
-        "prefill-email": params.get("email") || "",
-        "prefill-class-name": params.get("class_name") || "",
-        "prefill-khoa": params.get("khoa") || "",
-        "prefill-teacher-name": params.get("teacher_name") || "",
-      };
-
-      Object.entries(prefills).forEach(([id, value]) => {
-        const el = document.getElementById(id);
-        if (el) el.value = value;
-      });
     }
 
     function getQuestionTypeLabel(type) {
       const normalized = String(type || "choice").toLowerCase();
       if (normalized === "rating") return "Đánh giá";
       if (normalized === "star_rating") return "Đánh giá sao";
+      if (normalized === "scale") return "Thang đo";
       if (normalized === "checkbox") return "Hộp kiểm";
       if (normalized === "dropdown") return "Thả xuống";
-      if (normalized === "text" || normalized === "paragraph") return "Tự luận";
+      if (normalized === "grid_radio") return "Lưới trắc nghiệm";
+      if (normalized === "grid_checkbox") return "Lưới hộp kiểm";
+      if (normalized === "short_text" || normalized === "text") return "Tự luận";
+      if (normalized === "paragraph") return "Tự luận dài";
+      if (normalized === "upload") return "Tải tệp";
+      if (normalized === "date") return "Ngày";
+      if (normalized === "time") return "Giờ";
       return "Lựa chọn";
     }
 
@@ -478,8 +589,49 @@
       return option?.id || `opt_${fallbackIndex}`;
     }
 
+    function parseJsonObject(value) {
+      if (value && typeof value === "object" && !Array.isArray(value)) return value;
+      try {
+        const parsed = value ? JSON.parse(value) : {};
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function questionAllowsOther(question) {
+      const type = String(question?.loai || question?.type || "choice").toLowerCase();
+      if (type !== "choice" && type !== "checkbox") return false;
+      const validation = parseJsonObject(question.validation_json || question.validation || question.logic_json);
+      return !!(
+        question.allowOther ||
+        question.allow_other ||
+        question.hasOtherOption ||
+        question.has_other_option ||
+        validation.allow_other ||
+        validation.allowOther ||
+        validation.has_other_option
+      );
+    }
+
+    function getCleanTextArray(values) {
+      return (Array.isArray(values) ? values : [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+    }
+
+    function getGridRows(question) {
+      return getCleanTextArray(question?.rows || question?.hang);
+    }
+
+    function getGridCols(question) {
+      return getCleanTextArray(question?.cols || question?.cot);
+    }
+
     function renderChoiceOptions(question, type) {
       const options = Array.isArray(question.lua_chon) ? question.lua_chon : [];
+      const otherId = `other_${question.id}`;
+      const hasOther = questionAllowsOther(question);
       return `
         <div class="option-list">
           ${options.map((option, optionIndex) => `
@@ -496,6 +648,29 @@
               <span>${escapeHtml(getOptionLabel(option))}</span>
             </label>
           `).join("")}
+          ${hasOther ? `
+            <label class="option-item">
+              <input
+                type="${type === "checkbox" ? "checkbox" : "radio"}"
+                ${type === "checkbox" ? "" : `name="question_${question.id}"`}
+                id="${otherId}"
+                value="__other__"
+                data-question-id="${question.id}"
+                data-question-type="${type}"
+                data-option-id=""
+                data-option-label="Khác"
+                data-other-option="1"
+              >
+              <span>Khác:</span>
+              <input
+                class="other-answer"
+                data-question-other-id="${question.id}"
+                placeholder="Câu trả lời khác"
+                onfocus="const el=document.getElementById('${otherId}');if(el)el.checked=true"
+                id="${otherId}_text"
+              >
+            </label>
+          ` : ""}
         </div>
       `;
     }
@@ -566,16 +741,118 @@
       `;
     }
 
+    function getScaleConfig(question) {
+      let cfg = {};
+      try { cfg = JSON.parse(question.validation_json || '{}'); } catch(e) {}
+      const sc = cfg.scale_config || cfg.scale || {};
+      const opts = Array.isArray(question.lua_chon) ? question.lua_chon : [];
+      const legacyLabels = opts.length === 2 ? { labelMin: opts[0]?.noi_dung || opts[0] || '', labelMax: opts[1]?.noi_dung || opts[1] || '' } : {};
+      const rawStart = Number(sc.start ?? sc.min ?? 1);
+      const start = rawStart === 0 ? 0 : 1;
+      const rawEnd = Number(sc.end ?? sc.max ?? 5);
+      const end = Math.min(10, Math.max(2, isNaN(rawEnd) ? 5 : rawEnd));
+      return {
+        start, end,
+        labelMin: String(sc.labelMin ?? sc.label_min ?? legacyLabels.labelMin ?? '').trim(),
+        labelMax: String(sc.labelMax ?? sc.label_max ?? legacyLabels.labelMax ?? '').trim(),
+      };
+    }
+
+    function renderLinearScale(question) {
+      const scale = getScaleConfig(question);
+      const values = Array.from({ length: scale.end - scale.start + 1 }, (_, i) => scale.start + i);
+      const hasLabels = !!(scale.labelMin || scale.labelMax);
+      const minW = Math.max(values.length * 56, 200);
+      return `
+        <div style="width:100%;overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;min-width:${minW}px">
+            <thead>
+              <tr>
+                ${hasLabels ? `<td style="width:1%"></td>` : ''}
+                ${values.map(n => `<td style="padding:0 0 6px;text-align:center;font-size:13px;font-weight:700;color:#1e293b">${n}</td>`).join('')}
+                ${hasLabels ? `<td style="width:1%"></td>` : ''}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                ${hasLabels ? `<td style="padding:0 10px 0 0;white-space:nowrap;font-size:12.5px;font-weight:700;color:#64748b;text-align:left;width:1%">${escapeHtml(scale.labelMin)}</td>` : ''}
+                ${values.map(n => `
+                  <td style="padding:4px 0;text-align:center">
+                    <label style="display:flex;flex-direction:column;align-items:center;cursor:pointer">
+                      <input
+                        type="radio"
+                        name="question_${question.id}"
+                        value="${n}"
+                        data-question-id="${question.id}"
+                        data-question-type="scale"
+                        data-option-id=""
+                        data-option-label="${n}"
+                        style="width:20px;height:20px;accent-color:#00008B;cursor:pointer;margin:0"
+                      >
+                    </label>
+                  </td>`).join('')}
+                ${hasLabels ? `<td style="padding:0 0 0 10px;white-space:nowrap;font-size:12.5px;font-weight:700;color:#64748b;text-align:right;width:1%">${escapeHtml(scale.labelMax)}</td>` : ''}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderGridAnswer(question, type) {
+      const rows = getGridRows(question);
+      const cols = getGridCols(question);
+      if (!rows.length || !cols.length) {
+        return `<div style="padding:12px 14px;border:1px dashed #f59e0b;border-radius:12px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:700">Câu hỏi lưới chưa có dữ liệu hàng/cột.</div>`;
+      }
+
+      const inputType = type === "grid_checkbox" ? "checkbox" : "radio";
+      return `
+        <div style="overflow-x:auto;margin-top:12px">
+          <table style="width:100%;min-width:520px;table-layout:fixed;border-collapse:separate;border-spacing:0 8px">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:0 12px 6px;color:#64748b;font-size:12px;font-weight:800"></th>
+                ${cols.map((col) => `<th style="text-align:center;padding:0 12px 6px;color:#00008B;font-size:12px;font-weight:800">${escapeHtml(col)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row, rowIndex) => `
+                <tr>
+                  <td style="padding:13px 12px;background:#fff;border:1px solid #dbe4f0;border-right:none;border-radius:12px 0 0 12px;font-size:14px;font-weight:700;color:#334155">${escapeHtml(row)}</td>
+                  ${cols.map((col, colIndex) => `
+                    <td style="padding:13px 12px;background:#fff;border-top:1px solid #dbe4f0;border-bottom:1px solid #dbe4f0;text-align:center">
+                      <input
+                        type="${inputType}"
+                        ${inputType === "radio" ? `name="question_${question.id}_row_${rowIndex}"` : ""}
+                        data-question-id="${question.id}"
+                        data-question-type="${type}"
+                        data-row-index="${rowIndex}"
+                        data-col-index="${colIndex}"
+                        data-row-label="${escapeHtml(row)}"
+                        data-col-label="${escapeHtml(col)}"
+                        style="width:18px;height:18px;accent-color:${inputType === "radio" ? "#00008B" : "#f59e0b"};cursor:pointer"
+                      >
+                    </td>
+                  `).join("")}
+                  <td style="width:1px;padding:0;background:transparent;border:none"></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
     function renderQuestion(question, index) {
       const options = Array.isArray(question.lua_chon) ? question.lua_chon : [];
       const type = String(question.loai || "choice").toLowerCase();
-      const requiredMark = question.bat_buoc ? '<span style="color:#dc2626"> *</span>' : "";
 
       let answerHtml = "";
-      if (type === "text" || type === "paragraph") {
-        answerHtml = type === "paragraph"
-          ? `<textarea class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn"></textarea>`
-          : `<input class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn">`;
+      if (type === "text" || type === "short_text") {
+        answerHtml = `<input class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn">`;
+      } else if (type === "paragraph") {
+        answerHtml = `<textarea class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn"></textarea>`;
       } else if (type === "dropdown") {
         answerHtml = `
           <select class="select-answer" data-question-id="${question.id}" data-question-type="${type}">
@@ -591,10 +868,14 @@
         `;
       } else if (type === "checkbox") {
         answerHtml = renderChoiceOptions(question, "checkbox");
+      } else if (type === "scale") {
+        answerHtml = renderLinearScale(question);
       } else if (type === "rating") {
         answerHtml = renderAgreementScale(question, options);
       } else if (type === "star_rating") {
         answerHtml = renderStarScale(question);
+      } else if (type === "grid_radio" || type === "grid_checkbox") {
+        answerHtml = renderGridAnswer(question, type);
       } else if (options.length) {
         answerHtml = renderChoiceOptions(question, "choice");
       } else {
@@ -606,13 +887,13 @@
           <div class="question-head">
             <div class="question-left">
               <div class="question-no">${index + 1}</div>
-              <p class="question-text">${escapeHtml(question.noi_dung || "Câu hỏi")}${requiredMark}</p>
+              <p class="question-text">${formatRichText(question.noi_dung || "Câu hỏi", question.bat_buoc)}</p>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
               <div class="question-chip">${getQuestionTypeLabel(type)}</div>
-              <div class="question-chip">${question.bat_buoc ? "Bắt buộc" : "Không bắt buộc"}</div>
             </div>
           </div>
+          ${renderQuestionMedia(question)}
           ${answerHtml}
           <div class="error-text" id="error-question-${question.id}">Câu hỏi này chưa được trả lời.</div>
         </div>
@@ -620,10 +901,103 @@
     }
 
     function renderQuestions(questions) {
+      publicQuestionsRaw = questions;
+      publicFormPages = buildFormPages(questions);
+      currentPublicPageIndex = 0;
+      
       const target = document.getElementById("public-question-list");
-      target.innerHTML = questions.length
-        ? questions.map(renderQuestion).join("")
-        : `<div class="question-card" style="text-align:center;color:#64748b">Biểu mẫu này chưa có câu hỏi.</div>`;
+      if (!publicFormPages.length || (publicFormPages.length === 1 && !publicFormPages[0].items.length)) {
+        target.innerHTML = `<div class="question-card" style="text-align:center;color:#64748b">Biểu mẫu này chưa có câu hỏi.</div>`;
+        updatePublicFooter();
+        return;
+      }
+      
+      target.innerHTML = publicFormPages.map((page, pageIndex) => {
+        let html = `<div class="form-page" id="form-page-${pageIndex}" style="display:${pageIndex === 0 ? 'block' : 'none'};">`;
+        
+        if (page.section) {
+          html += `
+            <div style="border:1px solid #fbbf24;border-left:6px solid #f59e0b;border-radius:20px;padding:20px 22px;background:linear-gradient(180deg,#fffbeb 0%,#fff7ed 100%);box-shadow:0 12px 26px rgba(180,83,9,.08);margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:900;color:#b45309;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Phần ${pageIndex + 1} / ${publicFormPages.length}</div>
+              <div style="font-size:24px;font-weight:900;color:#78350f;line-height:1.3">${formatRichText(page.section.noi_dung || page.section.text || `Phần ${pageIndex + 1}`)}</div>
+              ${page.section.mo_ta || page.section.desc ? `<div style="font-size:14px;color:#92400e;line-height:1.55;margin-top:8px">${formatRichText(page.section.mo_ta || page.section.desc)}</div>` : ''}
+            </div>
+          `;
+        } else if (publicFormPages.length > 1) {
+          html += `
+            <div style="border:1px solid #fbbf24;border-left:6px solid #f59e0b;border-radius:20px;padding:14px 18px;background:linear-gradient(180deg,#fffbeb 0%,#fff7ed 100%);box-shadow:0 12px 26px rgba(180,83,9,.06);margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:900;color:#b45309;text-transform:uppercase;letter-spacing:.6px">Phần ${pageIndex + 1} / ${publicFormPages.length}</div>
+            </div>
+          `;
+        }
+        
+        html += page.items.map(({ item, originalIndex }) => renderQuestion(item, getQuestionNumberInSection(questions, originalIndex) - 1)).join("");
+        html += `</div>`;
+        return html;
+      }).join("");
+      
+      updatePublicFooter();
+    }
+
+    function setPublicPage(index) {
+      if (index < 0 || index >= publicFormPages.length) return;
+      if (index > currentPublicPageIndex) {
+        if (!validateCurrentPage()) return;
+      }
+      document.getElementById(`form-page-${currentPublicPageIndex}`).style.display = 'none';
+      currentPublicPageIndex = index;
+      document.getElementById(`form-page-${currentPublicPageIndex}`).style.display = 'block';
+      updatePublicFooter();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function validateCurrentPage() {
+      clearValidationErrors();
+      let hasError = false;
+      const currentPageItems = publicFormPages[currentPublicPageIndex].items;
+      currentPageItems.forEach(({ item: question }) => {
+        const answer = collectQuestionAnswer(question);
+        if (!answer.valid) {
+          hasError = true;
+          document.getElementById(`error-question-${question.id}`)?.classList.add("open");
+        }
+      });
+      if (hasError) {
+        if (typeof showToast === 'function') showToast("Vui lòng điền đủ các câu bắt buộc", "error");
+        else alert("Vui lòng điền đủ các câu bắt buộc");
+        return false;
+      }
+      return true;
+    }
+
+    function updatePublicFooter() {
+      const footer = document.querySelector('.public-footer');
+      if (!footer || !publicFormPages.length) return;
+      
+      const hasMultiplePages = publicFormPages.length > 1;
+      const isLastPage = currentPublicPageIndex === publicFormPages.length - 1;
+      
+      let html = '';
+      if (hasMultiplePages && currentPublicPageIndex > 0) {
+        html += `<button class="btn btn-outline" style="min-width:118px;height:48px;border-radius:14px;background:#fff;color:#00008B;font-weight:800;border:1px solid #cbd5e1;cursor:pointer;box-shadow:0 8px 18px rgba(15,23,42,.08)" type="button" onclick="setPublicPage(${currentPublicPageIndex - 1})">Quay lại</button>`;
+      }
+      
+      if (hasMultiplePages && !isLastPage) {
+        html += `<button class="btn" style="min-width:118px;height:48px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-weight:800;cursor:pointer;box-shadow:0 12px 28px rgba(29,155,240,.24)" type="button" onclick="setPublicPage(${currentPublicPageIndex + 1})">Tiếp</button>`;
+      } else {
+        html += `<button class="submit-btn" id="public-submit-btn" style="min-width:210px;height:48px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-weight:800;cursor:pointer;" type="button" onclick="submitPublicForm()">Gửi phản hồi</button>`;
+      }
+      
+      if (hasMultiplePages) {
+        html += `<span style="font-size:13px;font-weight:800;color:#64748b;display:flex;align-items:center;">Phần ${currentPublicPageIndex + 1}/${publicFormPages.length}</span>`;
+      }
+      
+      footer.innerHTML = html;
+      footer.style.display = 'flex';
+      footer.style.justifyContent = 'center';
+      footer.style.alignItems = 'center';
+      footer.style.gap = '10px';
+      footer.style.flexWrap = 'wrap';
     }
 
     function updateStarVisual(questionId, selectedValue) {
@@ -637,7 +1011,7 @@
       const type = String(question.loai || "choice").toLowerCase();
       const questionId = question.id;
 
-      if (type === "text" || type === "paragraph") {
+      if (type === "text" || type === "short_text" || type === "paragraph") {
         const input = document.querySelector(`[data-question-id="${questionId}"][data-question-type="${type}"]`);
         const value = input?.value?.trim() || "";
         return { valid: !question.bat_buoc || Boolean(value), summary: value, details: value ? [{ cau_hoi_id: questionId, noi_dung: value }] : [] };
@@ -652,10 +1026,18 @@
 
       if (type === "checkbox") {
         const checked = Array.from(document.querySelectorAll(`input[data-question-id="${questionId}"][data-question-type="${type}"]:checked`));
+        const otherInput = document.querySelector(`[data-question-other-id="${questionId}"]`);
+        const regularChecked = checked.filter((item) => item.dataset.otherOption !== "1");
+        const otherChecked = checked.some((item) => item.dataset.otherOption === "1");
+        const otherValue = otherChecked ? (otherInput?.value?.trim() || "") : "";
+        const summaryParts = regularChecked.map((item) => item.dataset.optionLabel || "").filter(Boolean);
+        if (otherValue) summaryParts.push(otherValue);
+        const details = regularChecked.map((item) => ({ cau_hoi_id: questionId, lua_chon_id: item.dataset.optionId || null }));
+        if (otherValue) details.push({ cau_hoi_id: questionId, noi_dung: otherValue });
         return {
-          valid: !question.bat_buoc || checked.length > 0,
-          summary: checked.map((item) => item.dataset.optionLabel || "").join(", "),
-          details: checked.map((item) => ({ cau_hoi_id: questionId, lua_chon_id: item.dataset.optionId || null })),
+          valid: !question.bat_buoc || regularChecked.length > 0 || Boolean(otherValue),
+          summary: summaryParts.join(", "),
+          details,
         };
       }
 
@@ -670,6 +1052,39 @@
         };
       }
 
+      if (type === "grid_radio" || type === "grid_checkbox") {
+        const rows = getGridRows(question);
+        const selected = Array.from(document.querySelectorAll(`input[data-question-id="${questionId}"][data-question-type="${type}"]:checked`));
+        const grouped = new Map();
+        selected.forEach((item) => {
+          const rowIndex = Number(item.dataset.rowIndex);
+          if (!grouped.has(rowIndex)) grouped.set(rowIndex, []);
+          grouped.get(rowIndex).push(item.dataset.colLabel || "");
+        });
+
+        const answeredRows = new Set(selected.map((item) => Number(item.dataset.rowIndex)));
+        const valid = !question.bat_buoc || (rows.length > 0 && rows.every((_, index) => answeredRows.has(index)));
+        const summaryParts = rows
+          .map((row, index) => {
+            const cols = grouped.get(index) || [];
+            return cols.length ? `${row}: ${cols.join(", ")}` : "";
+          })
+          .filter(Boolean);
+
+        return {
+          valid,
+          summary: summaryParts.join("; "),
+          details: selected.map((item) => ({
+            cau_hoi_id: questionId,
+            noi_dung: JSON.stringify({
+              type,
+              row: item.dataset.rowLabel || "",
+              col: item.dataset.colLabel || "",
+            }),
+          })),
+        };
+      }
+
       const fallbackInput = document.querySelector(`[data-question-id="${questionId}"][data-question-type="fallback-text"]`);
       if (fallbackInput) {
         const value = fallbackInput.value.trim();
@@ -677,10 +1092,12 @@
       }
 
       const selected = document.querySelector(`input[data-question-id="${questionId}"][data-question-type="choice"]:checked`);
+      const isOther = selected?.dataset?.otherOption === "1";
+      const otherValue = isOther ? (document.querySelector(`[data-question-other-id="${questionId}"]`)?.value?.trim() || "") : "";
       return {
-        valid: !question.bat_buoc || Boolean(selected),
-        summary: selected?.dataset?.optionLabel || "",
-        details: selected ? [{ cau_hoi_id: questionId, lua_chon_id: selected.dataset.optionId || null }] : [],
+        valid: !question.bat_buoc || (Boolean(selected) && (!isOther || Boolean(otherValue))),
+        summary: isOther ? otherValue : (selected?.dataset?.optionLabel || ""),
+        details: selected ? (isOther ? (otherValue ? [{ cau_hoi_id: questionId, noi_dung: otherValue }] : []) : [{ cau_hoi_id: questionId, lua_chon_id: selected.dataset.optionId || null }]) : [],
       };
     }
 
@@ -716,32 +1133,20 @@
     }
 
     function buildFeedbackBody(answers) {
-      const fullName = document.getElementById("prefill-full-name").value.trim();
-      const email = document.getElementById("prefill-email").value.trim();
-      const className = document.getElementById("prefill-class-name").value.trim();
-      const classAnswer = getClassAnswerFromQuestions(answers);
-      const khoa = document.getElementById("prefill-khoa").value.trim();
-      const teacherName = document.getElementById("prefill-teacher-name").value.trim();
-
       const ratingAnswers = answers.map((item) => item.rating).filter((value) => Number.isFinite(value));
       const averageRating = ratingAnswers.length
         ? Math.round(ratingAnswers.reduce((sum, value) => sum + value, 0) / ratingAnswers.length)
         : null;
 
-      const sentiment = averageRating >= 4 ? "positive" : averageRating && averageRating <= 2 ? "negative" : "neutral";
+      const sentiment = averageRating >= 4 ? "Tích cực" : (averageRating !== null && averageRating <= 2 ? "Tiêu cực" : (averageRating === 3 ? "Trung lập" : "Không rõ"));
       const textSummaries = answers.map((item) => String(item.summary || "").trim()).filter(Boolean);
       const primarySummary = textSummaries.find((item) => item.length > 12) || `Đã gửi phản hồi cho biểu mẫu "${currentForm.ten_form || "FLIC"}"`;
 
       return {
         form_id: Number(currentForm.id),
-        ho_ten: fullName || null,
-        email: email || null,
         danh_gia: averageRating,
         cam_xuc: sentiment,
         noi_dung: primarySummary,
-        lop: className || classAnswer || null,
-        khoa: khoa || null,
-        giao_vien: teacherName || null,
       };
     }
 
@@ -752,9 +1157,9 @@
       const card = document.querySelector(".form-card-public");
       if (!card) return;
       card.innerHTML = `
-        <div style="border-top:8px solid #0ea5e9;border-radius:22px;background:#fff;padding:34px 30px;text-align:left;box-shadow:0 16px 40px rgba(14,165,233,.12)">
+        <div style="border-top:8px solid #00008B;border-radius:22px;background:#fff;padding:34px 30px;text-align:left;box-shadow:0 16px 40px rgba(0,0,139,.12)">
           <div style="font-size:24px;font-weight:900;color:#0f172a;margin-bottom:14px">Gửi thành công!</div>
-          <div style="font-size:16px;line-height:1.7;color:#334155;font-weight:600">${escapeHtml(message)}</div>
+          <div style="font-size:16px;line-height:1.7;color:#334155;font-weight:600">${formatRichText(message)}</div>
         </div>
       `;
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -763,33 +1168,26 @@
     async function submitPublicForm() {
       if (!currentForm) return;
 
-      clearValidationErrors();
+      if (!validateCurrentPage()) return;
+
       const submitBtn = document.getElementById("public-submit-btn");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Đang gửi...";
+      }
+
       const successBox = document.getElementById("submit-success-box");
       successBox.classList.remove("open");
 
       const answers = [];
-      let hasError = false;
-
-      currentForm.cau_hoi.forEach((question) => {
-        const answer = collectQuestionAnswer(question);
-        answers.push(answer);
-        if (!answer.valid) {
-          hasError = true;
-          document.getElementById(`error-question-${question.id}`)?.classList.add("open");
-        }
+      publicFormPages.forEach(page => {
+        page.items.forEach(({ item: question }) => {
+          answers.push(collectQuestionAnswer(question));
+        });
       });
-
-      if (hasError) {
-        showToast("Vui lòng điền đủ các câu bắt buộc", "error");
-        return;
-      }
 
       const feedbackBody = buildFeedbackBody(answers);
       const detailRows = answers.flatMap((item) => item.details);
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Đang lưu...";
 
       try {
         const feedbackRes = await fetch(`${API_BASE}/feedback`, {
@@ -825,7 +1223,9 @@
       const formId = getFormIdFromUrl();
       if (!formId) {
         document.getElementById("public-form-title").textContent = "Không tìm thấy biểu mẫu";
-        document.getElementById("public-form-sub").textContent = "Link chia sẻ chưa có mã biểu mẫu hợp lệ.";
+        const sub = document.getElementById("public-form-sub");
+        sub.textContent = "Link chia sẻ chưa có mã biểu mẫu hợp lệ.";
+        sub.style.display = "";
         document.getElementById("public-question-list").innerHTML = `<div class="question-card" style="text-align:center;color:#64748b">Không có dữ liệu để hiển thị.</div>`;
         return;
       }
@@ -835,28 +1235,31 @@
         if (!res.ok) throw new Error("Không tải được biểu mẫu");
         const data = await res.json();
         currentForm = data;
+        applyPublicTheme(data);
 
         document.getElementById("public-form-title").textContent = data.ten_form || "Biểu mẫu công khai";
-        document.getElementById("public-form-sub").textContent = (data.mo_ta || data.danh_muc || "Biểu mẫu FLIC");
-        const teacherInput = document.getElementById("prefill-teacher-name");
-        if (teacherInput && !teacherInput.value.trim()) {
-          teacherInput.value = data.giao_vien || data.nguoi_tao || "";
+        const publicFormSub = document.getElementById("public-form-sub");
+        if (data.mo_ta) {
+          publicFormSub.innerHTML = formatRichText(data.mo_ta);
+          publicFormSub.style.display = "";
+        } else {
+          publicFormSub.innerHTML = "";
+          publicFormSub.style.display = "none";
         }
-
-        const publicQuestions = Array.isArray(data.cau_hoi) ? data.cau_hoi : [];
+        const publicQuestions = Array.isArray(data.form_items) ? data.form_items : (Array.isArray(data.cau_hoi) ? data.cau_hoi : []);
         renderQuestions(publicQuestions);
-        document.getElementById("public-form-sub").textContent = "Mẫu hiển thị trực tiếp của biểu mẫu, dùng để xem nhanh nội dung trước khi chia sẻ hoặc chỉnh sửa.";
         document.getElementById("public-form-cat").textContent = data.danh_muc || "Khác";
-        document.getElementById("public-form-count").textContent = `Tổng ${publicQuestions.length} câu hỏi`;
-        document.getElementById("public-form-created").textContent = data.ngay_tao || data.created || new Date().toLocaleDateString("vi-VN");
+        document.getElementById("public-form-count").textContent = `Tổng ${countRealQuestions(publicQuestions)} câu hỏi`;
+
       } catch (error) {
         document.getElementById("public-form-title").textContent = "Không tải được biểu mẫu";
-        document.getElementById("public-form-sub").textContent = error.message;
-        document.getElementById("public-question-list").innerHTML = `<div class="question-card" style="text-align:center;color:#64748b">Vui lòng kiểm tra lại backend hoặc mã form.</div>`;
+        const sub = document.getElementById("public-form-sub");
+        sub.textContent = error.message;
+        sub.style.display = "";
+        document.getElementById("public-question-list").innerHTML = `<div class="question-card" style="text-align:center;color:#64748b">Vui lòng kiểm tra lại backend hoặc mã biểu mẫu.</div>`;
       }
     }
 
-    setPrefillDefaults();
     loadPublicForm();
   </script>
 </body>

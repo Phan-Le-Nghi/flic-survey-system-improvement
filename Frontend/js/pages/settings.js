@@ -29,24 +29,17 @@ async function renderSettingsPage() {
 
   const avatarHtml = avatarSrc
     ? `<img id="avatar-img" src="${avatarSrc}" style="width:72px;height:72px;border-radius:50%;object-fit:cover">`
-    : `<div id="avatar-img" class="avatar-initials" style="background:#0ea5e9;width:72px;height:72px;font-size:24px">${initials}</div>`;
+    : `<div id="avatar-img" class="avatar-initials" style="background:#00008B;width:72px;height:72px;font-size:24px">${initials}</div>`;
 
   document.getElementById('page-content').innerHTML = `
   <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
     <div><h2 class="page-title">Cài đặt</h2><p class="page-sub">Quản lý cài đặt tài khoản và hệ thống</p></div>
-    <button class="btn btn-primary" onclick="saveSettings()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      Lưu thay đổi
-    </button>
   </div>
 
   <div data-tabs>
     <div class="tabs">
       <button class="tab-btn active" data-tab="account">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Tài khoản
-      </button>
-      <button class="tab-btn" data-tab="notifications">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>Thông báo
       </button>
       <button class="tab-btn" data-tab="security">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Bảo mật
@@ -71,7 +64,7 @@ async function renderSettingsPage() {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Tải ảnh lên
               </button>
-              ${avatarSrc ? `<button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="removeAvatar(${user.id})">Xóa ảnh</button>` : ''}
+              <button id="btn-remove-avatar" class="btn btn-outline btn-sm" style="color:var(--red); display:${avatarSrc ? 'inline-flex' : 'none'}" onclick="confirmRemoveAvatar(${user.id})">Xóa ảnh</button>
 
             </div>
             <input type="file" id="avatar-file-input" accept="image/*" style="display:none"
@@ -79,35 +72,23 @@ async function renderSettingsPage() {
             <div style="font-size:11.5px;color:var(--gray-400);margin-top:6px">JPG, PNG · Tối đa 2MB</div>
           </div>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;margin-top:20px">
+          <div style="font-weight:600;font-size:15px">Thông tin liên hệ</div>
+          <button class="btn btn-sm" style="background-color:#f4f8ff;color:#00008B;border:1px solid #dbeafe;font-weight:600;transition:all 0.2s" onmouseover="this.style.backgroundColor='#e0ebff'" onmouseout="this.style.backgroundColor='#f4f8ff'" onclick="openModal('edit-profile-modal')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            Chỉnh sửa
+          </button>
+        </div>
         <div class="grid-2">
           <div class="form-group"><label class="form-label">Họ và tên</label>
-            <input type="text" id="set-hoten" class="input" value="${user.ho_ten || ''}"></div>
+            <input type="text" id="set-hoten" class="input" value="${user.ho_ten || ''}" readonly style="background:var(--gray-50)"></div>
           <div class="form-group"><label class="form-label">Email</label>
-            <input type="email" id="set-email" class="input" value="${user.email || ''}"></div>
+            <input type="email" id="set-email" class="input" value="${user.email || ''}" readonly style="background:var(--gray-50)"></div>
           <div class="form-group"><label class="form-label">Số điện thoại</label>
-            <input type="tel" id="set-sdt" class="input" value="${user.so_dien_thoai || ''}"></div>
+            <input type="tel" id="set-sdt" class="input" value="${user.so_dien_thoai || ''}" readonly style="background:var(--gray-50)"></div>
           <div class="form-group"><label class="form-label">Phòng ban</label>
             <input type="text" class="input" value="${user.phong_ban || 'Chưa phân công'}" readonly style="background:var(--gray-50)"></div>
         </div>
-      </div>
-    </div>
-
-    <!-- NOTIFICATIONS TAB -->
-    <div class="tab-content" data-tab-content="notifications">
-      <div class="card card-body">
-        <div class="section-title" style="margin-bottom:20px">Cài đặt thông báo</div>
-        ${[
-          {label:'Thông báo qua Email',desc:'Nhận thông báo qua địa chỉ email',id:'notif-email',checked:true},
-          {label:'Thông báo đẩy',desc:'Nhận thông báo trên trình duyệt',id:'notif-push',checked:true},
-          {label:'Thông báo khi có phê duyệt',desc:'Nhận thông báo khi có yêu cầu phê duyệt mới',id:'notif-approval',checked:true},
-          {label:'Thông báo phản hồi mới',desc:'Nhận thông báo khi có phản hồi mới',id:'notif-feedback',checked:false},
-          {label:'Báo cáo tuần',desc:'Nhận tóm tắt hoạt động hàng tuần',id:'notif-weekly',checked:true},
-        ].map(n=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--gray-100)">
-            <div><div style="font-weight:500;font-size:14px">${n.label}</div>
-            <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${n.desc}</div></div>
-            <label class="switch"><input type="checkbox" id="${n.id}" ${n.checked?'checked':''}><span class="switch-track"></span></label>
-          </div>`).join('')}
       </div>
     </div>
 
@@ -116,18 +97,24 @@ async function renderSettingsPage() {
       <div class="card card-body" style="margin-bottom:16px">
         <div class="section-title" style="margin-bottom:20px">Đổi mật khẩu</div>
         <div class="form-group"><label class="form-label">Mật khẩu hiện tại</label>
-          <div class="input-wrap">
-            <input type="password" id="pw-old" class="input" placeholder="••••••••">
-            <button type="button" class="input-icon-right" onclick="togglePw(this)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <div class="input-wrap" style="position:relative">
+            <div style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--gray-400);pointer-events:none;display:flex">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            </div>
+            <input type="password" id="pw-old" class="input" placeholder="Nhập mật khẩu hiện tại" style="padding-left:42px;border-radius:8px">
+            <button type="button" class="input-icon-right" onclick="togglePw(this)" style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gray-400);transition:color 0.2s" onmouseover="this.style.color='var(--gray-600)'" onmouseout="this.style.color='var(--gray-400)'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
         </div>
         <div class="form-group"><label class="form-label">Mật khẩu mới</label>
-          <div class="input-wrap">
-            <input type="password" id="pw-new" class="input" placeholder="••••••••" oninput="checkPwStrength()">
-            <button type="button" class="input-icon-right" onclick="togglePw(this)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <div class="input-wrap" style="position:relative">
+            <div style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--gray-400);pointer-events:none;display:flex">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            </div>
+            <input type="password" id="pw-new" class="input" placeholder="Nhập mật khẩu mới" oninput="checkPwStrength()" style="padding-left:42px;border-radius:8px">
+            <button type="button" class="input-icon-right" onclick="togglePw(this)" style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gray-400);transition:color 0.2s" onmouseover="this.style.color='var(--gray-600)'" onmouseout="this.style.color='var(--gray-400)'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
         </div>
@@ -136,10 +123,13 @@ async function renderSettingsPage() {
           <div style="height:4px;background:var(--gray-100);border-radius:4px"><div id="pw-strength-bar" style="height:100%;border-radius:4px;transition:all .3s;width:0"></div></div>
         </div>
         <div class="form-group"><label class="form-label">Xác nhận mật khẩu mới</label>
-          <div class="input-wrap">
-            <input type="password" id="pw-confirm" class="input" placeholder="••••••••">
-            <button type="button" class="input-icon-right" onclick="togglePw(this)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <div class="input-wrap" style="position:relative">
+            <div style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--gray-400);pointer-events:none;display:flex">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            </div>
+            <input type="password" id="pw-confirm" class="input" placeholder="Nhập lại mật khẩu mới" style="padding-left:42px;border-radius:8px">
+            <button type="button" class="input-icon-right" onclick="togglePw(this)" style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gray-400);transition:color 0.2s" onmouseover="this.style.color='var(--gray-600)'" onmouseout="this.style.color='var(--gray-400)'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
         </div>
@@ -147,13 +137,6 @@ async function renderSettingsPage() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
           Đổi mật khẩu
         </button>
-      </div>
-      <div class="card card-body">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <div><div style="font-weight:500;font-size:14px">Xác thực 2 bước (2FA)</div>
-          <div style="font-size:12px;color:var(--gray-500);margin-top:2px">Tăng cường bảo mật tài khoản</div></div>
-          <label class="switch"><input type="checkbox" onchange="showToast('Đã cập nhật bảo mật','success')"><span class="switch-track"></span></label>
-        </div>
       </div>
     </div>
 
@@ -163,14 +146,14 @@ async function renderSettingsPage() {
         <div style="font-size:16px;font-weight:700;margin-bottom:20px">Giao diện</div>
         <div class="form-label" style="margin-bottom:12px">Giao diện hiển thị</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:720px">
-          <div onclick="selectTheme('light')" style="cursor:pointer;border-radius:12px;border:2.5px solid #0ea5e9;overflow:hidden" id="t-light">
+          <div onclick="selectTheme('light')" style="cursor:pointer;border-radius:12px;border:2.5px solid #00008B;overflow:hidden" id="t-light">
             <div style="height:90px;background:#f8fafc;border-bottom:1px solid #e2e8f0;position:relative">
               <div style="position:absolute;top:8px;left:8px;right:8px;height:10px;background:#e2e8f0;border-radius:3px"></div>
               <div style="position:absolute;top:26px;left:8px;width:40%;height:8px;background:#cbd5e1;border-radius:3px"></div>
             </div>
             <div style="padding:10px 12px;background:#fff;display:flex;align-items:center;justify-content:space-between">
               <span style="font-size:13px;font-weight:600">Sáng</span>
-              <div id="t-light-check" style="width:18px;height:18px;border-radius:50%;background:#0ea5e9;display:flex;align-items:center;justify-content:center">
+              <div id="t-light-check" style="width:18px;height:18px;border-radius:50%;background:#00008B;display:flex;align-items:center;justify-content:center">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
             </div>
@@ -192,6 +175,55 @@ async function renderSettingsPage() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="modal-overlay" id="edit-profile-modal" style="z-index:9999;">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:500px;border-radius:14px">
+      <div class="modal-header">
+        <div><div class="modal-title">Chỉnh sửa thông tin</div>
+        <div style="font-size:12.5px;color:var(--gray-400);margin-top:2px">Cập nhật thông tin liên hệ của bạn</div></div>
+        <button class="icon-btn close-btn" onclick="closeModal('edit-profile-modal')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="padding:20px">
+        <div class="form-group"><label class="form-label">Họ và tên <span style="color:#ea580c">*</span></label>
+          <input type="text" id="ep-hoten" class="input" value="${user.ho_ten || ''}"></div>
+        <div class="form-group"><label class="form-label">Email <span style="color:#ea580c">*</span></label>
+          <input type="email" id="ep-email" class="input" value="${user.email || ''}"></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Số điện thoại</label>
+          <input type="tel" id="ep-sdt" class="input" value="${user.so_dien_thoai || ''}"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('edit-profile-modal')">Hủy bỏ</button>
+        <button class="btn btn-primary" onclick="saveSettings()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Lưu thay đổi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="confirm-delete-avatar-modal" style="z-index:9999;">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;border-radius:14px">
+      <div class="modal-header">
+        <div><div class="modal-title" style="color:var(--red)">Xóa ảnh đại diện</div>
+        <div style="font-size:12.5px;color:var(--gray-400);margin-top:2px">Xác nhận hành động</div></div>
+        <button class="icon-btn close-btn" onclick="closeModal('confirm-delete-avatar-modal')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="padding:20px;font-size:14px;color:var(--gray-700)">
+        Bạn có chắc chắn muốn xóa ảnh đại diện này không? Hành động này không thể hoàn tác.
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('confirm-delete-avatar-modal')">Hủy bỏ</button>
+        <button class="btn" style="background:var(--red);color:#fff" id="btn-confirm-delete-avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          Xóa ảnh
+        </button>
       </div>
     </div>
   </div>
@@ -225,26 +257,59 @@ function handleAvatarUpload(event, userId) {
       img.style.cssText = 'width:72px;height:72px;border-radius:50%;object-fit:cover';
       el.parentNode.replaceChild(img, el);
     }
+    const headerContainer = document.getElementById('header-avatar-container');
+    if (headerContainer) {
+      headerContainer.innerHTML = `<img id="header-user-avatar" src="${base64}" alt="Avatar" class="user-avatar-logo" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+    }
+    const btnRemove = document.getElementById('btn-remove-avatar');
+    if (btnRemove) btnRemove.style.display = 'inline-flex';
     event.target.value = '';
     showToast('Đã cập nhật ảnh đại diện ✅', 'success');
   };
   reader.readAsDataURL(file);
 }
 
+function confirmRemoveAvatar(userId) {
+  openModal('confirm-delete-avatar-modal');
+  document.getElementById('btn-confirm-delete-avatar').onclick = () => {
+    removeAvatar(userId);
+    closeModal('confirm-delete-avatar-modal');
+  };
+}
+
 function removeAvatar(userId) {
-  if (!confirm('Xóa ảnh đại diện?')) return;
   localStorage.removeItem('flic_avatar_' + userId);
   showToast('Đã xóa ảnh đại diện', 'success');
-  renderSettingsPage();
+  
+  const initials = (document.getElementById('ep-hoten')?.value || 'U').split(' ').map(w => w[0]).slice(-2).join('').toUpperCase();
+  
+  const headerContainer = document.getElementById('header-avatar-container');
+  if (headerContainer) {
+    headerContainer.innerHTML = `<div id="header-user-avatar" class="avatar-initials" style="background:#00008B;width:100%;height:100%;font-size:14px;display:flex;align-items:center;justify-content:center;color:#fff;border-radius:50%;font-weight:600">${initials}</div>`;
+  }
+  
+  const el = document.getElementById('avatar-img');
+  if (el) {
+    const initials = (document.getElementById('ep-hoten')?.value || 'U').split(' ').map(w => w[0]).slice(-2).join('').toUpperCase();
+    const div = document.createElement('div');
+    div.id = 'avatar-img';
+    div.className = 'avatar-initials';
+    div.style.cssText = 'background:#00008B;width:72px;height:72px;font-size:24px;display:flex;align-items:center;justify-content:center;color:#fff;border-radius:50%;font-weight:600';
+    div.textContent = initials;
+    el.parentNode.replaceChild(div, el);
+  }
+  
+  const btnRemove = document.getElementById('btn-remove-avatar');
+  if (btnRemove) btnRemove.style.display = 'none';
 }
 
 // ════════════════════════════════════════════════════════════════
 // LƯU THÔNG TIN → PUT /api/auth/profile
 // ════════════════════════════════════════════════════════════════
 async function saveSettings() {
-  const ho_ten        = document.getElementById('set-hoten')?.value?.trim();
-  const email         = document.getElementById('set-email')?.value?.trim();
-  const so_dien_thoai = document.getElementById('set-sdt')?.value?.trim();
+  const ho_ten        = document.getElementById('ep-hoten')?.value?.trim();
+  const email         = document.getElementById('ep-email')?.value?.trim();
+  const so_dien_thoai = document.getElementById('ep-sdt')?.value?.trim();
 
   if (!ho_ten) { showToast('Họ tên không được để trống!', 'error'); return; }
   if (!email)  { showToast('Email không được để trống!', 'error'); return; }
@@ -266,6 +331,8 @@ async function saveSettings() {
     } catch {}
 
     showToast('Đã lưu thông tin thành công ✅', 'success');
+    closeModal('edit-profile-modal');
+    renderSettingsPage();
   } catch {
     showToast('Không kết nối được server!', 'error');
   }
@@ -281,7 +348,7 @@ async function changePassword() {
 
   if (!mat_khau_cu)              { showToast('Vui lòng nhập mật khẩu hiện tại!', 'error'); return; }
   if (!mat_khau_moi)             { showToast('Vui lòng nhập mật khẩu mới!', 'error'); return; }
-  if (mat_khau_moi.length < 6)   { showToast('Mật khẩu mới phải ít nhất 6 ký tự!', 'error'); return; }
+  if (mat_khau_moi.length < 6)   { showToast('Mật khẩu mới phải có ít nhất 6 ký tự!', 'error'); return; }
   if (mat_khau_moi !== confirm_pw){ showToast('Mật khẩu xác nhận không khớp!', 'error'); return; }
 
   try {
@@ -334,7 +401,15 @@ function checkPwStrength() {
 
 function togglePw(btn) {
   const input = btn.closest('.input-wrap')?.querySelector('input');
-  if (input) input.type = input.type === 'password' ? 'text' : 'password';
+  if (input) {
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"/></svg>`;
+    } else {
+      input.type = 'password';
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    }
+  }
 }
 
 function selectTheme(theme) {
@@ -343,8 +418,8 @@ function selectTheme(theme) {
     const check = document.getElementById('t-' + t + '-check');
     if (!card || !check) return;
     if (t === theme) {
-      card.style.border = '2.5px solid #0ea5e9';
-      check.style.background = '#0ea5e9';
+      card.style.border = '2.5px solid #00008B';
+      check.style.background = '#00008B';
       check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>';
     } else {
       card.style.border = '2px solid #e2e8f0';
@@ -403,8 +478,8 @@ async function openMyAccountSetting() {
   }
 
   const permGroups = [
-    { label:'Quản lý biểu mẫu', color:'#0ea5e9', items:[
-      {key:'view_form',label:'Xem form'},{key:'create_form',label:'Tạo form'},
+    { label:'Quản lý biểu mẫu', color:'#00008B', items:[
+      {key:'view_form',label:'Xem biểu mẫu'},{key:'create_form',label:'Tạo biểu mẫu'},
       {key:'edit_form',label:'Sửa form'},{key:'delete_form',label:'Xóa form'}]},
     { label:'Phê duyệt', color:'#10b981', items:[
       {key:'view_approval',label:'Xem phê duyệt'},{key:'approve',label:'Phê duyệt / Từ chối'}]},
@@ -418,7 +493,7 @@ async function openMyAccountSetting() {
 
   document.getElementById('my-setting-body').innerHTML = `
     <div style="display:flex;gap:0;border-bottom:2px solid var(--gray-200);margin-bottom:20px">
-      <button onclick="switchMyTab('myt-info')" id="mybtn-info" style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #0ea5e9;color:#0ea5e9;margin-bottom:-2px">Thông tin</button>
+      <button onclick="switchMyTab('myt-info')" id="mybtn-info" style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #00008B;color:#00008B;margin-bottom:-2px">Thông tin</button>
       <button onclick="switchMyTab('myt-perm')" id="mybtn-perm" style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--gray-400);margin-bottom:-2px">Phân quyền</button>
       <button onclick="switchMyTab('myt-notif')" id="mybtn-notif" style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--gray-400);margin-bottom:-2px">Thông báo</button>
     </div>
@@ -492,8 +567,8 @@ function switchMyTab(tabId) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
     const active = map[tabId] === btnId;
-    btn.style.borderBottomColor = active ? '#0ea5e9' : 'transparent';
-    btn.style.color = active ? '#0ea5e9' : 'var(--gray-400)';
+    btn.style.borderBottomColor = active ? '#00008B' : 'transparent';
+    btn.style.color = active ? '#00008B' : 'var(--gray-400)';
   });
 }
 
@@ -521,7 +596,7 @@ async function saveMyAccountSetting() {
 
   // Đổi mật khẩu nếu có nhập
   if (pwOld && pwNew) {
-    if (pwNew.length < 6) { showToast('Mật khẩu mới phải ít nhất 6 ký tự!', 'error'); return; }
+    if (pwNew.length < 6) { showToast('Mật khẩu mới phải có ít nhất 6 ký tự!', 'error'); return; }
     try {
       const r2 = await fetch(`${API_BASE}/auth/change-password`, {
         method: 'POST',
@@ -552,8 +627,8 @@ function syncThemeSelection(theme) {
     const check = document.getElementById('t-' + t + '-check');
     if (!card || !check) return;
     if (t === theme) {
-      card.style.border = '2.5px solid #0ea5e9';
-      check.style.background = '#0ea5e9';
+      card.style.border = '2.5px solid #00008B';
+      check.style.background = '#00008B';
       check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>';
     } else {
       card.style.border = '2px solid #e2e8f0';

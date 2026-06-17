@@ -13,7 +13,7 @@ router.get("/", authMiddleware, authorize("view_notif"), async (req, res) => {
     let where = "WHERE 1=1";
 
     if (status) { where += " AND trang_thai = @status"; req2.input("status", sql.NVarChar, status); }
-    if (type)   { where += " AND loai = @type";         req2.input("type",   sql.NVarChar, type); }
+    if (type) { where += " AND loai = @type"; req2.input("type", sql.NVarChar, type); }
     if (search) { where += " AND (tieu_de LIKE @search OR noi_dung LIKE @search)"; req2.input("search", sql.NVarChar, `%${search}%`); }
 
     const result = await req2.query(`
@@ -54,7 +54,7 @@ router.get("/stats", authMiddleware, authorize("view_notif"), async (req, res) =
 router.get("/unread", async (req, res) => {
   try {
     const result = await sql.query`
-      SELECT TOP 5 id, tieu_de, loai, ngay_tao
+      SELECT TOP 4 id, tieu_de, loai, ngay_tao
       FROM ThongBao
       WHERE trang_thai = 'sent'
       ORDER BY ngay_tao DESC
@@ -80,6 +80,33 @@ router.get("/:id", authMiddleware, authorize("view_notif"), async (req, res) => 
     if (!result.recordset[0])
       return res.status(404).json({ message: "Không tìm thấy thông báo" });
     res.json(result.recordset[0]);
+  } catch (err) {
+    err500(res, err);
+  }
+});
+
+// POST /api/notifications/:id/read - Đánh dấu thông báo đã đọc
+router.post("/:id/read", authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const nhan_vien_id = req.user.id;
+  try {
+    const notifRes = await sql.query`SELECT trang_thai, ngay_gui FROM ThongBao WHERE id = ${id}`;
+    if (!notifRes.recordset[0]) {
+      return res.status(404).json({ message: "Không tìm thấy thông báo" });
+    }
+    const t = notifRes.recordset[0];
+    if (t.trang_thai === 'draft' || (t.trang_thai === 'scheduled' && new Date(t.ngay_gui) > new Date())) {
+      return res.status(400).json({ message: "Thông báo chưa được gửi" });
+    }
+
+    const result = await sql.query`
+      IF NOT EXISTS (SELECT 1 FROM ThongBao_DaDoc WHERE thong_bao_id = ${id} AND nhan_vien_id = ${nhan_vien_id})
+      BEGIN
+        INSERT INTO ThongBao_DaDoc (thong_bao_id, nhan_vien_id) VALUES (${id}, ${nhan_vien_id});
+        UPDATE ThongBao SET luot_da_doc = luot_da_doc + 1 WHERE id = ${id};
+      END
+    `;
+    res.json({ message: "Đã đánh dấu đọc" });
   } catch (err) {
     err500(res, err);
   }

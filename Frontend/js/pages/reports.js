@@ -3,16 +3,18 @@
 // ═══════════════════════════════════════════════════════════════
 
 const API = API_BASE;
-const BLUE='#2563eb', RED='#ef4444', PALETTE=['#2563eb','#0891b2','#059669','#7c3aed','#db2777','#dc2626','#f97316','#0284c7','#65a30d','#4f46e5'];
+const BLUE='#00008B', RED='#ef4444', PALETTE=['#00008B', '#ea580c', '#06b6d4', '#facc15', '#3b82f6', '#ef4444', '#0f766e', '#fdba74', '#6366f1', '#b45309', '#10b981', '#db2777', '#8b5cf6', '#84cc16', '#1e3a8a', '#f97316', '#14b8a6', '#f43f5e', '#8b1c62', '#059669'];
 
 // ── State ─────────────────────────────────────────────────────
 let currentFormId = null;
 let analysisData  = null;
 let rawRows       = [];   // raw feedback rows để filter
+let activeReportRows = [];
+let baseAnalysisData = null;
 let csvData       = null;
 let charts        = {};
 
-// Danh sách form đã import từ Excel (lưu local để hiển thị bên trái)
+// Danh sách biểu mẫu đã import từ Excel (lưu local để hiển thị bên trái)
 let importedForms = [];
 
 let activeSource  = null;
@@ -23,6 +25,7 @@ let dashboardItems = [];
 
 // ── Helpers ───────────────────────────────────────────────────
 const esc      = v => String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const escJs    = v => String(v??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,' ');
 const fmt      = (n,d=1) => n==null||isNaN(n) ? '—' : Number(n).toFixed(d);
 const fmtDate  = d => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
 const fmtShortDate = d => d ? new Date(d).toLocaleDateString('vi-VN',{ day:'2-digit', month:'2-digit' }) : '—';
@@ -76,6 +79,17 @@ function polishReportChartConfig(id, cfg) {
     cfg.data.datasets[0].pointBorderWidth = 2;
     cfg.data.datasets[0].pointBorderColor = '#ffffff';
     cfg.data.datasets[0].pointHitRadius = 12;
+  }
+
+  // Bar charts standard styling
+  if (cfg.type === 'bar' && cfg.data?.datasets) {
+    cfg.data.datasets.forEach(ds => {
+      // User wants perfectly rectangular bars
+      ds.borderRadius = 0;
+      if (ds.maxBarThickness === undefined) {
+        ds.maxBarThickness = cfg.options?.indexAxis === 'y' ? 32 : 80; 
+      }
+    });
   }
 
   return cfg;
@@ -133,20 +147,19 @@ function renderTimelineSummary(cardId, stats, canvasId) {
 
   wrap.style.height = 'auto';
   wrap.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
-      <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fbff">
-        <div style="font-size:11px;color:#64748b;margin-bottom:4px">Tổng phản hồi</div>
-        <div style="font-size:22px;font-weight:800;color:#0f172a">${stats.total}</div>
-      </div>
-      <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fbff">
-        <div style="font-size:11px;color:#64748b;margin-bottom:4px">Cao nhất / tuần</div>
-        <div style="font-size:22px;font-weight:800;color:#0f172a">${stats.peakWeek}</div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:2px">${stats.peakWeekLabel || 'Chưa có dữ liệu'}</div>
-      </div>
-      <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fbff">
-        <div style="font-size:11px;color:#64748b;margin-bottom:4px">Cao nhất / ngày</div>
-        <div style="font-size:22px;font-weight:800;color:#0f172a">${stats.peakValue}</div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:2px">${stats.peakDate ? fmtDate(stats.peakDate) : 'Chưa có dữ liệu'}</div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px">
+      <div style="display:inline-flex;align-items:center;gap:16px;padding:8px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span style="font-size:12px;color:#64748b;font-weight:600">Cao nhất / tuần:</span>
+          <span style="font-size:15px;font-weight:800;color:var(--gray-900)">${stats.peakWeek}</span>
+          <span style="font-size:11px;color:#94a3b8">(${stats.peakWeekLabel || '--'})</span>
+        </div>
+        <div style="width:1px;height:14px;background:#cbd5e1"></div>
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span style="font-size:12px;color:#64748b;font-weight:600">Cao nhất / ngày:</span>
+          <span style="font-size:15px;font-weight:800;color:var(--gray-900)">${stats.peakValue}</span>
+          <span style="font-size:11px;color:#94a3b8">(${stats.peakDate ? fmtDate(stats.peakDate) : '--'})</span>
+        </div>
       </div>
     </div>
     <div style="height:220px">
@@ -160,20 +173,20 @@ function renderTimelineSummary(cardId, stats, canvasId) {
 document.getElementById('page-content').innerHTML = `
 <style>
   .dash-card {
-    background:#fff; border-radius:16px; border:1px solid #e8edf5;
+    background:var(--gray-50); border-radius:16px; border:1px solid #e8edf5;
     box-shadow:0 1px 4px rgba(0,0,0,.04); overflow:hidden; transition:box-shadow .2s;
   }
   .dash-card:hover { box-shadow:0 4px 20px rgba(0,0,0,.08); }
   .dash-card-header { padding:18px 20px 0; display:flex; align-items:flex-start; justify-content:space-between; }
-  .dash-card-title  { font-size:14px; font-weight:700; color:#0f172a; }
+  .dash-card-title  { font-size:14px; font-weight:700; color:var(--gray-900); }
   .dash-card-sub    { font-size:12px; color:#94a3b8; margin-top:2px; }
   .dash-card-body   { padding:14px 20px 20px; }
   .chart-type-btn {
     width:34px; height:34px; border-radius:8px; border:1.5px solid #e2e8f0;
-    background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .15s;
+    background:var(--gray-50); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .15s;
   }
-  .chart-type-btn:hover  { border-color:#2563eb; background:#eff6ff; }
-  .chart-type-btn.active { border-color:#2563eb; background:#2563eb; }
+  .chart-type-btn:hover  { border-color:var(--brand-color); background:#00008B; color:#fff; }
+  .chart-type-btn.active { border-color:var(--brand-color); background:#00008B; color:#fff; }
   .chart-type-btn.active svg { stroke:#fff !important; }
   .field-row {
     display:flex; align-items:center; gap:8px; padding:7px 12px;
@@ -182,9 +195,9 @@ document.getElementById('page-content').innerHTML = `
   .field-row:hover { background:#f8fafc; }
   .agg-btn {
     flex:1; padding:5px 3px; font-size:10px; font-weight:700; border-radius:6px;
-    border:1.5px solid #e2e8f0; background:#fff; color:#94a3b8; cursor:pointer; transition:all .15s;
+    border:1.5px solid #e2e8f0; background:var(--gray-50); color:#94a3b8; cursor:pointer; transition:all .15s;
   }
-  .agg-btn.active { border-color:#2563eb; background:#eff6ff; color:#2563eb; }
+  .agg-btn.active { border-color:var(--brand-color); background:#00008B; color:#fff; }
   .remove-btn {
     width:26px; height:26px; border-radius:6px; border:1px solid #fecaca;
     background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center;
@@ -197,7 +210,7 @@ document.getElementById('page-content').innerHTML = `
   }
   /* AI Analysis */
   .ai-section { margin-bottom:20px; }
-  .ai-section-title { font-size:13px; font-weight:700; color:#0f172a; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .ai-section-title { font-size:13px; font-weight:700; color:var(--gray-900); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
   .ai-tag {
     display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:600; margin:3px 3px 0 0;
   }
@@ -205,18 +218,59 @@ document.getElementById('page-content').innerHTML = `
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
   .ai-score-ring { position:relative; display:inline-flex; align-items:center; justify-content:center; }
   .ai-key-input { border:1.5px solid #e2e8f0; border-radius:9px; padding:8px 12px; font-size:12px; width:100%; box-sizing:border-box; outline:none; transition:border .15s; }
-  .ai-key-input:focus { border-color:#2563eb; }
+  .ai-key-input:focus { border-color:var(--brand-color); }
+  .report-topbar { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }
+  .report-actions { display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end; }
+  .report-filter-bar {
+    margin:0 0 16px;padding:14px 16px;
+    display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;
+    background:var(--gray-50);
+    border:1px solid #dbe8ff;border-radius:12px;box-shadow:none;
+  }
+  .report-filter-field { display:flex;flex-direction:column;gap:5px;min-width:160px; max-width: 320px; flex: 1; }
+  .report-filter-field.primary { flex:1;min-width:260px; max-width: none; }
+  .report-filter-field.keyword { flex:1;min-width:230px; max-width: none; }
+  #sf-dynamic-filters { display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;width:100%; }
+  .report-form-info-grid { display:grid;grid-template-columns:repeat(6,minmax(0,1fr)); }
+  .report-filter-field label { font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; width:100%; cursor:help; }
+  .report-filter-field select,
+  .report-filter-field input {
+    height:38px;border:1.5px solid #d6e2f0;border-radius:10px;background:var(--gray-50);
+    padding:0 11px;font-size:13px;color:var(--gray-900);outline:none;font-family:inherit;
+  }
+  .report-filter-field select:focus,
+  .report-filter-field input:focus { border-color:var(--brand-color);box-shadow:0 0 0 3px rgba(0,0,139,.08); }
+  .report-section-title { display:flex;align-items:center;justify-content:space-between;gap:10px;margin:20px 0 10px; }
+  .report-section-title h3 { margin:0;font-size:16px;font-weight:850;color:var(--gray-900);letter-spacing:0; }
+  .report-section-title span { font-size:12px;color:#64748b;font-weight:600; }
+  .report-ai-summary {
+    border:1px solid #c7d2fe;border-radius:16px;padding:18px 20px;
+    background:linear-gradient(135deg,#f8fbff 0%,#eef5ff 100%);
+    box-shadow:0 10px 28px rgba(30,64,175,.08);
+  }
+  .report-two-col { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px; }
+  .report-three-col { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px; }
+  .word-cloud { min-height:230px;display:flex;align-content:center;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:18px; }
+  .word-cloud span { display:inline-flex;padding:5px 9px;border-radius:999px;background:#f1f5f9;color:var(--gray-900);font-weight:800;line-height:1; }
+  @media (max-width:1100px) {
+    .report-two-col,.report-three-col { grid-template-columns:1fr; }
+    .report-topbar { flex-direction:column; }
+    .report-actions { justify-content:flex-start; }
+    .report-form-info-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
 </style>
 
 <!-- HEADER -->
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
-  <div>
-    <h2 style="font-size:22px;font-weight:800;color:#0f172a;margin:0">Báo cáo & Thống kê</h2>
-    <p style="font-size:13px;color:#94a3b8;margin:3px 0 0">Phân tích dữ liệu trực quan từ form khảo sát</p>
+<div id="rpt-main-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div>
+      <h2 style="font-size:22px;font-weight:800;color:var(--gray-900);margin:0">Báo cáo & Thống kê</h2>
+      <p style="font-size:13px;color:#94a3b8;margin:3px 0 0">Phân tích dữ liệu trực quan từ form khảo sát</p>
+    </div>
   </div>
   <div style="display:flex;gap:8px">
     <input type="file" id="rpt-csv-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImport(this)">
-    <button id="btn-ai-analyze" onclick="openAIAnalysis()" style="display:none;gap:6px;border-radius:10px;padding:0 16px;height:38px;border:1.5px solid #2563eb;background:linear-gradient(135deg,#60a5fa,#2563eb);color:#fff;font-size:13px;font-weight:600;cursor:pointer;align-items:center;transition:opacity .2s"
+    <button id="btn-ai-analyze" onclick="openAIAnalysis()" style="display:none;gap:6px;border-radius:10px;padding:0 16px;height:38px;border:1.5px solid #00008B;background:linear-gradient(135deg,#00008B,#00008B);color:#fff;font-size:13px;font-weight:600;cursor:pointer;align-items:center;transition:opacity .2s"
       onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:5px"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
       Phân tích AI
@@ -226,7 +280,7 @@ document.getElementById('page-content').innerHTML = `
       Import Excel
     </button>
     <div style="position:relative" id="rpt-exp-wrap">
-      <button class="btn btn-primary" onclick="document.getElementById('rpt-exp-menu').classList.toggle('open')" style="gap:6px;border-radius:10px;background:#2563eb;border-color:#2563eb">
+      <button class="btn btn-primary" onclick="document.getElementById('rpt-exp-menu').classList.toggle('open')" style="gap:6px;border-radius:10px;background:#00008B;border-color:#fff">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
         Xuất<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11" style="margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
@@ -241,36 +295,116 @@ document.getElementById('page-content').innerHTML = `
 
 <!-- PICKER -->
 <div id="rpt-picker">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-    <div class="dash-card">
-      <div class="dash-card-header">
-        <div>
-          <div class="dash-card-title">Form trong hệ thống</div>
-          <div class="dash-card-sub">Chỉ hiện form đã có phản hồi</div>
+  <!-- GLOBAL DASHBOARD (From requested design) -->
+  <div id="rpt-global-dashboard" style="margin-bottom:32px;">
+    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:16px;margin-bottom:16px;">
+      <!-- Card 1 -->
+      <div class="dash-card" style="padding:20px;border-radius:16px;position:relative;border:1px solid #f1f5f9;box-shadow:0 1px 3px rgba(0,0,0,0.05);background:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#64748b;margin-bottom:4px;">Tổng biểu mẫu</div>
+            <div style="font-size:12px;color:#94a3b8;margin-bottom:12px;font-weight:500;">Số lượng biểu mẫu đang hoạt động</div>
+            <div id="rpt-total-forms-value" style="font-size:32px;font-weight:800;color:var(--gray-900);line-height:1;margin-bottom:16px;">8</div>
+          </div>
+          <div style="width:42px;height:42px;border-radius:12px;background:#f5f7ff;display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          </div>
         </div>
-        <div style="width:36px;height:36px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" width="18" height="18"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div id="rpt-total-forms-trend" style="font-size:13px;font-weight:600;color:#10b981;display:flex;align-items:center;gap:4px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          +100% <span style="color:#94a3b8;font-weight:500;">so với tháng trước</span>
         </div>
       </div>
-      <div class="dash-card-body" style="padding-top:12px">
-        <div id="rpt-form-list" style="display:flex;flex-direction:column;gap:5px;max-height:300px;overflow-y:auto">
-          <div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px">Đang tải...</div>
+      <!-- Card 2 -->
+      <div class="dash-card" style="padding:20px;border-radius:16px;position:relative;border:1px solid #f1f5f9;box-shadow:0 1px 3px rgba(0,0,0,0.05);background:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#64748b;margin-bottom:4px;">Tổng phản hồi</div>
+            <div style="font-size:12px;color:#94a3b8;margin-bottom:12px;font-weight:500;">Số lượt người dùng nộp biểu mẫu</div>
+            <div id="rpt-total-responses-value" style="font-size:32px;font-weight:800;color:var(--gray-900);line-height:1;margin-bottom:16px;">32</div>
+          </div>
+          <div style="width:42px;height:42px;border-radius:12px;background:#fff7ed;display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+          </div>
+        </div>
+        <div id="rpt-total-responses-trend" style="font-size:13px;font-weight:600;color:#ef4444;display:flex;align-items:center;gap:4px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+          -20% <span style="color:#94a3b8;font-weight:500;">so với tháng trước</span>
+        </div>
+      </div>
+      <!-- Card 3: Biểu mẫu đang hoạt động -->
+      <div class="dash-card" style="padding:20px;border-radius:16px;position:relative;border:1px solid #f1f5f9;box-shadow:0 1px 3px rgba(0,0,0,0.05);background:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div style="width:100%">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <div style="font-size:14px;font-weight:700;color:#64748b;">Biểu mẫu đang hoạt động</div>
+              <div style="width:36px;height:36px;border-radius:10px;background:#f5f7ff;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+              </div>
+            </div>
+            <div style="font-size:12px;color:#94a3b8;margin-bottom:16px;font-weight:500;">Tỉ lệ form đang thu thập phản hồi</div>
+            <div style="display:flex;align-items:baseline;gap:8px;">
+              <div id="rpt-active-forms-value" style="font-size:32px;font-weight:800;color:var(--gray-900);line-height:1;">0</div>
+              <div style="font-size:14px;color:#64748b;font-weight:600;">/ <span id="rpt-active-forms-total">0</span> form</div>
+            </div>
+            <!-- Progress Bar -->
+            <div style="width:100%;background:#f1f5f9;height:8px;border-radius:4px;margin-top:16px;overflow:hidden;">
+              <div id="rpt-active-rate-bar" style="width:0%;background:#00008B;height:100%;border-radius:4px;transition:width 1s ease-out;"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    <div class="dash-card" style="border:2px dashed #e2e8f0;cursor:pointer;box-shadow:none"
-         onclick="document.getElementById('rpt-csv-input').click()"
-         onmouseenter="this.style.borderColor='#2563eb';this.style.background='#fafbff'"
-         onmouseleave="this.style.borderColor='#e2e8f0';this.style.background=''">
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px;padding:32px;text-align:center">
-        <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#93c5fd,#2563eb);display:flex;align-items:center;justify-content:center;margin-bottom:16px;box-shadow:0 8px 20px rgba(37,99,235,.25)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" width="28" height="28"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+
+    <!-- Second Row: Chart + Form List -->
+    <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;">
+      
+      <!-- Chart Card -->
+      <div class="dash-card" style="padding:24px;border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 3px rgba(0,0,0,0.05);background:#fff;display:flex;flex-direction:column;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+          <div>
+            <div style="font-size:18px;font-weight:800;color:var(--gray-900);margin-bottom:4px;">Thống kê hoạt động</div>
+            <div style="font-size:13px;color:#64748b;">Số biểu mẫu tạo mới và phản hồi nhận được theo thời gian.</div>
+          </div>
+          <div style="display:flex;gap:4px;background:#f1f5f9;padding:4px;border-radius:8px;border:1px solid #e2e8f0;">
+            <button class="rpt-range-btn" onclick="setActivityRange('7', this)" style="padding:6px 12px;border-radius:6px;border:none;background:#fff;font-size:12px;font-weight:600;color:var(--gray-900);cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.05);">7 ngày</button>
+            <button class="rpt-range-btn" onclick="setActivityRange('this_month', this)" style="padding:6px 12px;border-radius:6px;border:none;background:transparent;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;box-shadow:none;">Tháng này</button>
+            <button class="rpt-range-btn" onclick="setActivityRange('90', this)" style="padding:6px 12px;border-radius:6px;border:none;background:transparent;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;box-shadow:none;">3 tháng</button>
+          </div>
         </div>
-        <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px">Import file Excel</div>
-        <div style="font-size:12.5px;color:#94a3b8;margin-bottom:4px">Hỗ trợ .xlsx, .xls</div>
-        <div style="font-size:12px;color:#2563eb;font-weight:600">Bấm để chọn file</div>
-        <div id="rpt-csv-badge" style="display:none;margin-top:14px;padding:6px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;font-size:12px;font-weight:600;color:#16a34a"></div>
+        <div style="flex:1;position:relative;min-height:260px;">
+          <canvas id="rpt-global-chart"></canvas>
+        </div>
       </div>
+
+      <!-- Form trong hệ thống Card -->
+      <div class="dash-card" style="border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 3px rgba(0,0,0,0.05);background:#fff;display:flex;flex-direction:column;max-height:420px;">
+        <div class="dash-card-header" style="align-items: center; border-bottom: 1px solid #f8fafc; padding-bottom: 12px;">
+          <div>
+            <div class="dash-card-title">Form trong hệ thống</div>
+            <div class="dash-card-sub">Chỉ hiện biểu mẫu đã có phản hồi</div>
+          </div>
+          <div style="display:flex; gap: 8px; align-items:center;">
+            <input type="hidden" id="rpt-form-category-filter" value="">
+            <button class="rpt-cat-pill" onclick="setRptCategory('Ngoại ngữ', this)" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s;">Ngoại ngữ</button>
+            <button class="rpt-cat-pill" onclick="setRptCategory('Tin học', this)" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s;">Tin học</button>
+            <input type="file" id="rpt-import-file" style="display:none" accept=".xlsx,.xls,.csv" onchange="handleImportExcel(event)">
+          </div>
+        </div>
+        <!-- Thanh tìm kiếm -->
+        <div style="padding: 16px 16px 0; display:flex;">
+          <div style="flex:1; position:relative;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" width="14" height="14" style="position:absolute; left:12px; top:50%; transform:translateY(-50%);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="rpt-form-search-filter" oninput="renderFormListWithImports()" placeholder="Tìm kiếm biểu mẫu..." style="width:100%; padding: 8px 12px 8px 34px; border-radius: 10px; border: 1px solid #e2e8f0; font-size: 13px; color: var(--gray-900); background: #f8fafc; outline: none; transition: all .2s; box-sizing:border-box;">
+          </div>
+        </div>
+        <div class="dash-card-body" style="padding-top:16px;flex:1;display:flex;flex-direction:column;min-height:0;">
+          <div id="rpt-form-list" style="display:flex;flex-direction:column;gap:5px;flex:1;overflow-y:auto;padding-right:4px;">
+            <div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px">Đang tải...</div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -278,184 +412,91 @@ document.getElementById('page-content').innerHTML = `
 <!-- DASHBOARD -->
 <div id="rpt-dashboard" style="display:none">
   <!-- Breadcrumb -->
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
-    <button onclick="backToPicker()" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:9px;border:1.5px solid #bfdbfe;background:#eff6ff;font-size:12.5px;color:#2563eb;cursor:pointer;font-weight:600;transition:all .15s;opacity:.75"
-      onmouseenter="this.style.opacity='1';this.style.borderColor='#2563eb'"
-      onmouseleave="this.style.opacity='.75';this.style.borderColor='#bfdbfe'">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <button onclick="navigateBackToPicker()" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:12.5px;color:var(--brand-color);cursor:pointer;font-weight:700;transition:all .15s"
+      onmouseenter="this.style.background='var(--gray-100)'"
+      onmouseleave="this.style.background='var(--gray-100)'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="15 18 9 12 15 6"/></svg>
       Chọn nguồn khác
     </button>
     <svg viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2" width="13" height="13"><polyline points="9 18 15 12 9 6"/></svg>
-    <span id="rpt-dash-title" onclick="viewFormFromReport()" title="Xem chi tiết biểu mẫu" style="font-size:14px;font-weight:600;color:#2563eb;cursor:pointer;transition:color .15s" onmouseenter="this.style.color='#1d4ed8'" onmouseleave="this.style.color='#2563eb'"></span>
-    <span id="rpt-dash-badge" style="padding:3px 10px;border-radius:999px;background:#eff6ff;color:#2563eb;font-size:12px;font-weight:600"></span>
+    <span id="rpt-dash-title" onclick="viewFormFromReport()" title="Xem chi tiết biểu mẫu" style="font-size:14.5px;font-weight:700;color:var(--brand-color);cursor:pointer;transition:color .15s" onmouseenter="this.style.color='#0000cd'" onmouseleave="this.style.color='var(--brand-color)'"></span>
+    <span id="rpt-dash-badge" style="padding:4px 10px;border-radius:6px;background:#eef2ff;color:var(--brand-color);font-size:12.5px;font-weight:700"></span>
+  </div>
+  <!-- 1. KPIs Row (Top) -->
+  <div id="rpt-kpi-row" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:24px"></div>
 
+  <!-- 2. Sleek Filter Bar -->
+  <div class="dash-card" style="margin-bottom:24px;padding:16px 20px;border-radius:12px;background:var(--gray-50);border:1.5px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,.05)">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:20px">
+
+
+
+      <!-- Thời gian -->
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px">Từ:</span>
+        <input type="date" id="sf-tungay" onchange="onSmartSearch()" style="padding:6px 12px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:13px;outline:none;background:var(--gray-50)">
+        <span style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px">Đến:</span>
+        <input type="date" id="sf-denngay" onchange="onSmartSearch()" style="padding:6px 12px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:13px;outline:none;background:var(--gray-50)">
+      </div>
+      <!-- Tìm kiếm từ khóa -->
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px">
+        <input type="search" id="sf-keyword-input" placeholder="Tìm từ khóa..." oninput="onSmartSearch()" style="width:100%;padding:7px 12px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:13px;outline:none;background:var(--gray-50)">
+      </div>
+      <!-- Xóa bộ lọc -->
+      <button onclick="resetSmartSearch()" style="padding:8px 16px;border-radius:8px;border:1px solid #fed7aa;background:#fff7ed;color:#ea580c;font-size:12.5px;font-weight:700;cursor:pointer;transition:all .15s" onmouseenter="this.style.background='#ffedd5'" onmouseleave="this.style.background='#fff7ed'">Đặt lại</button>
+    </div>
+    
+    <!-- Nơi render thêm filter động (nếu có) -->
+    <div id="sf-dynamic-filters" style="display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-top:16px"></div>
+    
+    <div id="sf-result-bar" style="display:none;margin-top:16px;padding:10px 16px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;font-size:13px;font-weight:600;align-items:center;justify-content:space-between">
+      <span id="sf-result-label"></span>
+      <button onclick="resetSmartSearch()" style="font-size:12px;font-weight:700;color:#dc2626;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .15s" onmouseenter="this.style.background='#fef2f2'" onmouseleave="this.style.background='none'">✕ Xóa lọc</button>
+    </div>
   </div>
 
-  <div id="rpt-dash-grid" style="display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start">
-    <!-- CANVAS -->
-    <div>
-      <div id="rpt-kpi-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px"></div>
-      <div id="rpt-charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
-      <div style="margin-top:12px">
-        <button onclick="addCustomChartSlot()"
-          style="width:100%;padding:13px;border:2px dashed #e2e8f0;border-radius:14px;background:transparent;font-size:13px;font-weight:600;color:#94a3b8;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s"
-          onmouseenter="this.style.borderColor='#2563eb';this.style.color='#2563eb';this.style.background='#fafbff'"
-          onmouseleave="this.style.borderColor='#e2e8f0';this.style.color='#94a3b8';this.style.background='transparent'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Thêm biểu đồ tùy chỉnh
-        </button>
-      </div>
+  <!-- 3. AI Insights -->
+  <div id="rpt-ai-title" class="report-section-title" style="margin-top:8px"><h3>Phân tích AI</h3><span>Tóm tắt thông minh từ dữ liệu khảo sát</span></div>
+  <div id="rpt-ai-summary" class="report-ai-summary" style="margin-bottom:24px"></div>
+
+  <!-- 4. Overview Charts (2 Col) -->
+  <div id="rpt-ai-grid" class="report-two-col" style="margin-bottom:24px">
+    <div class="dash-card">
+      <div class="dash-card-header"><div class="dash-card-title">Biểu đồ cảm xúc</div></div>
+      <div class="dash-card-body" style="height:280px"><canvas id="rpt-ai-sentiment"></canvas></div>
     </div>
-
-    <!-- RIGHT PANEL - Smart Search -->
-    <div id="rpt-filter-panel" class="dash-card" style="position:sticky;top:16px">
-      <div style="padding:14px 16px 10px;border-bottom:1px solid #f1f5f9">
-        <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <span style="font-size:13px;font-weight:700;color:#0f172a">Tìm kiếm & Lọc</span>
-        </div>
-        <div style="font-size:11.5px;color:#94a3b8">Bấm chọn để lọc dữ liệu ngay</div>
-      </div>
-
-      <div style="padding:14px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 220px);overflow-y:auto">
-
-        <!-- Cảm xúc -->
-        <div>
-          <span class="panel-label">😊 Cảm xúc</span>
-          <div style="display:flex;gap:6px">
-            <button class="sf-chip sf-active" data-group="camxuc" data-val="" onclick="toggleChip(this,'camxuc')" style="flex:1;padding:5px 0;border-radius:8px;border:1.5px solid #2563eb;background:#eff6ff;font-size:11px;font-weight:700;color:#2563eb;cursor:pointer;transition:all .15s">All</button>
-            <button class="sf-chip" data-group="camxuc" data-val="positive" onclick="toggleChip(this,'camxuc')" title="Tích cực" style="flex:1;padding:5px 0;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:18px;cursor:pointer;transition:all .15s">😊</button>
-            <button class="sf-chip" data-group="camxuc" data-val="negative" onclick="toggleChip(this,'camxuc')" title="Tiêu cực" style="flex:1;padding:5px 0;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:18px;cursor:pointer;transition:all .15s">😞</button>
-          </div>
-        </div>
-
-        <div style="height:1px;background:#f1f5f9"></div>
-
-        <!-- Đánh giá -->
-        <div>
-          <span class="panel-label">⭐ Điểm đánh giá</span>
-          <div style="display:flex;gap:4px">
-            <button class="sf-chip sf-active" data-group="danhgia" data-val="" onclick="toggleChip(this,'danhgia')" style="flex:1;padding:5px 0;border-radius:8px;border:1.5px solid #2563eb;background:#eff6ff;font-size:11px;font-weight:700;color:#2563eb;cursor:pointer;transition:all .15s">All</button>
-            <button class="sf-chip" data-group="danhgia" data-val="5" onclick="toggleChip(this,'danhgia')" title="5 sao" style="flex:1;padding:5px 0;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:11px;font-weight:700;color:#d97706;cursor:pointer;transition:all .15s">5★</button>
-            <button class="sf-chip" data-group="danhgia" data-val="4" onclick="toggleChip(this,'danhgia')" title="4 sao" style="flex:1;padding:5px 0;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:11px;font-weight:700;color:#d97706;cursor:pointer;transition:all .15s">4★</button>
-            <button class="sf-chip" data-group="danhgia" data-val="3" onclick="toggleChip(this,'danhgia')" title="3 sao" style="flex:1;padding:5px 0;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:11px;font-weight:700;color:#d97706;cursor:pointer;transition:all .15s">3★</button>
-            <button class="sf-chip" data-group="danhgia" data-val="2" onclick="toggleChip(this,'danhgia')" title="2 sao" style="flex:1;padding:5px 0;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:11px;font-weight:700;color:#d97706;cursor:pointer;transition:all .15s">2★</button>
-            <button class="sf-chip" data-group="danhgia" data-val="1" onclick="toggleChip(this,'danhgia')" title="1 sao" style="flex:1;padding:5px 0;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:11px;font-weight:700;color:#d97706;cursor:pointer;transition:all .15s">1★</button>
-          </div>
-        </div>
-
-        <div style="height:1px;background:#f1f5f9"></div>
-
-        <!-- Thời gian -->
-        <div>
-          <span class="panel-label">📅 Khoảng thời gian</span>
-          <div style="display:flex;gap:6px">
-            <div style="flex:1"><div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Từ ngày</div>
-              <input type="date" id="sf-tungay" class="input" style="width:100%;box-sizing:border-box;font-size:11px;height:34px;border-radius:8px;position:relative;z-index:999" onchange="onSmartSearch()"></div>
-            <div style="flex:1"><div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Đến ngày</div>
-              <input type="date" id="sf-denngay" class="input" style="width:100%;box-sizing:border-box;font-size:11px;height:34px;border-radius:8px;position:relative;z-index:999" onchange="onSmartSearch()"></div>
-          </div>
-        </div>
-
-        <div style="height:1px;background:#f1f5f9"></div>
-
-        <!-- Tìm kiếm Khoa/Bộ môn -->
-        <div>
-          <span class="panel-label">🏫 Khoa</span>
-          <div style="position:relative">
-            <select id="sf-khoa-input"
-              style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;border:1.5px solid #e2e8f0;font-size:12px;outline:none;transition:border .15s;background:#fff;appearance:none;-webkit-appearance:none;cursor:pointer"
-              onchange="onDepartmentChange(this.value)"
-              onfocus="this.style.borderColor='#2563eb'"
-              onblur="this.style.borderColor='#e2e8f0'">
-              <option value="">-- Chọn khoa --</option>
-            </select>
-            <svg style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" width="13" height="13"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-        </div>
-
-        <div style="height:1px;background:#f1f5f9"></div>
-
-        <!-- Lọc theo khóa -->
-        <div>
-          <span class="panel-label">📅 Lọc theo khóa</span>
-          <div style="position:relative">
-            <select id="sf-khoa-hoc-input"
-              style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;border:1.5px solid #e2e8f0;font-size:12px;outline:none;transition:border .15s;background:#fff;appearance:none;-webkit-appearance:none;cursor:pointer"
-              onchange="populateLopDropdown(); onSmartSearch()"
-              onfocus="this.style.borderColor='#2563eb'"
-              onblur="this.style.borderColor='#e2e8f0'">
-              <option value="">-- Chọn khóa --</option>
-              <option value="48">48K</option>
-              <option value="49">49K</option>
-              <option value="50">50K</option>
-              <option value="47">47K</option>
-              <option value="46">46K</option>
-            </select>
-            <svg style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" width="13" height="13"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-        </div>
-
-        <div style="height:1px;background:#f1f5f9"></div>
-
-        <!-- Thêm biểu đồ -->
-        <div style="height:1px;background:#f1f5f9"></div>
-
-        <!-- Tìm kiếm Giáo viên -->
-        <div>
-          <span class="panel-label">👩‍🏫 Tìm kiếm giáo viên</span>
-          <div style="position:relative">
-            <select id="sf-giaovien-input"
-              style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;border:1.5px solid #e2e8f0;font-size:12px;outline:none;transition:border .15s;background:#fff;appearance:none;-webkit-appearance:none;cursor:pointer"
-              onchange="onTeacherSearch(this.value)"
-              onfocus="this.style.borderColor='#2563eb'"
-              onblur="this.style.borderColor='#e2e8f0'">
-              <option value="">-- Chọn giáo viên --</option>
-            </select>
-            <svg style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" width="13" height="13"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-          <div id="sf-giaovien-result" style="margin-top:8px"></div>
-        </div>
-
-        <div style="height:1px;background:#f1f5f9"></div>
-
-        <!-- Lọc theo lớp -->
-        <div>
-          <span class="panel-label">🎓 Lọc theo lớp</span>
-          <div style="position:relative">
-            <select id="sf-lop-input"
-              style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;border:1.5px solid #e2e8f0;font-size:12px;outline:none;transition:border .15s;background:#fff;appearance:none;-webkit-appearance:none;cursor:pointer"
-              onchange="onSmartSearch()"
-              onfocus="this.style.borderColor='#2563eb'"
-              onblur="this.style.borderColor='#e2e8f0'">
-              <option value="">-- Chọn lớp --</option>
-            </select>
-            <svg style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" width="13" height="13"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-        </div>
-
-        <div>
-          <span class="panel-label">📊 Thêm biểu đồ</span>
-          <button onclick="addCustomChartSlot()"
-            style="width:100%;padding:10px;border-radius:10px;border:1.5px dashed #cbd5e1;background:transparent;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .15s"
-            onmouseenter="this.style.borderColor='#2563eb';this.style.color='#2563eb';this.style.background='#fafbff'"
-            onmouseleave="this.style.borderColor='#cbd5e1';this.style.color='#64748b';this.style.background='transparent'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Chọn biểu đồ để thêm
-          </button>
-        </div>
-
-        <!-- Kết quả lọc -->
-        <div id="sf-result-bar" style="display:none;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span id="sf-result-label" style="font-size:12.5px;font-weight:600;color:#166534"></span>
-            <button onclick="resetSmartSearch()" style="font-size:11.5px;font-weight:600;color:#dc2626;background:none;border:none;cursor:pointer;padding:2px 8px;border-radius:6px"
-              onmouseenter="this.style.background='#fff1f2'" onmouseleave="this.style.background='none'">✕ Xóa lọc</button>
-          </div>
-        </div>
-
-      </div>
+    <div class="dash-card">
+      <div class="dash-card-header"><div class="dash-card-title">Đám mây từ khóa</div></div>
+      <div id="rpt-word-cloud" class="word-cloud" style="height:280px;align-content:center;justify-content:center"></div>
     </div>
+  </div>
+
+  <!-- 5. Participant Stats (3 Col) -->
+  <div id="rpt-participant-title" class="report-section-title"><h3>Thống kê đối tượng tham gia</h3><span>Chân dung người phản hồi</span></div>
+  <div id="rpt-participant-grid" class="report-three-col" style="margin-bottom:24px">
+    <div class="dash-card">
+      <div class="dash-card-header"><div class="dash-card-title">Tỷ lệ đối tượng</div></div>
+      <div class="dash-card-body" style="height:250px"><canvas id="rpt-participant-donut"></canvas></div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-card-header"><div class="dash-card-title">Top Khoa / Lớp</div></div>
+      <div class="dash-card-body" style="height:250px"><canvas id="rpt-top-dept"></canvas></div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-card-header"><div class="dash-card-title">Top Giảng viên được đánh giá</div></div>
+      <div id="rpt-teacher-leaderboard" class="dash-card-body" style="height:250px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <!-- 6. Questions Charts -->
+  <div id="rpt-charts-grid" style="display:grid;grid-template-columns:1fr;gap:24px"></div>
+
+  <div style="display:flex;justify-content:center;margin-top:32px;margin-bottom:16px">
+    <button onclick="addCustomChartSlot()" style="padding:10px 24px;border-radius:10px;border:1.5px dashed #00008B;background:#f8fafc;color:var(--brand-color);font-size:13.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s" onmouseenter="this.style.background='#eef2ff';this.style.transform='translateY(-1px)'" onmouseleave="this.style.background='var(--gray-100)';this.style.transform='none'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Thêm biểu đồ tùy chỉnh
+    </button>
   </div>
 </div>
 `;
@@ -666,7 +707,7 @@ function renderTeacherResult(data, q) {
   };
 
   const lopHtml = lopList.length
-    ? lopList.map(l=>`<span style="display:inline-block;padding:3px 10px;background:#eff6ff;color:#2563eb;border-radius:20px;font-size:11.5px;font-weight:600;margin:2px 3px 0 0">${esc(l)}</span>`).join('')
+    ? lopList.map(l=>`<span style="display:inline-block;padding:3px 10px;background:#00008B;color:#fff;border-radius:20px;font-size:11.5px;font-weight:600;margin:2px 3px 0 0">${esc(l)}</span>`).join('')
     : '<span style="color:#94a3b8;font-size:12px">Chưa có thông tin lớp</span>';
 
   // ── KPI ───────────────────────────────────────────────────
@@ -674,7 +715,7 @@ function renderTeacherResult(data, q) {
   const posR = Math.round(pos / ((tv.so_phan_hoi||1)) * 100);
   const negR = Math.round(neg / ((tv.so_phan_hoi||1)) * 100);
   kpiGrid.innerHTML = [
-    {label:'Tổng phản hồi',   value: tv.so_phan_hoi||0,              sub: `${tv.so_form||0} form · ${tv.so_lop||0} lớp`, icon:'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z', color:'#2563eb', bg:'#eff6ff'},
+    {label:'Tổng phản hồi',   value: tv.so_phan_hoi||0,              sub: `${tv.so_form||0} form · ${tv.so_lop||0} lớp`, icon:'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z', color:'#fff', bg:'#00008B'},
     {label:'Điểm hài lòng',   value: tv.diem_tb ? parseFloat(tv.diem_tb).toFixed(1)+'★' : '—', sub:'<span style="color:#f59e0b">★★★★★</span>', icon:'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z', color:'#d97706', bg:'#fffbeb'},
     {label:'Tích cực',        value: posR+'%',                        sub: pos+' người', icon:'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01', color:'#059669', bg:'#f0fdf4'},
     {label:'Tiêu cực',        value: negR+'%',                        sub: neg+' người', icon:'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM16 16s-1.5-2-4-2-4 2-4 2M9 9h.01M15 9h.01', color:'#dc2626', bg:'#fff1f2'},
@@ -682,7 +723,7 @@ function renderTeacherResult(data, q) {
     <div class="dash-card" style="padding:16px 18px;display:flex;align-items:center;gap:12px;border-left:3px solid ${k.color}">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;color:#94a3b8;font-weight:600;margin-bottom:4px">${k.label}</div>
-        <div style="font-size:26px;font-weight:800;color:#0f172a;line-height:1">${k.value}</div>
+        <div style="font-size:26px;font-weight:800;color:var(--gray-900);line-height:1">${k.value}</div>
         <div style="font-size:11px;color:#94a3b8;margin-top:3px">${k.sub}</div>
       </div>
       <div style="width:40px;height:40px;border-radius:12px;background:${k.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -697,18 +738,18 @@ function renderTeacherResult(data, q) {
   chartsGrid.innerHTML = `
   <!-- Header giáo viên -->
   <div class="dash-card" style="grid-column:1/-1;padding:0;overflow:hidden">
-    <div style="background:linear-gradient(135deg,#dbeafe 0%,#eff6ff 60%,#e0e7ff 100%);padding:18px 22px;display:flex;align-items:center;gap:14px;border-bottom:1.5px solid #bfdbfe">
-      <div style="width:44px;height:44px;border-radius:50%;background:#2563eb1a;border:1.5px solid #bfdbfe;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" width="22" height="22"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <div style="background:linear-gradient(135deg,#00008B 0%,#00008B 60%,#00008B 100%);padding:18px 22px;display:flex;align-items:center;gap:14px;border-bottom:1.5px solid #00008B">
+      <div style="width:44px;height:44px;border-radius:50%;background:#00008B1a;border:1.5px solid #00008B;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="2" width="22" height="22"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:17px;font-weight:800;color:#1e3a8a">${esc(tv.giao_vien)}</div>
+        <div style="font-size:17px;font-weight:800;color:var(--brand-color)">${esc(tv.giao_vien)}</div>
         <div style="font-size:12px;color:#64748b;margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">🏫 Lớp giảng dạy: ${lopHtml}</div>
       </div>
       <button onclick="window._teacherMode=false;document.getElementById('sf-giaovien-input').value='';document.getElementById('sf-giaovien-result').innerHTML='';renderKPIs();renderDefaultCharts();"
-        style="padding:7px 16px;border-radius:9px;border:1.5px solid #bfdbfe;background:#fff;color:#2563eb;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s"
-        onmouseenter="this.style.background='#eff6ff';this.style.borderColor='#2563eb'"
-        onmouseleave="this.style.background='#fff';this.style.borderColor='#bfdbfe'">
+        style="padding:7px 16px;border-radius:9px;border:1.5px solid #00008B;background:var(--gray-50);color:var(--brand-color);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s"
+        onmouseenter="this.style.background='#00008B';this.style.borderColor='#fff'"
+        onmouseleave="this.style.background='var(--gray-50)';this.style.borderColor='var(--brand-color)'">
         ✕ Đóng
       </button>
     </div>
@@ -732,24 +773,24 @@ function renderTeacherResult(data, q) {
         ${svList.length ? svList.map((sv,i) => `
           <div style="padding:12px 4px;border-bottom:1px solid #f1f5f9;display:${i<10?'block':'none'}" class="tv-sv-row">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px">
-              <div style="font-size:13px;font-weight:700;color:#0f172a">${esc(sv.ho_ten||'Ẩn danh')}</div>
+              <div style="font-size:13px;font-weight:700;color:var(--gray-900)">${esc(sv.ho_ten||'Ẩn danh')}</div>
               <div style="display:flex;gap:1px;flex-shrink:0">
                 ${[1,2,3,4,5].map(s=>`<span style="font-size:14px;color:${s<=parseInt(sv.danh_gia)?'#f59e0b':'#e2e8f0'}">★</span>`).join('')}
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-              ${sv.lop  ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:5px">${esc(sv.lop)}</span>` : ''}
-              ${sv.khoa ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:5px">${esc(sv.khoa)}</span>` : ''}
+              ${sv.lop  ? `<span style="font-size:11px;background:#f1f5f9;color:var(--gray-600);padding:2px 8px;border-radius:5px">${esc(sv.lop)}</span>` : ''}
+              ${sv.khoa ? `<span style="font-size:11px;background:#f1f5f9;color:var(--gray-600);padding:2px 8px;border-radius:5px">${esc(sv.khoa)}</span>` : ''}
               ${camBadge(sv.cam_xuc)}
             </div>
             ${sv.noi_dung && sv.noi_dung.trim() ? `
-            <div style="font-size:12px;color:#475569;font-style:italic;line-height:1.6;padding:8px 12px;background:#f8fafc;border-left:3px solid #bfdbfe;border-radius:0 8px 8px 0">
+            <div style="font-size:12px;color:var(--gray-600);font-style:italic;line-height:1.6;padding:8px 12px;background:#f8fafc;border-left:3px solid #00008B;border-radius:0 8px 8px 0">
               "${esc(sv.noi_dung.length>200 ? sv.noi_dung.slice(0,200)+'…' : sv.noi_dung)}"
             </div>` : ''}
           </div>`).join('') + (svList.length > 10 ? `
           <div id="tv-more-wrap" style="text-align:center;padding:10px 0">
             <button onclick="document.querySelectorAll('.tv-sv-row').forEach(el=>el.style.display='block');document.getElementById('tv-more-wrap').style.display='none'"
-              style="padding:7px 20px;border-radius:8px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#2563eb;font-size:12px;font-weight:700;cursor:pointer">
+              style="padding:7px 20px;border-radius:8px;border:1.5px solid #00008B;background:#00008B;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
               ▼ Xem thêm ${svList.length - 10} sinh viên
             </button>
           </div>` : '')
@@ -780,7 +821,7 @@ function renderTeacherResult(data, q) {
         labels: ['1★','2★','3★','4★','5★'],
         datasets: [{
           data: starData,
-          backgroundColor: [1,2,3,4,5].map((s=>['#ef4444','#fb923c','#60a5fa','#2563eb','#1d4ed8'][s-1]||'#94a3b8')),
+          backgroundColor: [1,2,3,4,5].map((s=>['#ef4444','#fb923c','#00008B','#00008B','#00008B'][s-1]||'#94a3b8')),
           borderRadius:0,
           borderSkipped: false,
         }]
@@ -871,34 +912,54 @@ function renderFormListWithImports(dbForms) {
 
   // Nếu không truyền dbForms, dùng cache
   if (dbForms !== undefined) window._cachedDbForms = dbForms;
-  const db = window._cachedDbForms || [];
+  let db = Array.isArray(window._cachedDbForms) ? window._cachedDbForms : [];
 
-  const catColor = { 'Ngoại ngữ': '#0ea5e9', 'Tin học': '#10b981' };
+  const categoryFilter = document.getElementById('rpt-form-category-filter')?.value;
+  if (categoryFilter) {
+    db = db.filter(f => f.danh_muc === categoryFilter);
+  }
+
+  const searchFilter = document.getElementById('rpt-form-search-filter')?.value.toLowerCase().trim();
+  if (searchFilter) {
+    db = db.filter(f => (f.ten_form || f.name || '').toLowerCase().includes(searchFilter));
+  }
+
+  const catColor = { 'Ngoại ngữ': '#f97316', 'Tin học': '#00008B' };
+
+  if (db.length === 0 && importedForms.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px">Không tìm thấy biểu mẫu nào</div>';
+    return;
+  }
 
   // Phần DB forms
   const dbHtml = db.map(f => {
-    const c = catColor[f.danh_muc] || '#64748b';
+    const formId = Number(f.id) || 0;
+    const formName = f.ten_form || f.name || 'Chưa có tên';
+    const category = f.danh_muc || 'Chưa phân loại';
+    const questionCount = f.so_cau_hoi ?? f.tong_cau_hoi ?? '-';
+    const feedbackCount = Number(f.so_phan_hoi ?? f.feedback_count ?? 0);
+    const c = catColor[category] || '#64748b';
     return `
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1.5px solid transparent;transition:all .15s;cursor:pointer"
-      onmouseenter="this.style.background='#f8fafc';this.style.borderColor='#e2e8f0';this.querySelector('.rpt-del-btn').style.opacity='1'"
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1.5px solid transparent;transition:all .15s;cursor:pointer;margin-bottom:4px;"
+      onmouseenter="this.style.background='var(--gray-100)';this.style.borderColor='var(--gray-200)';this.querySelector('.rpt-del-btn').style.opacity='1'"
       onmouseleave="this.style.background='';this.style.borderColor='transparent';this.querySelector('.rpt-del-btn').style.opacity='0'"
-      onclick="loadFormAnalysis(${f.id},'${esc(f.ten_form)}')">
+      onclick="loadFormAnalysis(${formId},'${escJs(formName)}')">
       <div style="width:38px;height:38px;border-radius:10px;background:${c}15;display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <svg viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" width="17" height="17"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.ten_form)}</div>
-        <div style="font-size:11.5px;color:#94a3b8;margin-top:2px">${f.danh_muc} · ${f.so_cau_hoi} câu hỏi</div>
+        <div style="font-size:13px;font-weight:600;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(formName)}</div>
+        <div style="font-size:11.5px;color:#94a3b8;margin-top:2px">${esc(category)} · ${questionCount} câu hỏi</div>
       </div>
       <div style="text-align:right;flex-shrink:0;margin-right:4px">
-        <div style="font-size:20px;font-weight:800;color:${c};line-height:1">${f.so_phan_hoi}</div>
+        <div style="font-size:20px;font-weight:800;color:${c};line-height:1">${feedbackCount}</div>
         <div style="font-size:10px;color:#94a3b8">phản hồi</div>
       </div>
-      <button class="rpt-del-btn" onclick="event.stopPropagation();rptDeleteForm(${f.id},'${esc(f.ten_form)}')"
+      <button class="rpt-del-btn" onclick="event.stopPropagation();rptDeleteForm(${formId},'${escJs(formName)}')"
         title="Chuyển vào thùng rác"
-        style="opacity:0;width:30px;height:30px;border:1px solid #fecaca;border-radius:8px;background:#fff;cursor:pointer;color:#ef4444;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s"
+        style="opacity:0;width:30px;height:30px;border:1px solid #fecaca;border-radius:8px;background:var(--gray-50);cursor:pointer;color:#ef4444;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s"
         onmouseenter="this.style.background='#fef2f2';this.style.borderColor='#f87171'"
-        onmouseleave="this.style.background='#fff';this.style.borderColor='#fecaca'">
+        onmouseleave="this.style.background='var(--gray-50)';this.style.borderColor='#fecaca'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
       </button>
     </div>`;
@@ -916,7 +977,7 @@ function renderFormListWithImports(dbForms) {
       </div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:5px">
-          <div style="font-size:13px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.tenForm)}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.tenForm)}</div>
           <span style="flex-shrink:0;font-size:9px;font-weight:700;background:#dcfce7;color:#059669;border:1px solid #bbf7d0;border-radius:4px;padding:1px 5px">EXCEL</span>
         </div>
         <div style="font-size:11.5px;color:#94a3b8;margin-top:2px">${f.headers.length} cột dữ liệu</div>
@@ -941,11 +1002,6 @@ function renderFormListWithImports(dbForms) {
     separator = `<div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.7px;text-transform:uppercase;padding:2px 12px 6px">📂 File đã import</div>`;
   }
 
-  if (!db.length && !importedForms.length) {
-    el.innerHTML = `<div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px">Chưa có form nào có phản hồi</div>`;
-    return;
-  }
-
   el.innerHTML = dbHtml + separator + importHtml;
 
   // Hover show remove btn
@@ -957,6 +1013,145 @@ function renderFormListWithImports(dbForms) {
     }
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+//  MODAL XEM TẤT CẢ FORMS
+// ─────────────────────────────────────────────────────────────
+window.openAllFormsModal = function() {
+  let modal = document.getElementById('rpt-all-forms-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'rpt-all-forms-modal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);z-index:99999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s;';
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:20px;width:90%;max-width:550px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);transform:scale(0.95);transition:transform 0.2s;">
+        <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:18px;font-weight:800;color:var(--gray-900);">Tất cả biểu mẫu</div>
+            <div style="font-size:13px;color:#64748b;margin-top:2px;">Quản lý và lọc tìm biểu mẫu</div>
+          </div>
+          <button onclick="document.getElementById('rpt-all-forms-modal').style.opacity='0';document.getElementById('rpt-all-forms-modal').children[0].style.transform='scale(0.95)';setTimeout(()=>document.getElementById('rpt-all-forms-modal').style.display='none',200)" style="width:32px;height:32px;border-radius:50%;background:#f1f5f9;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;" onmouseenter="this.style.background='#e2e8f0'" onmouseleave="this.style.background='#f1f5f9'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div style="padding:16px 24px;background:#f8fafc;border-bottom:1px solid #f1f5f9;display:flex;gap:12px;">
+          <input type="text" id="rpt-modal-search" oninput="window.renderModalFormList()" placeholder="Tìm kiếm biểu mẫu..." style="flex:1;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;outline:none;">
+          <select id="rpt-modal-category" onchange="window.renderModalFormList()" style="padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;outline:none;background:#fff;cursor:pointer;">
+            <option value="">Tất cả danh mục</option>
+            <option value="Tin học">Tin học</option>
+            <option value="Ngoại ngữ">Ngoại ngữ</option>
+          </select>
+        </div>
+        <div id="rpt-modal-form-list" style="flex:1;overflow-y:auto;padding:16px 24px;display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  
+  document.getElementById('rpt-modal-search').value = '';
+  document.getElementById('rpt-modal-category').value = '';
+  window.renderModalFormList();
+  
+  modal.style.display = 'flex';
+  // Trigger reflow
+  modal.offsetHeight;
+  modal.style.opacity = '1';
+  modal.children[0].style.transform = 'scale(1)';
+};
+
+window.renderModalFormList = function() {
+  const el = document.getElementById('rpt-modal-form-list');
+  if (!el) return;
+  
+  let db = Array.isArray(window._cachedDbForms) ? window._cachedDbForms : [];
+  const searchFilter = document.getElementById('rpt-modal-search').value.toLowerCase().trim();
+  const categoryFilter = document.getElementById('rpt-modal-category').value;
+  
+  if (categoryFilter) db = db.filter(f => f.danh_muc === categoryFilter);
+  if (searchFilter) db = db.filter(f => (f.ten_form || f.name || '').toLowerCase().includes(searchFilter));
+  
+  if (db.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;font-size:14px;">Không tìm thấy biểu mẫu nào khớp với tìm kiếm của bạn.</div>';
+    return;
+  }
+  
+  const catColor = { 'Ngoại ngữ': '#f97316', 'Tin học': '#00008B' };
+  
+  const html = db.map(f => {
+    const formId = Number(f.id) || 0;
+    const formName = f.ten_form || f.name || 'Chưa có tên';
+    const category = f.danh_muc || 'Chưa phân loại';
+    const questionCount = f.so_cau_hoi ?? f.tong_cau_hoi ?? '-';
+    const feedbackCount = Number(f.so_phan_hoi ?? f.feedback_count ?? 0);
+    const c = catColor[category] || '#64748b';
+    return `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;border:1px solid #e2e8f0;background:#fff;transition:all .15s;cursor:pointer;"
+      onmouseenter="this.style.background='#f8fafc';this.style.borderColor='#cbd5e1';this.querySelector('.rpt-del-btn').style.opacity='1'"
+      onmouseleave="this.style.background='#fff';this.style.borderColor='#e2e8f0';this.querySelector('.rpt-del-btn').style.opacity='0'"
+      onclick="document.getElementById('rpt-all-forms-modal').style.display='none';loadFormAnalysis(${formId},'${escJs(formName)}')">
+      <div style="width:42px;height:42px;border-radius:10px;background:${c}15;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:700;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(formName)}</div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px">${esc(category)} · ${questionCount} câu hỏi</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-right:8px">
+        <div style="font-size:20px;font-weight:800;color:${c};line-height:1">${feedbackCount}</div>
+        <div style="font-size:11px;color:#94a3b8">phản hồi</div>
+      </div>
+      <button class="rpt-del-btn" onclick="event.stopPropagation();rptDeleteForm(${formId},'${escJs(formName)}')"
+        title="Chuyển vào thùng rác"
+        style="opacity:0;width:32px;height:32px;border:1px solid #fecaca;border-radius:8px;background:#fef2f2;cursor:pointer;color:#ef4444;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s"
+        onmouseenter="this.style.background='#fee2e2';this.style.borderColor='#f87171'"
+        onmouseleave="this.style.background='#fef2f2';this.style.borderColor='#fecaca'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+  el.innerHTML = html;
+};
+
+window.setRptCategory = function(cat, btn) {
+  const input = document.getElementById('rpt-form-category-filter');
+  
+  // Nếu click vào nhãn đang active -> Hủy chọn (hiển thị tất cả)
+  if (input.value === cat) {
+    input.value = '';
+    btn.style.background = '#fff';
+    btn.style.color = '#64748b';
+    btn.style.borderColor = '#e2e8f0';
+    btn.style.fontWeight = '600';
+    renderFormListWithImports();
+    return;
+  }
+  
+  // Set value mới
+  input.value = cat;
+  
+  // Reset all pills
+  document.querySelectorAll('.rpt-cat-pill').forEach(el => {
+    el.style.background = '#fff';
+    el.style.color = '#64748b';
+    el.style.borderColor = '#e2e8f0';
+    el.style.fontWeight = '600';
+  });
+  
+  // Set active pill (Soft Badge Style)
+  if (cat === 'Tin học') {
+    btn.style.background = '#eff6ff';
+    btn.style.color = '#00008B';
+    btn.style.borderColor = '#bfdbfe';
+  } else if (cat === 'Ngoại ngữ') {
+    btn.style.background = '#fff7ed';
+    btn.style.color = '#ea580c';
+    btn.style.borderColor = '#fed7aa';
+  }
+  btn.style.fontWeight = '700';
+  
+  // Trigger filter
+  renderFormListWithImports();
+};
 
 function loadImportedExcel(id) {
   const f = importedForms.find(x => x.id === id);
@@ -970,28 +1165,316 @@ function loadImportedExcel(id) {
   renderDefaultChartsCSV();
 }
 
+function setReportBadge(text) {
+  const oldBadge = document.getElementById('rpt-dash-badge');
+  const topBadge = document.getElementById('rpt-dash-badge-top');
+  if (oldBadge) oldBadge.textContent = text || '';
+  if (topBadge) topBadge.textContent = text || '';
+}
+
+function renderReportFormFilterOptions() {
+  const select = document.getElementById('rpt-form-filter');
+  if (!select) return;
+  const db = Array.isArray(window._cachedDbForms) ? window._cachedDbForms : [];
+  const dbOptions = db.map(f => {
+    const id = f.id ?? f.form_id;
+    const name = f.ten_form || f.name || f.tenForm || 'Biểu mẫu';
+    return `<option value="form:${esc(id)}">${esc(name)}</option>`;
+  }).join('');
+  const importOptions = importedForms.map(f =>
+    `<option value="import:${esc(f.id)}">${esc(f.tenForm)} (Excel)</option>`
+  ).join('');
+  const importGroup = importOptions ? `<option disabled>──── File Excel đã import ────</option>${importOptions}` : '';
+  select.innerHTML = `<option value="">Biểu mẫu hiện tại</option>${dbOptions}${importGroup}`;
+  if (activeSource === 'form' && currentFormId != null) select.value = `form:${currentFormId}`;
+  const activeImport = activeSource === 'csv' && csvData
+    ? importedForms.find(f => f.csvDataSnapshot === csvData)
+    : null;
+  if (activeImport) select.value = `import:${activeImport.id}`;
+}
+
+function switchReportFormFromFilter(value) {
+  if (!value) return;
+  if (value.startsWith('import:')) {
+    loadImportedExcel(value.slice(7));
+    return;
+  }
+  if (value.startsWith('form:')) {
+    const id = value.slice(5);
+    const form = (window._cachedDbForms || []).find(f => String(f.id ?? f.form_id) === String(id));
+    loadFormAnalysis(id, form?.ten_form || form?.name || form?.tenForm || 'Biểu mẫu');
+  }
+}
+
 function removeImportedForm(id) {
   importedForms = importedForms.filter(f => f.id !== id);
   renderFormListWithImports();
+  renderReportFormFilterOptions();
+}
+
+async function fetchReportJson(url, token) {
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+  let data = null;
+  try { data = await res.json(); } catch(e) {}
+  if (!res.ok) {
+    const detail = data?.error ? `${data.message || `HTTP ${res.status}`}: ${data.error}` : (data?.message || `HTTP ${res.status}`);
+    throw new Error(detail);
+  }
+  return data;
+}
+
+async function loadReportFormListFallback(token) {
+  const forms = await fetchReportJson(`${API}/forms`, token);
+  return (Array.isArray(forms) ? forms : [])
+    .filter(f => Number(f.so_phan_hoi || 0) > 0)
+    .map(f => ({
+      id: f.id,
+      ten_form: f.ten_form || f.name,
+      danh_muc: f.danh_muc,
+      trang_thai: f.trang_thai,
+      so_phan_hoi: Number(f.so_phan_hoi || 0),
+      so_cau_hoi: f.so_cau_hoi ?? f.tong_cau_hoi ?? '-',
+      diem_tb: f.diem_tb ?? null,
+      phan_hoi_moi_nhat: f.phan_hoi_moi_nhat || null
+    }))
+    .sort((a, b) => Number(b.so_phan_hoi || 0) - Number(a.so_phan_hoi || 0));
+}
+
+function renderReportListError(message) {
+  const el = document.getElementById('rpt-form-list');
+  if (!el) return;
+  el.innerHTML = `
+    <div style="text-align:center;padding:24px;color:#64748b;font-size:12.5px;line-height:1.6">
+      <div style="font-weight:700;color:var(--gray-900);margin-bottom:4px">Chưa tải được dữ liệu báo cáo</div>
+      <div>${esc(message || 'Kiểm tra backend và quyền xem báo cáo của tài khoản hiện tại.')}</div>
+    </div>`;
+}
+
+function reportDateKey(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function avgNumber(values) {
+  const nums = (values || []).map(Number).filter(v => !Number.isNaN(v));
+  return nums.length ? nums.reduce((sum, v) => sum + v, 0) / nums.length : null;
+}
+
+function reportQuestionType(type) {
+  const t = String(type || '').toLowerCase();
+  if (['multiple_choice', 'single_choice', 'radio', 'trac_nghiem'].includes(t)) return 'choice';
+  if (['star_rating', 'stars', 'rate'].includes(t)) return 'rating';
+  if (['linear_scale', 'thang_diem'].includes(t)) return 'scale';
+  if (['file_upload', 'upload_file'].includes(t)) return 'upload';
+  if (['short_text', 'textarea', 'long_text'].includes(t)) return t === 'textarea' || t === 'long_text' ? 'paragraph' : 'text';
+  return t || 'text';
+}
+
+async function fetchFeedbackDetailsForReport(feedbacks, token) {
+  const rows = await Promise.all((feedbacks || []).map(async fb => {
+    try {
+      const details = await fetchReportJson(`${API}/feedback/${fb.id}/chitiet`, token);
+      return (Array.isArray(details) ? details : []).map(detail => ({ ...detail, _feedback: fb }));
+    } catch(e) {
+      return [];
+    }
+  }));
+  return rows.flat();
+}
+
+function buildReportAnalysisFallback(form, feedbacks, details) {
+  const questions = (form.cau_hoi || form.questions || [])
+    .filter(q => q && q.id && reportQuestionType(q.loai || q.type) !== 'section')
+    .map((q, idx) => ({
+      id: q.id,
+      noi_dung: q.noi_dung || q.title || q.question || '',
+      loai: reportQuestionType(q.loai || q.type),
+      thu_tu: q.thu_tu || idx + 1,
+      bat_buoc: q.bat_buoc || q.required || false,
+      lua_chon: q.lua_chon || q.options || [],
+      hang_grid: q.hang_grid || q.hang,
+      cot_grid: q.cot_grid || q.cot
+    }));
+
+  const feedbackList = Array.isArray(feedbacks) ? feedbacks : [];
+  const cachedForm = (window._cachedDbForms || []).find(item => Number(item.id) === Number(form.id)) || {};
+  const fallbackFeedbackCount = Number(form.so_phan_hoi ?? cachedForm.so_phan_hoi ?? cachedForm.feedback_count ?? 0);
+  const totalFeedbackCount = feedbackList.length || fallbackFeedbackCount;
+  const ratings = feedbackList.map(r => Number(r.danh_gia)).filter(v => !Number.isNaN(v));
+  const dates = feedbackList.map(r => reportDateKey(r.ngay_gui)).filter(Boolean).sort();
+  const countMap = (items, keyFn) => {
+    const map = {};
+    items.forEach(item => {
+      const key = keyFn(item);
+      if (key !== null && key !== undefined && String(key) !== '') map[key] = (map[key] || 0) + 1;
+    });
+    return map;
+  };
+
+  const ratingMap = countMap(feedbackList, r => {
+    const n = Number(r.danh_gia);
+    return Number.isNaN(n) ? '' : n;
+  });
+  const timelineMap = countMap(feedbackList, r => reportDateKey(r.ngay_gui));
+  const statusMap = countMap(feedbackList, r => r.trang_thai || 'new');
+
+  const detailList = Array.isArray(details) ? details : [];
+  const choiceStats = [];
+  questions
+    .filter(q => ['choice', 'checkbox', 'dropdown'].includes(q.loai))
+    .forEach(q => {
+      const optionNames = (q.lua_chon || [])
+        .map(opt => typeof opt === 'string' ? opt : opt?.noi_dung)
+        .filter(Boolean);
+      const optionMap = {};
+      optionNames.forEach(name => { optionMap[name] = 0; });
+      detailList
+        .filter(d => Number(d.cau_hoi_id) === Number(q.id) && (d.ten_lua_chon || d.lua_chon_text))
+        .forEach(d => {
+          const name = d.ten_lua_chon || d.lua_chon_text;
+          optionMap[name] = (optionMap[name] || 0) + 1;
+        });
+      Object.entries(optionMap).forEach(([lua_chon, so_chon]) => {
+        choiceStats.push({ cau_hoi_id: q.id, lua_chon, so_chon });
+      });
+    });
+
+  const ratingDistByQ = [];
+  const ratingStats = questions.filter(q => q.loai === 'rating').map(q => {
+    const vals = detailList
+      .filter(d => Number(d.cau_hoi_id) === Number(q.id) && d.diem_danh_gia != null)
+      .map(d => Number(d.diem_danh_gia))
+      .filter(v => !Number.isNaN(v));
+    [1,2,3,4,5].forEach(sao => {
+      const so_luong = vals.filter(v => v === sao).length;
+      if (so_luong) ratingDistByQ.push({ cau_hoi_id: q.id, sao, so_luong });
+    });
+    return {
+      cau_hoi_id: q.id,
+      diem_tb: avgNumber(vals),
+      so_tra_loi: vals.length,
+      min_diem: vals.length ? Math.min(...vals) : null,
+      max_diem: vals.length ? Math.max(...vals) : null
+    };
+  }).filter(r => r.so_tra_loi > 0);
+
+  const textStats = detailList
+    .filter(d => (d.noi_dung_tra_loi || d.noi_dung || '').trim().length > 2)
+    .map(d => ({
+      cau_hoi_id: d.cau_hoi_id,
+      noi_dung: d.noi_dung_tra_loi || d.noi_dung || '',
+      ho_ten: d._feedback?.ho_ten || '',
+      lop: d._feedback?.lop || '',
+      khoa: d._feedback?.khoa || '',
+      giao_vien: d._feedback?.giao_vien || '',
+      danh_gia: d._feedback?.danh_gia || null,
+      cam_xuc: d._feedback?.cam_xuc || ''
+    }));
+
+  return {
+    form: {
+      id: form.id,
+      ten_form: form.ten_form || form.name || '',
+      danh_muc: form.danh_muc || '',
+      mo_ta: form.mo_ta || '',
+      trang_thai: form.trang_thai || '',
+      luot_xem: form.luot_xem || 0,
+      so_phan_hoi: totalFeedbackCount,
+      diem_tb: avgNumber(ratings),
+      ngay_dau: dates[0] || null,
+      ngay_cuoi: dates[dates.length - 1] || null,
+      tich_cuc: feedbackList.filter(r => r.cam_xuc === 'positive').length,
+      trung_tinh: feedbackList.filter(r => r.cam_xuc === 'neutral').length,
+      tieu_cuc: feedbackList.filter(r => r.cam_xuc === 'negative').length
+    },
+    rating_dist: Object.entries(ratingMap).map(([sao, so_luong]) => ({ sao: Number(sao), so_luong })).sort((a,b) => a.sao - b.sao),
+    rating_dist_by_q: ratingDistByQ,
+    timeline: Object.entries(timelineMap).map(([ngay, so_luong]) => ({ ngay, so_luong })).sort((a,b) => a.ngay.localeCompare(b.ngay)),
+    questions,
+    choice_stats: choiceStats,
+    rating_stats: ratingStats,
+    status_dist: Object.entries(statusMap).map(([trang_thai, so_luong]) => ({ trang_thai, so_luong })),
+    text_stats: textStats
+  };
+}
+
+async function loadFormAnalysisFallback(formId, token) {
+  const form = await fetchReportJson(`${API}/forms/${formId}`, token);
+  let feedbackList = [];
+  try {
+    const feedbacks = await fetchReportJson(`${API}/feedback?form_id=${formId}`, token);
+    feedbackList = Array.isArray(feedbacks) ? feedbacks : [];
+  } catch(e) {
+    feedbackList = [];
+  }
+  const details = feedbackList.length ? await fetchFeedbackDetailsForReport(feedbackList, token) : [];
+  return {
+    data: buildReportAnalysisFallback(form, feedbackList, details),
+    rows: await enrichRowsWithClassQuestion(formId, feedbackList)
+  };
+}
+
+function activateReportAnalysis(formId, formName, data, rows) {
+  if (!history.state || history.state.view !== 'detail') {
+    history.pushState({ view: 'detail', formId: formId }, '', '#detail');
+  }
+  analysisData = data;
+  csvData = null;
+  activeSource = 'form';
+  currentFormId = formId;
+  activeFilters = {};
+  allFields = buildFieldsFromForm(data);
+  data._origChoiceStats = JSON.parse(JSON.stringify(data.choice_stats || []));
+  data._origRatingStats = JSON.parse(JSON.stringify(data.rating_stats || []));
+  showDashboard(formName, `${data.form.so_phan_hoi} phản hồi`);
+  rawRows = rows && rows.length ? rows : buildRawRowsFromAnalysis(data);
+  activeReportRows = rawRows.slice();
+  baseAnalysisData = JSON.parse(JSON.stringify({
+    form: data.form || {},
+    questions: data.questions || [],
+    choice_stats: data.choice_stats || [],
+    rating_stats: data.rating_stats || [],
+    rating_dist: data.rating_dist || [],
+    rating_dist_by_q: data.rating_dist_by_q || [],
+    timeline: data.timeline || [],
+    status_dist: data.status_dist || [],
+    text_stats: data.text_stats || []
+  }));
+  renderReportFormContext();
+  renderDynamicReportFilters();
+  renderKPIs();
+  renderDefaultCharts();
+  populateTeacherDropdown();
+  populateDepartmentDropdown();
 }
 
 // ─────────────────────────────────────────────────────────────
 //  LOAD FORM LIST
 // ─────────────────────────────────────────────────────────────
 async function loadFormList() {
+  const token = localStorage.getItem('token') || '';
   try {
-    const token = localStorage.getItem('token') || '';
-    const res  = await fetch(`${API}/reports/forms-with-data`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
-    const list = await res.json();
+    const list = await fetchReportJson(`${API}/reports/forms-with-data`, token);
+    if (!Array.isArray(list)) throw new Error(list?.message || 'Dữ liệu báo cáo không hợp lệ');
     renderFormListWithImports(list);
   } catch(e) {
-    const el = document.getElementById('rpt-form-list');
-    if (el) el.innerHTML =
-      `<div style="text-align:center;padding:24px;color:#ef4444;font-size:12.5px">Không kết nối được server<br><code style="font-size:11px;background:#f8fafc;padding:2px 6px;border-radius:4px">npm start</code></div>`;
-    // Vẫn hiển thị form đã import nếu có
-    if (importedForms.length) renderFormListWithImports([]);
+    try {
+      const fallbackList = await loadReportFormListFallback(token);
+      renderFormListWithImports(fallbackList);
+      if (fallbackList.length && typeof showToast === 'function') {
+        showToast('Đã tải danh sách form bằng dữ liệu dự phòng', 'default');
+      }
+    } catch(fallbackError) {
+      if (importedForms.length) {
+        renderFormListWithImports([]);
+      } else {
+        renderReportListError(fallbackError.message || e.message);
+      }
+    }
   }
 }
 
@@ -1000,35 +1483,31 @@ async function loadFormList() {
 // ─────────────────────────────────────────────────────────────
 async function loadFormAnalysis(formId, formName) {
   showToast('Đang tải dữ liệu...','default');
+  const token = localStorage.getItem('token') || '';
   try {
-    const token = localStorage.getItem('token') || '';
-    const res  = await fetch(`${API}/reports/form-analysis/${formId}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
-    const data = await res.json();
-    if(!data.form){ showToast('Không tìm thấy dữ liệu','error'); return; }
-    analysisData=data; csvData=null; activeSource='form'; currentFormId=formId;
-    activeFilters={};
-    allFields=buildFieldsFromForm(data);
-    data._origChoiceStats = JSON.parse(JSON.stringify(data.choice_stats || []));
-    data._origRatingStats = JSON.parse(JSON.stringify(data.rating_stats || []));
-    showDashboard(formName,`${data.form.so_phan_hoi} phản hồi`);
-    // Lấy raw rows thật từ API feedback (có lop, khoa, giao_vien)
+    const data = await fetchReportJson(`${API}/reports/form-analysis/${formId}`, token);
+    if(!data.form) throw new Error(data?.message || 'Không tìm thấy dữ liệu');
+    // Ưu tiên rows thô trả từ API phân tích để lọc đúng theo từng câu hỏi.
+    let rows = Array.isArray(data.responses) ? data.responses : [];
     try {
-      const token = localStorage.getItem('token');
-      const fbRes = await fetch(`${API}/feedback?form_id=${formId}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-      rawRows = await fbRes.json();
-      rawRows = await enrichRowsWithClassQuestion(formId, rawRows);
+      if (!rows.length) {
+        rows = await fetchReportJson(`${API}/feedback?form_id=${formId}`, token);
+        rows = await enrichRowsWithClassQuestion(formId, rows);
+      }
     } catch(e) {
-      rawRows = buildRawRowsFromAnalysis(data);
+      rows = buildRawRowsFromAnalysis(data);
     }
-
-    renderKPIs();
-    renderDefaultCharts();
-    populateTeacherDropdown();
-    populateDepartmentDropdown();
+    activateReportAnalysis(formId, formName, data, rows);
     showToast('Tải xong ✅','success');
-  } catch(e){ showToast('Lỗi: '+e.message,'error'); }
+  } catch(e) {
+    try {
+      const fallback = await loadFormAnalysisFallback(formId, token);
+      activateReportAnalysis(formId, formName, fallback.data, fallback.rows);
+      showToast('Đã tải báo cáo bằng dữ liệu dự phòng','success');
+    } catch(fallbackError) {
+      showToast('Lỗi: ' + (fallbackError.message || e.message), 'error');
+    }
+  }
 }
 
 function buildFieldsFromForm(data) {
@@ -1044,9 +1523,114 @@ function buildFieldsFromForm(data) {
   return f;
 }
 
+function normalizeReportDate(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.slice(0, 10);
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+}
+
+function normalizeReportText(value) {
+  return String(value ?? '').trim();
+}
+
+function getReportQuestionOptions(q) {
+  return (q?.lua_chon || q?.opts || [])
+    .map(opt => typeof opt === 'string' ? opt : (opt?.noi_dung || opt?.label || opt?.text || ''))
+    .map(normalizeReportText)
+    .filter(Boolean);
+}
+
+function splitReportAnswer(value) {
+  const text = normalizeReportText(value);
+  if (!text) return [];
+  return text.split(/\s*;\s*|\s*,\s*|\n+/).map(v => v.trim()).filter(Boolean);
+}
+
+function getReportRowAnswer(row, q) {
+  return row?.['q_' + q.id] ?? row?.[q.id] ?? row?.[q.noi_dung] ?? '';
+}
+
+function inferReportFilterLabel(q) {
+  if (!q?.noi_dung) return null;
+  const text = String(q.noi_dung).toLowerCase();
+  
+  // Phân loại nhóm đánh giá / mức độ hài lòng
+  if (text.includes('hài lòng') || text.includes('đánh giá') || text.includes('chất lượng') || text.includes('dễ hiểu') || text.includes('nhiệt tình')) {
+    if (text.includes('giảng viên') || text.includes('thầy') || text.includes('cô')) return 'Đánh giá giảng viên';
+    if (text.includes('cơ sở') || text.includes('phòng') || text.includes('nhiệt độ')) return 'Đánh giá CSVC';
+    if (text.includes('khóa') || text.includes('môn')) return 'Đánh giá khóa học';
+    return 'Độ hài lòng / Đánh giá';
+  }
+  
+  // Phân loại nhóm thực thể (Entity)
+  if (text.includes('giảng viên') || text.includes('giao vien') || text.includes('thầy') || text.includes('cô ')) return 'Giảng viên';
+  if (text.includes('cơ sở vật chất') || text.includes('phòng học') || text.includes('thiết bị')) return 'CSVC / Phòng học';
+  if (text.includes('khóa học') || text.includes('khoa hoc') || text.includes('môn ')) return 'Khóa học / Môn học';
+  if (/(^|\s)(khoa|ngành|nganh)(\s|$)/.test(text)) return 'Khoa / Ngành';
+  if (/(^|\s)(lớp|lop)(\s|$)/.test(text)) return 'Lớp';
+  if (text.includes('trình độ') || text.includes('level')) return 'Trình độ';
+  
+  // Nếu câu hỏi ngắn (dưới 25 ký tự), có thể giữ nguyên làm label
+  if (q.noi_dung.length <= 25) return q.noi_dung;
+
+  return null; // Không phải câu hỏi quan trọng để lọc
+}
+
+function isReportQuestionFilterable(q) {
+  // Chỉ hiện những câu hỏi "quan trọng" đã được rút gọn label
+  const label = inferReportFilterLabel(q);
+  if (!label) return false;
+
+  const type = reportQuestionType(q?.loai || q?.type);
+  const options = getReportQuestionOptions(q);
+  if (['choice', 'dropdown', 'checkbox'].includes(type)) return options.length > 0 && options.length <= 20;
+  if (['rating', 'scale', 'star_rating'].includes(type)) return true;
+  return false;
+}
+
+function renderReportFormContext() {
+  const el = document.getElementById('rpt-form-info-card');
+  if (el) el.innerHTML = '';
+}
+
+function formStatusLabel(status) {
+  return ({ draft:'Nháp', pending:'Chờ phê duyệt', active:'Hoạt động', rejected:'Bị từ chối', closed:'Đã đóng', deleted:'Đã xóa' })[status] || status || 'Chưa rõ';
+}
+
+function renderDynamicReportFilters() {
+  const statusSel = document.getElementById('sf-status-select');
+  if (statusSel) {
+    const statuses = [...new Set((rawRows || []).map(r => normalizeReportText(r.trang_thai)).filter(Boolean))];
+    statusSel.innerHTML = '<option value="">Tất cả</option>' + statuses.map(s => `<option value="${esc(s)}">${esc(responseStatusLabel(s))}</option>`).join('');
+  }
+  const wrap = document.getElementById('sf-dynamic-filters');
+  if (!wrap) return;
+  const filters = (analysisData?.questions || []).filter(isReportQuestionFilterable).slice(0, 8);
+  wrap.innerHTML = filters.map(q => {
+    const type = reportQuestionType(q.loai || q.type);
+    const label = inferReportFilterLabel(q);
+    const id = 'sf-dyn-' + q.id;
+    if (['rating', 'scale', 'star_rating'].includes(type)) {
+      return `<div class="report-filter-field"><label title="${esc(label)}">${esc(label)}</label><select id="${id}" data-qid="${esc(q.id)}" data-filter-type="rating" onchange="onSmartSearch()"><option value="">Tất cả điểm</option>${[1,2,3,4,5].map(n => `<option value="${n}">${n} điểm</option>`).join('')}</select></div>`;
+    }
+    if (['upload', 'file'].includes(type)) {
+      return `<div class="report-filter-field"><label title="${esc(label)}">${esc(label)}</label><select id="${id}" data-qid="${esc(q.id)}" data-filter-type="file" onchange="onSmartSearch()"><option value="">Tất cả</option><option value="has">Có file</option><option value="empty">Chưa có file</option></select></div>`;
+    }
+    const opts = getReportQuestionOptions(q);
+    const multiple = type === 'checkbox' ? ' multiple size="1"' : '';
+    return `<div class="report-filter-field"><label title="${esc(label)}">${esc(label)}</label><select id="${id}" data-qid="${esc(q.id)}" data-filter-type="${esc(type)}" onchange="onSmartSearch()"${multiple}><option value="">Tất cả</option>${opts.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select></div>`;
+  }).join('');
+}
+
+function responseStatusLabel(status) {
+  return ({ active:'Hoạt động', deleted:'Đã xóa', new:'Mới', viewed:'Đã xem', archived:'Lưu trữ' })[status] || status || 'Tất cả';
+}
+
 // Xây rawRows tổng hợp từ analysisData để smart search lọc được
 function buildRawRowsFromAnalysis(data) {
   if (!data) return [];
+  if (Array.isArray(data.responses) && data.responses.length) return data.responses;
   const total = data.form.so_phan_hoi || 0;
   const sentiments = [
     ...Array(data.form.tich_cuc   || 0).fill('positive'),
@@ -1100,7 +1684,7 @@ async function handleExcelImport(input) {
   const badge = document.getElementById('rpt-csv-badge');
   badge.style.display = 'block';
   badge.textContent = '⏳ Đang đọc file...';
-  badge.style.cssText += ';background:#eff6ff;border-color:#bfdbfe;color:#2563eb';
+  badge.style.cssText += ';background:#00008B;border-color:var(--brand-color);color:#fff';
 
   try {
     const tenForm = file.name.replace(/\.[^/.]+$/, '').trim() || 'Form import';
@@ -1125,8 +1709,19 @@ async function handleExcelImport(input) {
       const nums = vals.filter(v => !isNaN(v) && v !== '');
       if (vals.length && nums.length / vals.length > 0.8)
         return Math.max(...nums.map(Number)) <= 10 ? 'rating' : 'number';
+      if (vals.length) {
+        const commaVals = vals.filter(v => v.includes(','));
+        if (commaVals.length > 0) {
+          const allOptions = [];
+          vals.forEach(v => v.split(',').map(s => s.trim()).filter(Boolean).forEach(opt => allOptions.push(opt)));
+          const uniqOptions = new Set(allOptions);
+          if (uniqOptions.size <= 30 && uniqOptions.size < vals.length * 1.5) return 'checkbox';
+        }
+      }
+      
       const uniq = new Set(vals);
       if (vals.length && uniq.size <= 15 && uniq.size < vals.length * 0.6) return 'choice';
+      
       if (vals.some(v => /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}/.test(v))) return 'date';
       return 'text';
     });
@@ -1196,12 +1791,13 @@ function showDashboard(title,badge) {
   document.getElementById('rpt-picker').style.display='none';
   document.getElementById('rpt-dashboard').style.display='block';
   document.getElementById('rpt-dash-title').textContent=title;
-  document.getElementById('rpt-dash-badge').textContent=badge;
+  setReportBadge(badge);
   document.getElementById('rpt-charts-grid').innerHTML='';
   document.getElementById('rpt-kpi-row').innerHTML='';
   // Hiện nút AI khi vào dashboard
   const aiBtn = document.getElementById('btn-ai-analyze');
   if (aiBtn) aiBtn.style.display = 'flex';
+  renderReportFormFilterOptions();
 }
 
 async function viewFormFromReport() {
@@ -1214,9 +1810,9 @@ async function viewFormFromReport() {
   const rEsc = v => String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const rNorm = t => { if(t==='text'||t==='short_text'||t==='long_text') return 'paragraph'; if(t==='star_rating') return 'rating'; return t||'choice'; };
   const rLabel = t => ({choice:'Trắc nghiệm',checkbox:'Hộp kiểm',dropdown:'Thả xuống',paragraph:'Đoạn văn',rating:'Xếp hạng',scale:'Tuyến tính',grid_radio:'Lưới trắc nghiệm',grid_checkbox:'Lưới hộp kiểm'}[rNorm(t)] || t || 'Khác');
-  const rOpts = (opts, kind) => `<div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff">
-    ${opts.map(o=>`<label style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#374151;cursor:default">
-      <span style="width:16px;height:16px;border:1.8px solid #9ca3af;border-radius:${kind==='checkbox'?'4px':'50%'};display:inline-block;flex-shrink:0;background:#fff"></span>
+  const rOpts = (opts, kind) => `<div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:var(--gray-50)">
+    ${opts.map(o=>`<label style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:var(--gray-700);cursor:default">
+      <span style="width:16px;height:16px;border:1.8px solid #9ca3af;border-radius:${kind==='checkbox'?'4px':'50%'};display:inline-block;flex-shrink:0;background:var(--gray-50)"></span>
       ${rEsc(o)}</label>`).join('')}</div>`;
   const rQ = (q, idx) => {
     const n = rNorm(q.type||q.loai);
@@ -1226,15 +1822,15 @@ async function viewFormFromReport() {
     if (n==='paragraph') ans = `<textarea disabled rows="3" placeholder="Nhập câu trả lời..." style="width:100%;padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;color:#94a3b8;background:#f8fafc;resize:none;outline:none;box-sizing:border-box;margin-top:10px"></textarea>`;
     else if (n==='dropdown') ans = `<select disabled style="margin-top:10px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;color:#64748b;background:#f8fafc;outline:none;min-width:220px"><option>Chọn một mục...</option>${opts.map(o=>`<option>${rEsc(o)}</option>`).join('')}</select>`;
     else if (opts.length) ans = rOpts(opts, n==='checkbox'?'checkbox':'radio');
-    return `<div style="border:1px solid #bfdbfe;border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.95);box-shadow:0 6px 18px rgba(59,130,246,.07)">
+    return `<div style="border:1px solid #00008B;border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.95);box-shadow:0 6px 18px rgba(0,0,139,.07)">
       <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="width:34px;height:34px;border-radius:50%;background:#dbeafe;color:#2563eb;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${idx+1}</div>
+        <div style="width:34px;height:34px;border-radius:50%;background:#00008B;color:#fff;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${idx+1}</div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <span style="padding:5px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:11.5px;font-weight:700">${rLabel(q.type||q.loai)}</span>
+            <span style="padding:5px 10px;border-radius:999px;background:#00008B;color:#fff;font-size:11.5px;font-weight:700">${rLabel(q.type||q.loai)}</span>
             ${req?'<span style="padding:5px 10px;border-radius:999px;background:#fee2e2;color:#dc2626;font-size:11.5px;font-weight:700">Bắt buộc</span>':'<span style="padding:5px 10px;border-radius:999px;background:#f8fafc;color:#64748b;font-size:11.5px;font-weight:700">Không bắt buộc</span>'}
           </div>
-          <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:2px;line-height:1.4">${rEsc(q.noi_dung||q.text||'')}</div>
+          <div style="font-size:18px;font-weight:700;color:var(--gray-900);margin-bottom:2px;line-height:1.4">${rEsc(q.noi_dung||q.text||'')}</div>
           ${ans}
         </div>
       </div>
@@ -1249,19 +1845,19 @@ async function viewFormFromReport() {
   modal.id = 'rpt-view-form-modal';
   modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.5);display:flex;align-items:center;justify-content:center;padding:22px;backdrop-filter:blur(3px)';
   modal.innerHTML = `
-    <div onclick="event.stopPropagation()" style="background:#fff;border-radius:20px;width:min(720px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.22);overflow:hidden;border:1px solid #bfdbfe">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-bottom:1px solid #bfdbfe;flex-shrink:0">
+    <div onclick="event.stopPropagation()" style="background:var(--gray-50);border-radius:20px;width:min(720px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.22);overflow:hidden;border:1px solid #00008B">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#00008B,#00008B);border-bottom:1px solid #00008B;flex-shrink:0">
         <div style="min-width:0">
-          <div style="font-size:16px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${rEsc(title)}</div>
+          <div style="font-size:16px;font-weight:800;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${rEsc(title)}</div>
           <div style="font-size:12px;color:#64748b;margin-top:3px">${rEsc(cat)}${cat&&created?' · ':''}${created?'Ngày tạo: '+created:''}</div>
         </div>
-        <button onclick="document.getElementById('rpt-view-form-modal').remove()" style="flex-shrink:0;margin-left:12px;width:32px;height:32px;border:1px solid #93c5fd;background:#eff6ff;border-radius:8px;cursor:pointer;color:#1d4ed8;font-size:18px;display:flex;align-items:center;justify-content:center">×</button>
+        <button onclick="document.getElementById('rpt-view-form-modal').remove()" style="flex-shrink:0;margin-left:12px;width:32px;height:32px;border:1px solid #00008B;background:#00008B;border-radius:8px;cursor:pointer;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center">×</button>
       </div>
       <div id="rpt-vfm-body" style="flex:1;overflow-y:auto;background:#f1f5f9;padding:20px 22px">
         <div style="text-align:center;padding:40px;color:#94a3b8">Đang tải câu hỏi...</div>
       </div>
-      <div style="padding:14px 22px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;flex-shrink:0;background:#fff">
-        <button onclick="document.getElementById('rpt-view-form-modal').remove()" style="padding:8px 22px;border:1.5px solid #e2e8f0;border-radius:9px;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer">Đóng</button>
+      <div style="padding:14px 22px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;flex-shrink:0;background:var(--gray-50)">
+        <button onclick="document.getElementById('rpt-view-form-modal').remove()" style="padding:8px 22px;border:1.5px solid #e2e8f0;border-radius:9px;background:var(--gray-50);color:var(--gray-700);font-size:13px;font-weight:600;cursor:pointer">Đóng</button>
       </div>
     </div>`;
   modal.addEventListener('click', () => modal.remove());
@@ -1289,7 +1885,7 @@ async function viewFormFromReport() {
   if (!qs.length) { body.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8">Không có câu hỏi nào</div>'; return; }
 
   body.innerHTML = `
-    <div style="background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 52%,#93c5fd 100%);border-radius:20px;padding:22px 24px;margin-bottom:18px;color:#1e3a8a;box-shadow:0 16px 36px rgba(59,130,246,.13)">
+    <div style="background:linear-gradient(135deg,#00008B 0%,#00008B 52%,#00008B 100%);border-radius:20px;padding:22px 24px;margin-bottom:18px;color:var(--brand-color);box-shadow:0 16px 36px rgba(0,0,139,.13)">
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
         ${cat?`<span style="font-size:12px;background:rgba(255,255,255,.55);padding:5px 12px;border-radius:999px;font-weight:700">${rEsc(cat)}</span>`:''}
         <span style="font-size:12px;background:rgba(255,255,255,.55);padding:5px 12px;border-radius:999px;font-weight:700">Tổng ${qs.length} câu hỏi</span>
@@ -1301,12 +1897,60 @@ async function viewFormFromReport() {
       ${qs.map((q,i) => rQ(q,i)).join('')}
     </div>
     <div style="padding:20px 0 4px;text-align:center">
-      <button disabled style="padding:11px 32px;background:#3b82f6;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:not-allowed;opacity:.75">Gửi phản hồi</button>
+      <button disabled style="padding:11px 32px;background:#00008B;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:not-allowed;opacity:.75">Gửi phản hồi</button>
     </div>`;
 }
 
-async function rptDeleteForm(id, name) {
-  if (!confirm(`Chuyển form "${name}" vào thùng rác?\nForm sẽ tự động xóa vĩnh viễn sau 30 ngày.`)) return;
+let rptDeleteTarget = null;
+
+function openRptDeleteModal(id, name) {
+  rptDeleteTarget = { id, name };
+  let modal = document.getElementById('rpt-delete-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'rpt-delete-modal';
+    modal.className = 'modal-overlay';
+    modal.style.zIndex = '99999';
+    modal.innerHTML = `
+      <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;border-radius:14px">
+        <div class="modal-header">
+          <div><div class="modal-title" style="color:var(--red)">Xóa biểu mẫu</div>
+          <div style="font-size:12.5px;color:var(--gray-400);margin-top:2px">Xác nhận hành động</div></div>
+          <button class="icon-btn close-btn" onclick="closeRptDeleteModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div id="rpt-delete-msg" style="padding:20px;font-size:14px;color:var(--gray-700);text-align:left">
+          Chuyển biểu mẫu này vào thùng rác? Biểu mẫu sẽ tự động xóa vĩnh viễn sau 30 ngày.
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeRptDeleteModal()">Hủy bỏ</button>
+          <button class="btn" style="background:var(--red);color:#fff" onclick="confirmRptDelete()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            Xóa biểu mẫu
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.offsetHeight; // reflow
+  }
+  
+  document.getElementById('rpt-delete-msg').innerHTML = `Chuyển biểu mẫu <strong>${name}</strong> vào thùng rác?<br>Biểu mẫu sẽ tự động xóa vĩnh viễn sau 30 ngày.`;
+  modal.classList.add('open');
+}
+
+function closeRptDeleteModal() {
+  const modal = document.getElementById('rpt-delete-modal');
+  if (modal) modal.classList.remove('open');
+  rptDeleteTarget = null;
+}
+
+async function confirmRptDelete() {
+  if (!rptDeleteTarget) return;
+  const { id, name } = rptDeleteTarget;
+  closeRptDeleteModal();
+  
   try {
     const token = localStorage.getItem('token') || '';
     const res = await fetch(`${API}/forms/${id}`, {
@@ -1314,12 +1958,30 @@ async function rptDeleteForm(id, name) {
       headers: token ? { Authorization: 'Bearer ' + token } : {}
     });
     if (!res.ok) throw new Error('Không xóa được form');
-    showToast('Đã chuyển form vào thùng rác', 'success');
+    showToast('Đã chuyển biểu mẫu vào thùng rác', 'success');
     // Reload picker list
     window._cachedDbForms = (window._cachedDbForms || []).filter(f => f.id !== id);
     renderFormListWithImports(undefined);
   } catch(e) {
     showToast('Lỗi: ' + e.message, 'error');
+  }
+}
+
+async function rptDeleteForm(id, name) {
+  openRptDeleteModal(id, name);
+}
+
+window.addEventListener('popstate', (e) => {
+  if (!e.state || e.state.view !== 'detail') {
+    backToPicker();
+  }
+});
+
+function navigateBackToPicker() {
+  if (history.state && history.state.view === 'detail') {
+    history.back();
+  } else {
+    backToPicker();
   }
 }
 
@@ -1336,15 +1998,36 @@ function backToPicker() {
 //  KPI
 // ─────────────────────────────────────────────────────────────
 function renderKPIs() {
-  const d=analysisData; const total=d.form.so_phan_hoi||1;
-  const posR=Math.round((d.form.tich_cuc||0)/total*100);
-  const negR=Math.round((d.form.tieu_cuc||0)/total*100);
-  renderKPIHtml([
-    {label:'Tổng phản hồi',    value:d.form.so_phan_hoi,   sub:`${fmtDate(d.form.ngay_dau)} → ${fmtDate(d.form.ngay_cuoi)}`, icon:'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z',color:'#2563eb',bg:'#eff6ff'},
-    {label:'Điểm hài lòng',    value:fmt(d.form.diem_tb)+'★',sub:starBar(d.form.diem_tb),                                    icon:'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',color:'#ea580c',bg:'#fff7ed'},
-    {label:'Tích cực',         value:`${posR}%`,            sub:`${d.form.tich_cuc||0} người`,                                icon:'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01',color:'#2563eb',bg:'#eff6ff'},
-    {label:'Tiêu cực',         value:`${negR}%`,            sub:`${d.form.tieu_cuc||0} người`,                                icon:'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM16 16s-1.5-2-4-2-4 2-4 2M9 9h.01M15 9h.01',color:'#f59e0b',bg:'#fff7ed'},
-  ]);
+  const d=analysisData;
+  if (!d?.form) return;
+  const rows = activeReportRows && activeReportRows.length ? activeReportRows : rawRows || [];
+  const responses = rows.length;
+  
+  // Phản hồi trong ngày
+  const todayDate = new Date();
+  const todayStr = todayDate.getFullYear() + '-' + String(todayDate.getMonth() + 1).padStart(2, '0') + '-' + String(todayDate.getDate()).padStart(2, '0');
+  const todayResp = rows.filter(r => r.ngay_gui && String(r.ngay_gui).startsWith(todayStr)).length;
+  
+  // Số câu hỏi
+  const numQuestions = (analysisData?.questions || []).length;
+  
+  // Ngày gần nhất
+  const dates = rows.map(r => new Date(r.ngay_gui)).filter(d => !isNaN(d.getTime())).sort((a,b)=>b-a);
+  const latestDateStr = dates.length ? fmtDate(dates[0].toISOString().slice(0,10)) : 'Chưa có';
+
+  const kpis = [
+    {label:'Tổng phản hồi', value:responses, sub:'Số lượt điền khảo sát', icon:'M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z', iconColor:'#00008B', bg:'#e0e7ff', borderColor:'#00008B'},
+    {label:'Hôm nay', value:todayResp, sub:'Phản hồi mới trong ngày', icon:'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', iconColor:'#2563eb', bg:'#dbeafe', borderColor:'#2563eb'},
+    {label:'Số câu hỏi', value:numQuestions, sub:'Có trong biểu mẫu', icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', iconColor:'#0284c7', bg:'#e0f2fe', borderColor:'#0284c7'},
+    {label:'Ngày gần nhất', value:latestDateStr, sub:'Phản hồi mới nhất', icon:'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', iconColor:'#06b6d4', bg:'#cffafe', borderColor:'#06b6d4'},
+  ];
+  renderKPIHtml(kpis);
+}
+
+function getTopReportChoice() {
+  const stats = (analysisData?.choice_stats || []).filter(s => normalizeReportText(s.lua_chon) && Number(s.so_chon || 0) > 0);
+  if (!stats.length) return null;
+  return stats.sort((a,b) => Number(b.so_chon || 0) - Number(a.so_chon || 0))[0];
 }
 
 function starBar(rating) {
@@ -1354,29 +2037,161 @@ function starBar(rating) {
 }
 
 function renderKPIsFromCSV() {
+  setFormDetailOverviewVisibility(false);
   const {rows,colTypes,headers}=csvData;
-  const rCol=colTypes.map((t,i)=>({t,i})).find(c=>c.t==='rating');
-  const avg=rCol?((vals=rows.map(r=>parseFloat(r[rCol.i])).filter(v=>!isNaN(v)))=>vals.length?fmt(vals.reduce((a,b)=>a+b,0)/vals.length):null)():null;
-  renderKPIHtml([
-    {label:'Tổng phản hồi',   value:rows.length,     sub:`${headers.length} cột`,                       icon:'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z',color:'#2563eb',bg:'#eff6ff'},
-    {label:'Điểm trung bình', value:avg?avg+'★':'—', sub:avg?starBar(avg):'Không có cột rating',         icon:'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',color:'#ea580c',bg:'#fff7ed'},
-    {label:'Câu trắc nghiệm', value:colTypes.filter(t=>t==='choice').length, sub:'câu có thể phân tích', icon:'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11',color:'#2563eb',bg:'#eff6ff'},
-    {label:'Import lúc',      value:new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}), sub:new Date().toLocaleDateString('vi-VN'), icon:'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',color:'#f59e0b',bg:'#fff7ed'},
-  ]);
+  
+  // Phản hồi trong ngày
+  const todayDate = new Date();
+  const todayStr = todayDate.getFullYear() + '-' + String(todayDate.getMonth() + 1).padStart(2, '0') + '-' + String(todayDate.getDate()).padStart(2, '0');
+  let dateKey = headers.find(h => h.toLowerCase().includes('time') || h.toLowerCase().includes('ngày') || h.toLowerCase().includes('date')) || 'ngay_gui';
+  const todayResp = rows.filter(r => r[dateKey] && String(r[dateKey]).includes(todayStr)).length;
+  
+  // Số câu hỏi (số cột không đếm cột thời gian)
+  const numQuestions = Math.max(0, headers.length - 1);
+  
+  // Ngày gần nhất
+  const dates = rows.map(r => new Date(r[dateKey])).filter(d => !isNaN(d.getTime())).sort((a,b)=>b-a);
+  const latestDateStr = dates.length ? fmtDate(dates[0].toISOString().slice(0,10)) : 'Chưa có';
+
+  const kpis = [
+    {label:'Tổng phản hồi', value:rows.length, sub:'Số lượt điền khảo sát', icon:'M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z', iconColor:'#00008B', bg:'#e0e7ff', borderColor:'#00008B'},
+    {label:'Hôm nay', value:todayResp, sub:'Phản hồi mới trong ngày', icon:'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', iconColor:'#2563eb', bg:'#dbeafe', borderColor:'#2563eb'},
+    {label:'Số câu hỏi', value:numQuestions, sub:'Cột dữ liệu', icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', iconColor:'#0284c7', bg:'#e0f2fe', borderColor:'#0284c7'},
+    {label:'Ngày gần nhất', value:latestDateStr, sub:'Phản hồi mới nhất', icon:'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', iconColor:'#06b6d4', bg:'#cffafe', borderColor:'#06b6d4'},
+  ];
+  renderKPIHtml(kpis);
 }
 
 function renderKPIHtml(kpis) {
-  document.getElementById('rpt-kpi-row').innerHTML=kpis.map(k=>`
-    <div class="dash-card" style="padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:110px;border-left:3px solid ${k.color}">
-      <div style="display:flex;flex-direction:column;gap:5px">
-        <div style="font-size:12px;font-weight:600;color:#64748b">${k.label}</div>
-        <div style="font-size:26px;font-weight:800;color:#0f172a;letter-spacing:-.5px;line-height:1">${k.value}</div>
-        <div style="font-size:11.5px;color:#94a3b8">${k.sub}</div>
+  const row = document.getElementById('rpt-kpi-row');
+  if (!row) return;
+  row.style.gridTemplateColumns = 'repeat(auto-fit,minmax(190px,1fr))';
+  row.innerHTML=kpis.map(k=>`
+    <div class="dash-card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;height:120px;border-left:3px solid ${k.borderColor};border-radius:12px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:13px;font-weight:700;color:#64748b">${k.label}</div>
+        <div style="font-size:28px;font-weight:800;color:var(--gray-900);line-height:1;margin-top:2px">${k.value}</div>
+        <div style="font-size:12px;color:#94a3b8;font-weight:500;margin-top:2px">${k.sub}</div>
       </div>
-      <div style="width:40px;height:40px;border-radius:10px;background:${k.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg viewBox="0 0 24 24" fill="none" stroke="${k.color}" stroke-width="2" width="18" height="18"><path d="${k.icon}"/></svg>
+      <div style="width:48px;height:48px;border-radius:12px;background:${k.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="${k.iconColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="${k.icon}"/></svg>
       </div>
     </div>`).join('');
+}
+
+function classifyReportAudience(row) {
+  const text = [
+    row?.doi_tuong, row?.loai_doi_tuong, row?.nghe_nghiep, row?.vai_tro,
+    row?.lop, row?.khoa
+  ].map(v => String(v || '').toLowerCase()).join(' ');
+  if (text.includes('người đi làm') || text.includes('di lam') || text.includes('đi làm') || text.includes('worker')) return 'Người đi làm';
+  if (text.includes('sinh viên') || text.includes('sinh vien') || text.includes('student') || row?.lop || row?.khoa) return 'Sinh viên';
+  return 'Khác';
+}
+
+function countReportValues(items, getter, limit = 8) {
+  const map = {};
+  (items || []).forEach(item => {
+    const key = String(getter(item) || '').trim();
+    if (!key) return;
+    map[key] = (map[key] || 0) + 1;
+  });
+  return Object.entries(map).sort((a,b) => b[1] - a[1]).slice(0, limit);
+}
+
+function collectReportText(rows) {
+  const texts = [];
+  (analysisData?.text_stats || []).forEach(t => texts.push(t.noi_dung || ''));
+  (analysisData?.questions || []).forEach(q => texts.push(q.noi_dung || ''));
+  (rows || []).forEach(r => {
+    Object.entries(r || {}).forEach(([k,v]) => {
+      if (/q_|noi_dung|ghi_chu|comment|nhan_xet|tra_loi/i.test(k) && String(v || '').length > 3) texts.push(v);
+    });
+  });
+  if (csvData?.rows?.length) {
+    const textCols = csvData.colTypes.map((t,i) => t === 'text' ? i : -1).filter(i => i >= 0);
+    csvData.rows.slice(0, 80).forEach(row => textCols.forEach(i => texts.push(row[i] || '')));
+  }
+  return texts.join(' ');
+}
+
+function extractTopKeywords(text, limit = 24) {
+  const stop = new Set('và của cho với trong là có được các một những này đó tại từ để khi về như hơn rất bạn chúng tôi trung tâm biểu mẫu khảo sát chất lượng dịch vụ phản hồi đánh giá'.split(' '));
+  const words = String(text || '').toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .map(w => w.trim())
+    .filter(w => w.length >= 3 && !stop.has(w));
+  const map = {};
+  words.forEach(w => { map[w] = (map[w] || 0) + 1; });
+  return Object.entries(map).sort((a,b) => b[1] - a[1]).slice(0, limit);
+}
+
+function renderDashboardOverviewSections() {
+  const rows = activeSource === 'form' ? (rawRows || []) : [];
+  const total = analysisData?.form?.so_phan_hoi || csvData?.rows?.length || rows.length || 0;
+  const pos = analysisData?.form?.tich_cuc || 0;
+  const neu = analysisData?.form?.trung_tinh || 0;
+  const neg = analysisData?.form?.tieu_cuc || 0;
+  const rating = analysisData?.form?.diem_tb;
+  const posRate = total ? Math.round(pos / total * 100) : 0;
+  const summary = document.getElementById('rpt-ai-summary');
+  if (summary) {
+    summary.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:42px;height:42px;border-radius:12px;background:#00008B;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:900">AI</div>
+        <div>
+          <div style="font-size:13px;font-weight:900;color:var(--brand-color);margin-bottom:4px">AI Tóm tắt báo cáo</div>
+          <div style="font-size:15px;font-weight:750;color:var(--gray-900);line-height:1.55">
+            Biểu mẫu hiện có <b>${total}</b> phản hồi${rating ? `, điểm hài lòng trung bình <b>${fmt(rating)}</b>/5` : ''}.
+            ${analysisData ? `Tỷ lệ phản hồi tích cực đạt <b>${posRate}%</b>, gồm ${pos} tích cực, ${neu} trung lập và ${neg} tiêu cực.` : 'Dữ liệu Excel đã sẵn sàng để xem thống kê theo từng cột.'}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const sentimentVals = analysisData ? [pos, neu, neg] : [0, csvData?.rows?.length || 0, 0];
+  mkChart('rpt-ai-sentiment', {
+    type:'doughnut',
+    data:{labels:['Tích cực','Trung lập','Tiêu cực'],datasets:[{data:sentimentVals,backgroundColor:['#16a34a','#f59e0b','#ef4444'],borderWidth:0,hoverOffset:6}]},
+    options:{...rAF,cutout:'68%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,usePointStyle:true,font:{size:11,weight:'700'}}},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw} phản hồi`}}}}
+  });
+
+  const keywords = extractTopKeywords(collectReportText(rows));
+  const cloud = document.getElementById('rpt-word-cloud');
+  if (cloud) {
+    cloud.innerHTML = keywords.length
+      ? keywords.map(([word,count],idx) => `<span style="font-size:${Math.max(12, 26 - idx)}px;opacity:${Math.max(.55, 1 - idx*.025)}">${esc(word)} <small style="font-size:10px;color:#64748b;margin-left:3px">${count}</small></span>`).join('')
+      : '<div style="color:#94a3b8;font-size:13px;font-weight:700">Chưa đủ dữ liệu văn bản để tạo word cloud</div>';
+  }
+
+  const audienceRows = rows.length ? rows : buildRawRowsFromAnalysis(analysisData);
+  const audience = countReportValues(audienceRows, classifyReportAudience, 4);
+  mkChart('rpt-participant-donut', {
+    type:'doughnut',
+    data:{labels:audience.map(x=>x[0]),datasets:[{data:audience.map(x=>x[1]),backgroundColor:['#00008B','#16a34a','#f59e0b','#94a3b8'],borderWidth:0}]},
+    options:{...rAF,cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,usePointStyle:true,font:{size:11,weight:'700'}}}}}
+  });
+
+  const dept = countReportValues(audienceRows, r => r.khoa || r.lop, 6);
+  mkChart('rpt-top-dept', {
+    type:'bar',
+    data:{labels:dept.map(x=>x[0]),datasets:[{data:dept.map(x=>x[1]),backgroundColor:'#00008B',borderRadius:8,borderSkipped:false}]},
+    options:{...rAF,indexAxis:'y',plugins:{...noLegend},scales:{x:{...softGrid,beginAtZero:true,ticks:{precision:0}},y:{...noGrid,ticks:{font:{size:11,weight:'700'}}}}}
+  });
+
+  const teachers = countReportValues(audienceRows, r => r.giao_vien || r.giang_vien || r.teacher, 5);
+  const board = document.getElementById('rpt-teacher-leaderboard');
+  if (board) {
+    board.innerHTML = teachers.length
+      ? teachers.map(([name,count],i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9">
+          <div style="width:28px;height:28px;border-radius:9px;background:${i===0?'#00008B':'#eef2ff'};color:${i===0?'#fff':'#00008B'};display:flex;align-items:center;justify-content:center;font-weight:900">${i+1}</div>
+          <div style="flex:1;min-width:0;font-size:13px;font-weight:800;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
+          <div style="font-size:12px;font-weight:900;color:#64748b">${count}</div>
+        </div>`).join('')
+      : '<div style="padding:34px 0;text-align:center;color:#94a3b8;font-size:13px;font-weight:700">Chưa có dữ liệu giảng viên</div>';
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1399,7 +2214,18 @@ function renderDefaultCharts() {
 
     if(!hasTwoPerids) {
       // ── 1 đợt: biểu đồ đường ──
-      addChartCard('c-timeline','Phản hồi theo thời gian','full',320);
+      addChartCard('c-timeline','Phản hồi theo thời gian','full',380);
+      // Add So sánh button inline with title
+      setTimeout(()=>{
+        const titleEl = document.querySelector('#slot-c-timeline .dash-card-title');
+        if(titleEl && !titleEl.querySelector('.cmp-toggle-btn')){
+          titleEl.insertAdjacentHTML('afterend',`
+            <button class="cmp-toggle-btn" onclick="document.getElementById('rpt-compare-section')?.scrollIntoView({behavior:'smooth'})" style="margin-left:10px;padding:5px 14px;border-radius:8px;border:1.5px solid #e2e8f0;background:var(--gray-50);color:#64748b;font-size:11.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s" onmouseenter="this.style.borderColor='var(--brand-color)';this.style.color='var(--brand-color)'" onmouseleave="this.style.borderColor='var(--gray-200)';this.style.color='#64748b'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              So sánh
+            </button>`);
+        }
+      },0);
       setTimeout(()=>{
         const timelineStats = buildTimelineStats(sorted);
         renderTimelineSummary('c-timeline', timelineStats, 'c-timeline');
@@ -1412,27 +2238,29 @@ function renderDefaultCharts() {
             fill:true,
             backgroundColor:(ctx)=>{
               const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);
-              g.addColorStop(0,'rgba(37,99,235,0.18)');
-              g.addColorStop(1,'rgba(37,99,235,0.01)');
+              g.addColorStop(0,'rgba(59,130,246,0.08)');
+              g.addColorStop(1,'rgba(59,130,246,0.005)');
               return g;
             },
-            borderColor:'#2563eb',borderWidth:2,
-            pointBackgroundColor:vals.map(v=>v===timelineStats.peakValue?'#2563eb':'rgba(37,99,235,0.5)'),
-            pointRadius:vals.map(v=>v===timelineStats.peakValue?5:2),
-            pointHoverRadius:6,tension:0.4,
+            borderColor:'#3b82f6',borderWidth:1.5,borderDash:[4,3],
+            pointBackgroundColor:vals.map(v=>v===timelineStats.peakValue?'#2563eb':'#3b82f6'),
+            pointBorderColor:'#fff',pointBorderWidth:1.5,
+            pointRadius:vals.map(v=>v===timelineStats.peakValue?5:0),
+            pointHoverRadius:5,pointHoverBackgroundColor:'#2563eb',
+            tension:0.35,
           }]},
           options:{...rAF,interaction:{mode:'index',intersect:false},
             plugins:{...noLegend,tooltip:{backgroundColor:'#0f172a',padding:10,cornerRadius:8,
               titleFont:{size:11},bodyFont:{size:13,weight:'bold'},
               callbacks:{title:i=>`📅 ${i[0].label}`,label:i=>`${i.raw} phản hồi`}}},
             scales:{
-              x:{...noGrid,ticks:{font:{size:10},color:'#94a3b8',maxRotation:0,autoSkip:false,
+              x:{...noGrid,ticks:{font:{size:10,weight:'500'},color:'#94a3b8',maxRotation:0,autoSkip:false,
                 callback(value,index){
                   const every=Math.max(1,Math.ceil(totalPoints/7));
                   return index%every===0?fmtShortDate(sorted[index]?.ngay):'';
                 }}},
               y:{...softGrid,beginAtZero:true,ticks:{stepSize:1,precision:0,font:{size:10},color:'#94a3b8'},
-                title:{display:true,text:'Số phản hồi',color:'#64748b',font:{size:11,weight:'600'}}}
+                title:{display:true,text:'Số phản hồi',color:'#94a3b8',font:{size:10,weight:'500'}}}
             }}
         });
       },100);
@@ -1462,15 +2290,15 @@ function renderDefaultCharts() {
         return `<span style="color:${c};font-size:12px;font-weight:700">${icon} ${v>0?'+':''}${v}</span>`;
       };
       const barRow = (label,v1,v2,max) => `
-        <div style="padding:14px 16px;border:1px solid #f1f5f9;border-radius:12px;background:#fff;margin-bottom:8px">
+        <div style="padding:14px 16px;border:1px solid #f1f5f9;border-radius:12px;background:var(--gray-50);margin-bottom:8px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <span style="font-size:13px;font-weight:600;color:#0f172a">${label}</span>
+            <span style="font-size:13px;font-weight:600;color:var(--gray-900)">${label}</span>
             ${diffBadge(v2-v1)}
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="font-size:11px;color:#2563eb;font-weight:600;min-width:54px">Đợt 1: ${v1}</span>
+            <span style="font-size:11px;color:var(--brand-color);font-weight:600;min-width:54px">Đợt 1: ${v1}</span>
             <div style="flex:1;height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden">
-              <div style="height:100%;width:${Math.round(v1/max*100)}%;background:#2563eb;border-radius:5px"></div>
+              <div style="height:100%;width:${Math.round(v1/max*100)}%;background:#00008B;border-radius:5px"></div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
@@ -1490,9 +2318,9 @@ function renderDefaultCharts() {
         const titleEl = slot.querySelector('.dash-card-title');
         if(titleEl) titleEl.innerHTML = `Phản hồi theo thời gian
           <button id="btn-toggle-cmp" onclick="window._toggleCmpView()"
-            style="margin-left:12px;padding:4px 12px;border-radius:7px;border:1.5px solid #2563eb;background:#eff6ff;color:#2563eb;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;vertical-align:middle"
-            onmouseenter="this.style.background='#2563eb';this.style.color='#fff'"
-            onmouseleave="if(!window._cmpActive){this.style.background='#eff6ff';this.style.color='#2563eb'}else{this.style.background='#2563eb';this.style.color='#fff'}">
+            style="margin-left:12px;padding:4px 12px;border-radius:7px;border:1.5px solid #00008B;background:#00008B;color:#fff;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;vertical-align:middle"
+            onmouseenter="this.style.background='#00008B';this.style.color='#fff'"
+            onmouseleave="if(!window._cmpActive){this.style.background='#00008B';this.style.color='#fff'}else{this.style.background='#00008B';this.style.color='#fff'}">
             ⇄ So sánh
           </button>`;
       }
@@ -1506,25 +2334,24 @@ function renderDefaultCharts() {
         wrap.style.height = 'auto';
         // Build stat boxes + bar view + compare view tất cả cùng lúc
         wrap.innerHTML = `
-          <div id="tl-stat-boxes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
-            <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fbff">
-              <div style="font-size:11px;color:#64748b;margin-bottom:4px">Tổng phản hồi</div>
-              <div style="font-size:22px;font-weight:800;color:#0f172a">${timelineStats.total}</div>
-            </div>
-            <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fbff">
-              <div style="font-size:11px;color:#64748b;margin-bottom:4px">Cao nhất / tuần</div>
-              <div style="font-size:22px;font-weight:800;color:#0f172a">${timelineStats.peakWeek}</div>
-              <div style="font-size:11px;color:#94a3b8;margin-top:2px">${timelineStats.peakWeekLabel||'Chưa có dữ liệu'}</div>
-            </div>
-            <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fbff">
-              <div style="font-size:11px;color:#64748b;margin-bottom:4px">Cao nhất / ngày</div>
-              <div style="font-size:22px;font-weight:800;color:#0f172a">${timelineStats.peakValue}</div>
-              <div style="font-size:11px;color:#94a3b8;margin-top:2px">${timelineStats.peakDate?fmtDate(timelineStats.peakDate):'Chưa có dữ liệu'}</div>
+          <div id="tl-stat-boxes" style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px">
+            <div style="display:inline-flex;align-items:center;gap:16px;padding:8px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px">
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <span style="font-size:12px;color:#64748b;font-weight:600">Cao nhất / tuần:</span>
+                <span style="font-size:15px;font-weight:800;color:var(--gray-900)">${timelineStats.peakWeek}</span>
+                <span style="font-size:11px;color:#94a3b8">(${timelineStats.peakWeekLabel||'--'})</span>
+              </div>
+              <div style="width:1px;height:14px;background:#cbd5e1"></div>
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <span style="font-size:12px;color:#64748b;font-weight:600">Cao nhất / ngày:</span>
+                <span style="font-size:15px;font-weight:800;color:var(--gray-900)">${timelineStats.peakValue}</span>
+                <span style="font-size:11px;color:#94a3b8">(${timelineStats.peakDate?fmtDate(timelineStats.peakDate):'--'})</span>
+              </div>
             </div>
           </div>
           <div id="tl-bar-view"><div style="height:220px"><canvas id="c-timeline"></canvas></div></div>
           ${compareHTML}`;
-        const CMP_BLUE = '#2563eb';
+        const CMP_BLUE = '#00008B';
         const CMP_ORANGE = '#f59e0b';
         const defaultStartDate1 = (() => {
           const d0 = new Date(dot1[0]?.ngay || '');
@@ -1570,7 +2397,7 @@ function renderDefaultCharts() {
             avg: ratings.length ? ratings.reduce((a,b)=>a+b,0) / ratings.length : 0,
           };
         };
-        const TREND_UP = '#2563eb';
+        const TREND_UP = '#00008B';
         const TREND_DOWN = '#f59e0b';
         const TREND_NEUTRAL = '#64748b';
         const formatPercent = (value, total) => total ? `${Math.round((value / total) * 100)}%` : '0%';
@@ -1621,16 +2448,16 @@ function renderDefaultCharts() {
           cmpView.innerHTML = `
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
               <!-- Đợt 1 pill -->
-              <div style="display:flex;align-items:center;gap:8px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:7px 14px">
+              <div style="display:flex;align-items:center;gap:8px;background:#00008B;border:1.5px solid #00008B;border-radius:12px;padding:7px 14px">
                 <div style="width:10px;height:10px;border-radius:50%;background:${CMP_BLUE};flex-shrink:0"></div>
                 <span style="font-size:13px;font-weight:700;color:${CMP_BLUE}">Đợt 1</span>
                 <div style="position:relative">
-                  <button type="button" onclick="window._openCompareDatePicker('cmp-start-date-1')" style="background:none;border:none;font-size:13px;color:#1e3a8a;font-weight:600;cursor:pointer;padding:0;text-decoration:none">${formatDateLabel(start1)}</button>
+                  <button type="button" onclick="window._openCompareDatePicker('cmp-start-date-1')" style="background:none;border:none;font-size:13px;color:var(--brand-color);font-weight:600;cursor:pointer;padding:0;text-decoration:none">${formatDateLabel(start1)}</button>
                   <input id="cmp-start-date-1" type="date" value="${start1}" onchange="window._renderTimelineCompare()" style="position:absolute;inset:0;opacity:0;pointer-events:none">
                 </div>
-                <span style="color:#93c5fd;font-size:13px">→</span>
+                <span style="color:var(--brand-color);font-size:13px">→</span>
                 <div style="position:relative">
-                  <button type="button" onclick="window._openCompareDatePicker('cmp-end-date-1')" style="background:none;border:none;font-size:13px;color:#1e3a8a;font-weight:600;cursor:pointer;padding:0;text-decoration:none">${formatDateLabel(end1)}</button>
+                  <button type="button" onclick="window._openCompareDatePicker('cmp-end-date-1')" style="background:none;border:none;font-size:13px;color:var(--brand-color);font-weight:600;cursor:pointer;padding:0;text-decoration:none">${formatDateLabel(end1)}</button>
                   <input id="cmp-end-date-1" type="date" value="${end1}" onchange="window._renderTimelineCompare()" style="position:absolute;inset:0;opacity:0;pointer-events:none">
                 </div>
                 <span style="font-size:14px;color:${CMP_BLUE}">📅</span>
@@ -1653,13 +2480,13 @@ function renderDefaultCharts() {
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:4px">
               <!-- Card 1: Tổng phản hồi -->
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;box-shadow:0 2px 12px rgba(15,23,42,0.06)">
+              <div style="background:var(--gray-50);border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;box-shadow:0 2px 12px rgba(15,23,42,0.06)">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
                   <span style="font-size:15px">📊</span>
-                  <span style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.07em">Tổng phản hồi</span>
+                  <span style="font-size:11px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:.07em">Tổng phản hồi</span>
                 </div>
                 <div style="height:140px"><canvas id="cmp-chart-total"></canvas></div>
-                <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:${totalChange.color===TREND_UP?'#eff6ff':totalChange.color===TREND_DOWN?'#fff7ed':'#f8fafc'};border:1px solid ${totalChange.color===TREND_UP?'#bfdbfe':totalChange.color===TREND_DOWN?'#fed7aa':'#e2e8f0'}">
+                <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:${totalChange.color===TREND_UP?'#00008B':totalChange.color===TREND_DOWN?'#fff7ed':'#f8fafc'};border:1px solid ${totalChange.color===TREND_UP?'#00008B':totalChange.color===TREND_DOWN?'#fed7aa':'#e2e8f0'}">
                   <div>
                     <div style="font-size:13px;font-weight:800;color:${totalChange.color}">${totalChange.arrow} ${totalChange.text}</div>
                     <div style="font-size:10px;color:#64748b;margin-top:2px">${stats2.total > stats1.total ? 'Đợt 2 nhận nhiều hơn đợt 1' : stats2.total < stats1.total ? 'Đợt 2 nhận ít hơn đợt 1' : 'Hai đợt bằng nhau'}</div>
@@ -1670,10 +2497,10 @@ function renderDefaultCharts() {
                 </div>
               </div>
               <!-- Card 2: Cảm xúc tích cực -->
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;box-shadow:0 2px 12px rgba(15,23,42,0.06)">
+              <div style="background:var(--gray-50);border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;box-shadow:0 2px 12px rgba(15,23,42,0.06)">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
                   <span style="font-size:15px">😊</span>
-                  <span style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.07em">Cảm xúc tích cực</span>
+                  <span style="font-size:11px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:.07em">Cảm xúc tích cực</span>
                 </div>
                 <div style="height:140px"><canvas id="cmp-chart-pos"></canvas></div>
                 <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:${posRateChange.color===TREND_UP?'#f0fdf4':posRateChange.color===TREND_DOWN?'#fff7ed':'#f8fafc'};border:1px solid ${posRateChange.color===TREND_UP?'#bbf7d0':posRateChange.color===TREND_DOWN?'#fed7aa':'#e2e8f0'}">
@@ -1688,10 +2515,10 @@ function renderDefaultCharts() {
                 </div>
               </div>
               <!-- Card 3: Điểm hài lòng -->
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;box-shadow:0 2px 12px rgba(15,23,42,0.06)">
+              <div style="background:var(--gray-50);border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;box-shadow:0 2px 12px rgba(15,23,42,0.06)">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
                   <span style="font-size:15px">⭐</span>
-                  <span style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.07em">Điểm hài lòng</span>
+                  <span style="font-size:11px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:.07em">Điểm hài lòng</span>
                 </div>
                 <div style="height:140px"><canvas id="cmp-chart-avg"></canvas></div>
                 <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:${avgChange.color===TREND_UP?'#fffbeb':avgChange.color===TREND_DOWN?'#fef2f2':'#f8fafc'};border:1px solid ${avgChange.color===TREND_UP?'#fde68a':avgChange.color===TREND_DOWN?'#fecaca':'#e2e8f0'}">
@@ -1732,7 +2559,7 @@ function renderDefaultCharts() {
                 x: {
                   grid: { display: false },
                   ticks: {
-                    color: (ctx) => ctx.index === 0 ? '#2563eb' : '#f59e0b',
+                    color: (ctx) => ctx.index === 0 ? '#00008B' : '#f59e0b',
                     font: (ctx) => ({ size: ctx.index === 0 ? 10 : 10, weight: '700' }),
                     callback: function(val, index) {
                       const labels = ['Đợt 1', 'Đợt 2'];
@@ -1750,8 +2577,8 @@ function renderDefaultCharts() {
             labels: ['Đợt 1', 'Đợt 2'],
             datasets: [
               { label: 'Đợt 1', data: [val1, val2],
-                backgroundColor: ['rgba(37,99,235,0.85)', 'rgba(245,158,11,0.85)'],
-                borderColor: ['#2563eb', '#f59e0b'],
+                backgroundColor: ['rgba(0,0,139,0.85)', 'rgba(245,158,11,0.85)'],
+                borderColor: ['#00008B', '#f59e0b'],
                 borderWidth: 1.5, borderRadius: 0, borderSkipped: false },
             ]
           });
@@ -1790,7 +2617,7 @@ function renderDefaultCharts() {
           barView.style.display  = window._cmpActive ? 'none' : 'block';
           cmpView.style.display  = window._cmpActive ? 'block' : 'none';
           if(btn){
-            btn.style.background = window._cmpActive ? CMP_BLUE : '#eff6ff';
+            btn.style.background = window._cmpActive ? CMP_BLUE : '#00008B';
             btn.style.color      = window._cmpActive ? '#fff' : CMP_BLUE;
           }
           if (window._cmpActive) window._renderTimelineCompare();
@@ -1804,12 +2631,12 @@ function renderDefaultCharts() {
             fill:true,
             backgroundColor:(ctx)=>{
               const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);
-              g.addColorStop(0,'rgba(37,99,235,0.18)');
-              g.addColorStop(1,'rgba(37,99,235,0.01)');
+              g.addColorStop(0,'rgba(0,0,139,0.18)');
+              g.addColorStop(1,'rgba(0,0,139,0.01)');
               return g;
             },
-            borderColor:'#2563eb',borderWidth:2,
-            pointBackgroundColor:vals.map(v=>v===timelineStats.peakValue?'#2563eb':'rgba(37,99,235,0.5)'),
+            borderColor:'#00008B',borderWidth:2,
+            pointBackgroundColor:vals.map(v=>v===timelineStats.peakValue?'#00008B':'rgba(0,0,139,0.5)'),
             pointRadius:vals.map(v=>v===timelineStats.peakValue?5:2),
             pointHoverRadius:6,tension:0.4,
           }]},
@@ -1840,7 +2667,7 @@ function renderDefaultCharts() {
         type:'bar',
         data:{labels:d.rating_dist.map(r=>`${r.sao}★`),datasets:[{
           data:d.rating_dist.map(r=>r.so_luong),
-          backgroundColor:d.rating_dist.map(r=>['#ef4444','#fb923c','#60a5fa','#2563eb','#1d4ed8'][r.sao-1]||'#94a3b8'),
+          backgroundColor:d.rating_dist.map(r=>['#ea580c', '#f97316', '#60a5fa', '#2563eb', '#00008B'][r.sao-1]||'#94a3b8'),
           borderRadius:0,borderSkipped:false,
         }]},
         options:{...rAF,
@@ -1965,7 +2792,7 @@ function renderOverviewChart() {
         const pct = Math.round(s.so_chon/total*100);
         return '<div>' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
-            '<span style="font-size:12px;color:#374151;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.lua_chon)+'</span>' +
+            '<span style="font-size:12px;color:var(--gray-700);font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.lua_chon)+'</span>' +
             '<span style="font-size:12px;font-weight:700;color:'+PALETTE[i%PALETTE.length]+';margin-left:8px;white-space:nowrap">'+s.so_chon+' người ('+pct+'%)</span>' +
           '</div>' +
           '<div style="height:7px;background:#f1f5f9;border-radius:4px">' +
@@ -1995,19 +2822,15 @@ function renderAnswerList(answers) {
   return '<div style="font-size:12px;color:#94a3b8;margin-bottom:10px">' + answers.length + ' câu trả lời</div>' +
     '<div style="display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto">' +
     answers.map((r,i) => {
-      const colors = [BLUE,'#7c3aed','#059669','#d97706',RED,'#0891b2'];
+      const colors = [BLUE, '#ea580c', '#2563eb', '#f97316', '#00008B', '#fb923c'];
       const color = colors[i % colors.length];
-      const stars = r.danh_gia ? Array.from({length:5},(_,j)=>
-        '<svg viewBox="0 0 24 24" fill="'+(j<r.danh_gia?'#fbbf24':'#e2e8f0')+'" width="11" height="11"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
-      ).join('') : '';
       return '<div style="padding:10px 14px;background:#f8fafc;border-left:3px solid '+color+';border-radius:0 10px 10px 0">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
           '<div style="font-size:11.5px;font-weight:700;color:'+color+'">' + esc(r.ho_ten||'Học viên') +
             (r.lop ? ' <span style="font-size:10.5px;color:#94a3b8;font-weight:400">· '+esc(r.lop)+'</span>' : '') +
           '</div>' +
-          (stars ? '<div style="display:flex;gap:1px">'+stars+'</div>' : '') +
         '</div>' +
-        '<div style="font-size:12.5px;color:#374151;line-height:1.5">' + esc(r.noi_dung) + '</div>' +
+        '<div style="font-size:12.5px;color:var(--gray-700);line-height:1.5">' + esc(r.noi_dung) + '</div>' +
       '</div>';
     }).join('') +
     '</div>';
@@ -2029,7 +2852,7 @@ function renderRatingHTML(rs, qId) {
   const starBars = [5,4,3,2,1].map(s => {
     const n = distData[s-1];
     const pct = Math.round(n/distTotal*100);
-    const c = ['#ef4444','#fb923c','#60a5fa','#2563eb','#1d4ed8'][s-1]||'#94a3b8';
+    const c = ['#ea580c', '#f97316', '#60a5fa', '#2563eb', '#00008B'][s-1]||'#94a3b8';
     return '<div onclick="showRatingPeople('+qId+','+s+')" style="display:flex;align-items:center;gap:8px;cursor:pointer;border-radius:8px;padding:3px 6px;transition:background .15s" onmouseenter="this.style.background=\'#f8fafc\'" onmouseleave="this.style.background=\'transparent\'">' +
       '<span style="font-size:12px;font-weight:700;color:'+c+';min-width:22px;text-align:right">'+s+'★</span>' +
       '<div style="flex:1;height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden">' +
@@ -2061,16 +2884,16 @@ function renderRatingHTML(rs, qId) {
 }
 
 function showRatingPeople(qId, sao) {
-  const c = ['#ef4444','#fb923c','#60a5fa','#2563eb','#1d4ed8'][sao-1]||'#94a3b8';
+  const c = ['#ea580c', '#f97316', '#60a5fa', '#2563eb', '#00008B'][sao-1]||'#94a3b8';
   const old = document.getElementById('rating-people-modal'); if(old) old.remove();
   const modal = document.createElement('div');
   modal.id = 'rating-people-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
   modal.innerHTML =
-    '<div style="background:#fff;border-radius:20px;padding:24px;width:520px;max-width:94vw;max-height:80vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.18)">' +
+    '<div style="background:var(--gray-50);border-radius:20px;padding:24px;width:520px;max-width:94vw;max-height:80vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.18)">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
         '<div>' +
-          '<div style="font-size:16px;font-weight:800;color:#0f172a">Người đánh giá '+sao+'★</div>' +
+          '<div style="font-size:16px;font-weight:800;color:var(--gray-900)">Người đánh giá '+sao+'★</div>' +
           '<div id="rpm-sub" style="font-size:12px;color:#94a3b8;margin-top:2px">Đang tải...</div>' +
         '</div>' +
         '<button onclick="document.getElementById(\'rating-people-modal\').remove()" style="width:32px;height:32px;border-radius:9px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:18px;color:#94a3b8">✕</button>' +
@@ -2094,7 +2917,7 @@ function showRatingPeople(qId, sao) {
         body.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">Không có ai đánh giá '+sao+'★ cho câu hỏi này.</div>';
         return;
       }
-      const colors = [BLUE,'#7c3aed','#059669','#d97706',RED,'#0891b2'];
+      const colors = [BLUE, '#ea580c', '#2563eb', '#f97316', '#00008B', '#fb923c'];
       body.innerHTML = people.map((r,i) =>
         '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#f8fafc;border-left:3px solid '+colors[i%colors.length]+';border-radius:0 10px 10px 0">' +
           '<div style="flex:1">' +
@@ -2117,7 +2940,7 @@ function _showPeopleModal(title, sub, people) {
   const modal = document.createElement('div');
   modal.id = 'rating-people-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
-  const colors = [BLUE,'#7c3aed','#059669','#d97706',RED,'#0891b2'];
+  const colors = ['#00008B', '#ea580c', '#06b6d4', '#facc15', '#3b82f6', '#ef4444', '#0f766e', '#fdba74', '#6366f1', '#b45309', '#10b981', '#db2777', '#8b5cf6', '#84cc16', '#1e3a8a', '#f97316', '#14b8a6', '#f43f5e', '#8b1c62', '#059669'];
   const rows = people.length
     ? people.map((r,i)=>
         '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#f8fafc;border-left:3px solid '+colors[i%colors.length]+';border-radius:0 10px 10px 0">' +
@@ -2130,10 +2953,10 @@ function _showPeopleModal(title, sub, people) {
       ).join('')
     : '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">Không có dữ liệu.</div>';
   modal.innerHTML =
-    '<div style="background:#fff;border-radius:20px;padding:24px;width:520px;max-width:94vw;max-height:80vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.18)">' +
+    '<div style="background:var(--gray-50);border-radius:20px;padding:24px;width:520px;max-width:94vw;max-height:80vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.18)">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
         '<div>' +
-          '<div style="font-size:16px;font-weight:800;color:#0f172a">'+esc(title)+'</div>' +
+          '<div style="font-size:16px;font-weight:800;color:var(--gray-900)">'+esc(title)+'</div>' +
           '<div style="font-size:12px;color:#94a3b8;margin-top:2px">'+people.length+' người'+esc(sub)+'</div>' +
         '</div>' +
         '<button onclick="document.getElementById(\'rating-people-modal\').remove()" style="width:32px;height:32px;border-radius:9px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:18px;color:#94a3b8">✕</button>' +
@@ -2154,6 +2977,7 @@ function showRatingPeopleOverall(sao) {
 
 
 function renderDonutChoice(cid, stats) {
+  stats.sort((a,b) => b.so_chon - a.so_chon);
   const total = stats.reduce((s,x)=>s+x.so_chon,0)||1;
   const donutId = 'donut-' + cid;
   const tableId = 'table-' + cid;
@@ -2162,7 +2986,7 @@ function renderDonutChoice(cid, stats) {
   wrap.innerHTML =
     '<div style="display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center;min-height:200px">' +
       '<div style="position:relative;height:200px"><canvas id="'+donutId+'"></canvas></div>' +
-      '<div id="'+tableId+'" style="display:flex;flex-direction:column;gap:10px"></div>' +
+      '<div id="'+tableId+'" style="display:flex;flex-direction:column;gap:10px;max-height:240px;overflow-y:auto;padding-right:8px"></div>' +
     '</div>';
   setTimeout(() => {
     destroyChart(donutId);
@@ -2182,7 +3006,7 @@ function renderDonutChoice(cid, stats) {
       const pct = Math.round(s.so_chon/total*100);
       return '<div>' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
-          '<span style="font-size:12px;color:#374151;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.lua_chon)+'</span>' +
+          '<span style="font-size:12px;color:var(--gray-700);font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.lua_chon)+'</span>' +
           '<span style="font-size:12px;font-weight:700;color:'+PALETTE[i%PALETTE.length]+';margin-left:8px;white-space:nowrap">'+s.so_chon+' người ('+pct+'%)</span>' +
         '</div>' +
         '<div style="height:7px;background:#f1f5f9;border-radius:4px">' +
@@ -2200,8 +3024,8 @@ function switchOverviewTab(tab) {
   if (tp) tp.style.display = isChart ? 'none'  : 'block';
   const bc = document.getElementById('ovtab-chart');
   const bt = document.getElementById('ovtab-text');
-  if (bc) { bc.style.background = isChart ? '#2563eb' : '#fff'; bc.style.color = isChart ? '#fff' : '#64748b'; bc.style.border = isChart ? 'none' : '1.5px solid #e2e8f0'; }
-  if (bt) { bt.style.background = isChart ? '#fff' : '#2563eb'; bt.style.color = isChart ? '#64748b' : '#fff'; bt.style.border = isChart ? '1.5px solid #e2e8f0' : 'none'; }
+  if (bc) { bc.style.background = isChart ? '#00008B' : '#fff'; bc.style.color = isChart ? '#fff' : '#64748b'; bc.style.border = isChart ? 'none' : '1.5px solid #e2e8f0'; }
+  if (bt) { bt.style.background = isChart ? '#fff' : '#00008B'; bt.style.color = isChart ? '#64748b' : '#fff'; bt.style.border = isChart ? '1.5px solid #e2e8f0' : 'none'; }
   if (!isChart) renderTextAnswers();
 }
 
@@ -2231,8 +3055,8 @@ function switchQTab(tab) {
   if (cp) cp.style.display = isRating ? 'none' : 'block';
   const br = document.getElementById('qtab-rating');
   const bc = document.getElementById('qtab-choice');
-  if (br) { br.style.background = isRating ? '#2563eb' : '#fff'; br.style.color = isRating ? '#fff' : '#64748b'; br.style.border = isRating ? 'none' : '1.5px solid #e2e8f0'; }
-  if (bc) { bc.style.background = isRating ? '#fff' : '#2563eb'; bc.style.color = isRating ? '#64748b' : '#fff'; bc.style.border = isRating ? '1.5px solid #e2e8f0' : 'none'; }
+  if (br) { br.style.background = isRating ? '#00008B' : '#fff'; br.style.color = isRating ? '#fff' : '#64748b'; br.style.border = isRating ? 'none' : '1.5px solid #e2e8f0'; }
+  if (bc) { bc.style.background = isRating ? '#fff' : '#00008B'; bc.style.color = isRating ? '#64748b' : '#fff'; bc.style.border = isRating ? '1.5px solid #e2e8f0' : 'none'; }
   if (!isRating) renderQuestionChart();
 }
 
@@ -2249,7 +3073,7 @@ function renderQuestionChart() {
       type:'bar',
       data:{labels:stats.map(s=>s.lua_chon),datasets:[{
         data:stats.map(s=>s.so_chon),
-        backgroundColor:'#2563eb',
+        backgroundColor:'#00008B',
         borderRadius:0,borderSkipped:false,
       }]},
       options:{...rAF,indexAxis:'y',
@@ -2261,7 +3085,7 @@ function renderQuestionChart() {
         ${stats.map((s,i)=>{const pct=Math.round(s.so_chon/total*100);return `
         <div>
           <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span style="font-size:12px;color:#374151;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.lua_chon)}</span>
+            <span style="font-size:12px;color:var(--gray-700);font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.lua_chon)}</span>
             <span style="font-size:12px;font-weight:700;color:${PALETTE[i%PALETTE.length]};margin-left:8px">${pct}%</span>
           </div>
           <div style="height:7px;background:#f1f5f9;border-radius:4px">
@@ -2280,7 +3104,7 @@ function renderQuestionChart() {
       type:'bar',
       data:{labels:['1★','2★','3★','4★','5★'],datasets:[{
         data:dist,
-        backgroundColor:[1,2,3,4,5].map(s=>s>=4?'#059669':s===3?'#d97706':'#ef4444'),
+        backgroundColor:[1,2,3,4,5].map(s=>['#ea580c', '#f97316', '#60a5fa', '#2563eb', '#00008B'][s-1]),
         borderRadius:0, borderSkipped:false,
       }]},
       options:{...rAF,
@@ -2302,10 +3126,515 @@ function renderQuestionChart() {
             '<div style="font-size:22px;font-weight:800;color:#dc2626">'+rs.min_diem+'★</div>' +
             '<div style="font-size:10px;color:#dc2626;margin-top:2px">Thấp nhất</div></div>' +
         '</div>' +
-        '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#2563eb">'+rs.so_tra_loi+'</div>' +
+        '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:var(--brand-color)">'+rs.so_tra_loi+'</div>' +
         '<div style="font-size:10px;color:#64748b">câu trả lời</div></div>' +
       '</div>';
   }
+}
+
+function getActiveReportFormMeta() {
+  const forms = Array.isArray(window._cachedDbForms) ? window._cachedDbForms : [];
+  return forms.find(f => String(f.id ?? f.form_id) === String(currentFormId)) || {};
+}
+
+function setFormDetailOverviewVisibility(show) {
+  ['rpt-ai-title','rpt-ai-summary','rpt-ai-grid','rpt-participant-title','rpt-participant-grid'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? '' : 'none';
+  });
+}
+
+function sameReportQuestionId(a, b) {
+  return String(a) === String(b) || Number(a) === Number(b);
+}
+
+function reportQuestionLabel(type) {
+  return ({
+    choice:'Trắc nghiệm 1 lựa chọn',
+    checkbox:'Checkbox nhiều lựa chọn',
+    dropdown:'Dropdown',
+    rating:'Thang điểm / đánh giá sao',
+    scale:'Thang điểm',
+    text:'Văn bản ngắn',
+    paragraph:'Đoạn văn',
+    date:'Ngày',
+    time:'Thời gian',
+    upload:'Upload file',
+    file:'Upload file',
+    grid_radio:'Ma trận',
+    grid_checkbox:'Ma trận'
+  })[reportQuestionType(type)] || 'Câu hỏi';
+}
+
+function getQuestionChoiceStats(q) {
+  const qId = q.id;
+  const options = (q.lua_chon || q.opts || [])
+    .map(opt => typeof opt === 'string' ? opt : (opt?.noi_dung || opt?.label || ''))
+    .filter(Boolean);
+  const stats = (analysisData.choice_stats || [])
+    .filter(s => sameReportQuestionId(s.cau_hoi_id, qId))
+    .map(s => ({ lua_chon: s.lua_chon || s.noi_dung || '', so_chon: Number(s.so_chon || s.count || 0) }));
+  const map = {};
+  options.forEach(o => { map[o] = 0; });
+  stats.forEach(s => { if (s.lua_chon) map[s.lua_chon] = (map[s.lua_chon] || 0) + s.so_chon; });
+  const merged = Object.entries(map).map(([lua_chon, so_chon]) => ({ lua_chon, so_chon }));
+  return merged.length ? merged : stats;
+}
+
+function getQuestionRatingDistribution(q) {
+  const qId = q.id;
+  const byQ = (analysisData.rating_dist_by_q || []).filter(r => sameReportQuestionId(r.cau_hoi_id, qId));
+  const vals = [1,2,3,4,5].map(sao => {
+    const found = byQ.find(r => Number(r.sao) === sao);
+    return found ? Number(found.so_luong || 0) : 0;
+  });
+  if (vals.some(Boolean)) return vals;
+  const fromRows = (rawRows || [])
+    .map(r => Number(r['q_' + qId] || r[qId] || r[q.noi_dung]))
+    .filter(v => v >= 1 && v <= 5);
+  return [1,2,3,4,5].map(sao => fromRows.filter(v => v === sao).length);
+}
+
+function getQuestionTextAnswers(q) {
+  const qId = q.id;
+  const fromStats = (analysisData.text_stats || [])
+    .filter(r => sameReportQuestionId(r.cau_hoi_id, qId) && String(r.noi_dung || '').trim())
+    .map(r => ({
+      text: String(r.noi_dung || '').trim(),
+      name: r.ho_ten || 'Ẩn danh',
+      meta: [r.lop, r.khoa, r.giao_vien].filter(Boolean).join(' - '),
+      sentiment: r.cam_xuc || ''
+    }));
+  if (fromStats.length) return fromStats;
+  return (rawRows || [])
+    .map(r => String(r['q_' + qId] || r[qId] || r[q.noi_dung] || '').trim())
+    .filter(Boolean)
+    .map(text => ({ text, name:'Ẩn danh', meta:'', sentiment:'' }));
+}
+
+function renderReportTextAnswers(qId, keyword = '') {
+  const q = (analysisData?.questions || []).find(item => sameReportQuestionId(item.id, qId));
+  if (!q) return '';
+  const kw = String(keyword || '').trim().toLowerCase();
+  const answers = getQuestionTextAnswers(q).filter(a => !kw || a.text.toLowerCase().includes(kw));
+  if (!answers.length) return '<div style="padding:22px;text-align:center;color:#94a3b8;font-size:13px;font-weight:700">Chưa có câu trả lời phù hợp</div>';
+  const sentimentMap = {
+    positive: ['Tích cực', '#dcfce7', '#166534'],
+    neutral: ['Trung lập', '#f1f5f9', '#475569'],
+    negative: ['Tiêu cực', '#fee2e2', '#991b1b']
+  };
+  const colors = ['#00008B', '#ea580c', '#06b6d4', '#facc15', '#3b82f6', '#ef4444', '#0f766e', '#fdba74', '#6366f1', '#b45309', '#10b981', '#db2777', '#8b5cf6', '#84cc16', '#1e3a8a', '#f97316', '#14b8a6', '#f43f5e', '#8b1c62', '#059669'];
+  return answers.map((a, i) => {
+    const s = sentimentMap[a.sentiment] || null;
+    const color = colors[i % colors.length];
+    
+    let textHtml = esc(a.text);
+    if (a.text.includes('http')) {
+      textHtml = textHtml.replace(/(https?:\/\/[^\s,<]+)/g, url => `<a href="${url}" target="_blank" style="color:#2563eb;text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:#eff6ff;padding:2px 8px;border-radius:6px;font-weight:600;margin-right:4px;margin-top:2px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>Tệp đính kèm</a>`);
+    }
+
+    return `
+      <div style="padding:12px 0;border-bottom:1px solid #f1f5f9">
+        <div style="padding-left:12px;border-left:3px solid ${color}">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
+            <div style="font-size:12px;font-weight:800;color:${color}">${esc(a.name)}${a.meta ? `<span style="color:#94a3b8;font-weight:500;margin-left:6px">· ${esc(a.meta)}</span>` : ''}</div>
+            ${s ? `<span style="flex-shrink:0;padding:3px 8px;border-radius:999px;background:${s[1]};color:${s[2]};font-size:10px;font-weight:800">${s[0]}</span>` : ''}
+          </div>
+          <div style="font-size:13px;color:var(--gray-900);line-height:1.5;word-break:break-word">${textHtml}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function filterReportTextAnswers(qId, keyword) {
+  const body = document.getElementById('rpt-text-answers-' + qId);
+  if (body) body.innerHTML = renderReportTextAnswers(qId, keyword);
+}
+
+function renderDetailTimeline(range = 'all') {
+  const timeline = [...(analysisData?.timeline || [])].sort((a,b) => String(a.ngay).localeCompare(String(b.ngay)));
+  const body = document.getElementById('rpt-detail-timeline-body');
+  if (!body) return;
+  const buttons = document.querySelectorAll('[data-rpt-range]');
+  buttons.forEach(btn => {
+    const active = btn.dataset.rptRange === range;
+    btn.style.background = active ? '#00008B' : '#fff';
+    btn.style.color = active ? '#fff' : '#475569';
+    btn.style.borderColor = active ? '#00008B' : '#dbe5f0';
+  });
+  let items = timeline;
+  if (range !== 'all' && timeline.length) {
+    const days = Number(range);
+    const maxDate = timeline.reduce((best, item) => new Date(item.ngay) > new Date(best.ngay) ? item : best, timeline[0]);
+    const from = new Date(maxDate.ngay);
+    from.setDate(from.getDate() - days + 1);
+    items = timeline.filter(item => new Date(item.ngay) >= from);
+  }
+  if (!items.length) {
+    destroyChart('rpt-detail-timeline');
+    body.innerHTML = '<div style="height:220px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:13px;font-weight:700">Chưa có dữ liệu thời gian</div>';
+    return;
+  }
+  let compareHtml = '';
+  // Build stats for the stat cards
+  const statsItems = items.map(t => ({ngay: t.ngay, so_luong: Number(t.so_luong || 0)}));
+  const tlStats = buildTimelineStats(statsItems);
+
+  body.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px">
+      <div style="display:inline-flex;align-items:center;gap:16px;padding:8px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span style="font-size:12px;color:#64748b;font-weight:600">Cao nhất / tuần:</span>
+          <span style="font-size:15px;font-weight:800;color:var(--gray-900)">${tlStats.peakWeek}</span>
+          <span style="font-size:11px;color:#94a3b8">(${tlStats.peakWeekLabel || '--'})</span>
+        </div>
+        <div style="width:1px;height:14px;background:#cbd5e1"></div>
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span style="font-size:12px;color:#64748b;font-weight:600">Cao nhất / ngày:</span>
+          <span style="font-size:15px;font-weight:800;color:var(--gray-900)">${tlStats.peakValue}</span>
+          <span style="font-size:11px;color:#94a3b8">(${tlStats.peakDate ? fmtDate(tlStats.peakDate) : '--'})</span>
+        </div>
+      </div>
+    </div>
+    <div style="height:220px"><canvas id="rpt-detail-timeline"></canvas></div>${compareHtml}`;
+  const vals = items.map(t => Number(t.so_luong || 0));
+  const totalPoints = items.length;
+  mkChart('rpt-detail-timeline', {
+    type:'line',
+    data:{labels:items.map(t=>fmtDate(t.ngay)),datasets:[{
+      data:vals,
+      fill:true,
+      backgroundColor:ctx => {
+        const g = ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);
+        g.addColorStop(0,'rgba(59,130,246,0.08)');
+        g.addColorStop(1,'rgba(59,130,246,0.005)');
+        return g;
+      },
+      borderColor:'#3b82f6',
+      borderWidth:1.5,
+      borderDash:[4,3],
+      pointRadius:vals.map(v => v === tlStats.peakValue ? 5 : 0),
+      pointBackgroundColor:vals.map(v => v === tlStats.peakValue ? '#2563eb' : '#3b82f6'),
+      pointBorderColor:'#fff',
+      pointBorderWidth:1.5,
+      pointHoverRadius:5,
+      pointHoverBackgroundColor:'#2563eb',
+      tension:.35
+    }]},
+    options:{...rAF,interaction:{mode:'index',intersect:false},
+      plugins:{...noLegend,tooltip:{backgroundColor:'#0f172a',padding:10,cornerRadius:8,titleFont:{size:11},bodyFont:{size:13,weight:'bold'},callbacks:{title:i=>`📅 ${i[0].label}`,label:ctx=>ctx.raw + ' phản hồi'}}},
+      scales:{
+        x:{...noGrid,ticks:{font:{size:10,weight:'500'},color:'#94a3b8',maxRotation:0,autoSkip:false,
+          callback(value,index){
+            const every = Math.max(1, Math.ceil(totalPoints / 7));
+            return index % every === 0 ? fmtShortDate(items[index]?.ngay) : '';
+          }}},
+        y:{...softGrid,beginAtZero:true,ticks:{stepSize:1,precision:0,font:{size:10},color:'#94a3b8'},
+          title:{display:true,text:'Số phản hồi',color:'#94a3b8',font:{size:10,weight:'500'}}}
+      }}
+  });
+}
+
+function renderQuestionDetailCard(q, index) {
+  const type = reportQuestionType(q.loai || q.type);
+  const title = q.noi_dung || q.text || ('Câu hỏi ' + (index + 1));
+  const qId = q.id;
+  const chartId = 'rpt-q-chart-' + qId;
+  const supportsChoice = ['choice','checkbox','dropdown'].includes(type);
+  const supportsRating = ['rating','star_rating','scale'].includes(type);
+  const supportsText = ['text','paragraph','short_text','long_text'].includes(type);
+  const supportsGrid = ['grid_radio','grid_checkbox'].includes(type);
+  let body = '';
+  if (supportsText) {
+    body = `
+      <div style="margin-bottom:12px">
+        <input class="input" placeholder="Tìm kiếm câu trả lời..." oninput="filterReportTextAnswers('${qId}', this.value)" style="height:38px;border-radius:10px;font-size:13px">
+      </div>
+      <div id="rpt-text-answers-${qId}" style="max-height:310px;overflow-y:auto;padding-right:4px">${renderReportTextAnswers(qId)}</div>`;
+  } else if (supportsChoice) {
+    body = `
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px;align-items:center">
+        <div style="height:260px"><canvas id="${chartId}"></canvas></div>
+        <div id="rpt-q-side-${qId}"></div>
+      </div>`;
+  } else if (supportsRating) {
+    body = `<div id="rpt-q-rating-container-${qId}"></div>`;
+  } else if (supportsGrid) {
+    body = `
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div style="min-height:300px;width:100%"><canvas id="${chartId}"></canvas></div>
+        <div id="rpt-q-side-${qId}"></div>
+      </div>`;
+  } else {
+    const answers = getQuestionTextAnswers(q);
+    body = answers.length
+      ? `<div style="max-height:280px;overflow-y:auto">${renderReportTextAnswers(qId)}</div>`
+      : '<div style="padding:28px;text-align:center;color:#94a3b8;font-size:13px;font-weight:700">Loại câu hỏi này hiện chưa có dữ liệu tổng hợp phù hợp</div>';
+  }
+  return `
+    <div class="dash-card report-question-card" data-question-id="${esc(qId)}" data-question-type="${esc(type)}">
+      <div class="dash-card-header" style="padding-bottom:12px;border-bottom:1px solid #f1f5f9">
+        <div style="display:flex;gap:12px;align-items:flex-start;min-width:0">
+          <div style="width:34px;height:34px;border-radius:50%;background:#00008B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0">${index + 1}</div>
+          <div style="min-width:0">
+            <div class="dash-card-title" style="font-size:16px;line-height:1.35">${esc(title)}</div>
+            <div class="dash-card-sub" style="margin-top:4px">${reportQuestionLabel(type)}</div>
+          </div>
+        </div>
+      </div>
+      <div class="dash-card-body">${body}</div>
+    </div>`;
+}
+
+function renderReportResponseTable() {
+  const rows = (activeReportRows && activeReportRows.length ? activeReportRows : rawRows || []).slice(0, 50);
+  const questions = (analysisData?.questions || []).slice(0, 4);
+  const headers = ['Người gửi', 'Email', 'Ngày gửi', 'Trạng thái', ...questions.map(q => q.noi_dung || 'Câu hỏi')];
+  const body = rows.length
+    ? rows.map(r => `
+      <tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #eef2f7;color:var(--gray-900);font-weight:700">${esc(r.ho_ten || 'Ẩn danh')}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #eef2f7;color:var(--gray-600)">${esc(r.email || '-')}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #eef2f7;color:var(--gray-600)">${esc(fmtDate(r.ngay_gui))}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #eef2f7;color:var(--gray-600)">${esc(responseStatusLabel(r.trang_thai || 'active'))}</td>
+        ${questions.map(q => `<td style="padding:10px 12px;border-bottom:1px solid #eef2f7;color:var(--gray-600)">${esc(shortReportCell(r['q_' + q.id]))}</td>`).join('')}
+      </tr>`).join('')
+    : `<tr><td colspan="${headers.length}" style="text-align:center;color:#94a3b8;font-weight:700;padding:24px">Chưa có dữ liệu phản hồi</td></tr>`;
+  return `
+    <div class="dash-card report-chart-card" style="grid-column:1/-1">
+      <div class="dash-card-header" style="padding-bottom:12px;border-bottom:1px solid #f1f5f9">
+        <div>
+          <div class="dash-card-title">Dữ liệu phản hồi</div>
+          <div class="dash-card-sub">Hiển thị tối đa 50 phản hồi theo bộ lọc hiện tại</div>
+        </div>
+      </div>
+      <div class="dash-card-body" style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:760px;font-size:13px">
+          <thead>
+            <tr>${headers.map(h => `<th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase">${esc(h)}</th>`).join('')}</tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function shortReportCell(value) {
+  const text = normalizeReportText(value);
+  if (!text) return '-';
+  return text.length > 90 ? text.slice(0, 87) + '...' : text;
+}
+
+function drawQuestionDetailCharts() {
+  (analysisData?.questions || []).forEach(q => {
+    try {
+      const type = reportQuestionType(q.loai || q.type);
+      const qId = q.id;
+      const chartId = 'rpt-q-chart-' + qId;
+      const side = document.getElementById('rpt-q-side-' + qId);
+      
+      if (['choice','checkbox','dropdown'].includes(type)) {
+        const stats = getQuestionChoiceStats(q).filter(s => String(s.lua_chon || '').trim());
+        const total = stats.reduce((sum,s) => sum + Number(s.so_chon || 0), 0) || 1;
+        if (!stats.length) {
+          if (side) side.innerHTML = '<div style="color:#94a3b8;font-size:13px;font-weight:700">Chưa có lựa chọn nào được chọn</div>';
+          return;
+        }
+        mkChart(chartId, {
+          type: type === 'choice' ? 'doughnut' : 'bar',
+          data:{labels:stats.map(s=>s.lua_chon),datasets:[{data:stats.map(s=>s.so_chon),backgroundColor:stats.map((_,i)=>PALETTE[i%PALETTE.length]),borderWidth:0,borderRadius:type==='choice'?0:8,borderSkipped:false}]},
+          options: type === 'choice'
+            ? {...rAF,cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,usePointStyle:true,font:{size:11,weight:'700'}}},tooltip:{callbacks:{label:ctx=>ctx.raw+' phản hồi ('+Math.round(ctx.raw/total*100)+'%)'}}}}
+            : {...rAF,indexAxis:'y',plugins:{...noLegend,tooltip:{callbacks:{label:ctx=>ctx.raw+' phản hồi ('+Math.round(ctx.raw/total*100)+'%)'}}},scales:{x:{...softGrid,beginAtZero:true,ticks:{precision:0}},y:{...noGrid,ticks:{font:{size:11,weight:'700'}}}}}
+        });
+        if (side) side.innerHTML = stats.map((s,i) => {
+          const pct = Math.round(Number(s.so_chon || 0) / total * 100);
+          return `<div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">
+              <span style="font-size:12.5px;color:var(--gray-700);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.lua_chon)}</span>
+              <span style="font-size:12px;font-weight:900;color:${PALETTE[i%PALETTE.length]}">${pct}%</span>
+            </div>
+            <div style="height:8px;background:#f1f5f9;border-radius:999px"><div style="height:100%;width:${pct}%;background:${PALETTE[i%PALETTE.length]};border-radius:999px"></div></div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:3px">${s.so_chon} lượt chọn</div>
+          </div>`;
+        }).join('');
+      } else if (['rating','star_rating','scale'].includes(type)) {
+        const rs = (analysisData.rating_stats || []).find(s => sameReportQuestionId(s.cau_hoi_id, qId));
+        const dist = getQuestionRatingDistribution(q);
+        const total = dist.reduce((a,b)=>a+b,0) || Number(rs?.so_tra_loi || 0) || 1;
+        
+        let avgVal = Number(rs?.diem_tb || 0);
+        let minVal = rs?.min_diem ?? null;
+        let maxVal = rs?.max_diem ?? null;
+        
+        if (!avgVal && dist.some(d => d > 0)) {
+          let sum = 0, count = 0;
+          dist.forEach((c, i) => { sum += c * (i + 1); count += c; });
+          if (count > 0) avgVal = sum / count;
+          
+          const activeIdx = dist.map((c, i) => c > 0 ? i + 1 : null).filter(Boolean);
+          if (activeIdx.length) {
+            minVal = Math.min(...activeIdx);
+            maxVal = Math.max(...activeIdx);
+          }
+        }
+
+        const ratingContainer = document.getElementById(`rpt-q-rating-container-${qId}`);
+        if (ratingContainer) {
+          const ratingColors = ['#ea580c', '#f97316', '#fb923c', '#3b82f6', '#00008B'];
+          let barsHtml = '';
+          for (let i = 4; i >= 0; i--) {
+            const count = dist[i] || 0;
+            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            const color = ratingColors[i];
+            barsHtml += `
+              <div style="display:flex;align-items:center;gap:12px;font-size:12px;font-weight:700">
+                <div style="width:24px;color:${color}">${i+1}★</div>
+                <div style="flex:1;height:8px;background:#f1f5f9;border-radius:999px">
+                  <div style="height:100%;width:${pct}%;background:${color};border-radius:999px"></div>
+                </div>
+                <div style="width:85px;text-align:right;color:#94a3b8;font-size:11px;font-weight:600">${count} người <span style="opacity:0.6">(${pct}%)</span></div>
+              </div>`;
+          }
+
+          ratingContainer.innerHTML = `
+            <div style="display:flex;align-items:center;gap:24px;padding:10px 0">
+              <div style="width:140px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="font-size:52px;font-weight:900;color:var(--brand-color);line-height:1;letter-spacing:-0.03em">${avgVal ? fmt(avgVal) : '0'}</div>
+                <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:4px">/ 5 sao</div>
+                <div style="color:#e2e8f0;font-size:18px;letter-spacing:1px;position:relative;display:inline-block">
+                  ★★★★★
+                  <div style="color:#f59e0b;position:absolute;top:0;left:0;overflow:hidden;width:${avgVal/5*100}%;white-space:nowrap">★★★★★</div>
+                </div>
+                <div style="font-size:11.5px;color:#94a3b8;font-weight:600;margin-top:6px">${total} câu trả lời</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:12px;padding:0 24px;border-left:1px solid #f1f5f9;border-right:1px solid #f1f5f9">
+                ${barsHtml}
+              </div>
+              <div style="width:110px;display:flex;flex-direction:column;gap:10px">
+                <div style="padding:14px 10px;border-radius:12px;background:#ecfdf5;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                  <div style="color:#047857;font-size:20px;font-weight:900;line-height:1">${maxVal ? maxVal + '<span style="font-size:15px;margin-left:2px">★</span>' : '—'}</div>
+                  <div style="font-size:11px;color:#059669;font-weight:700;margin-top:4px">Cao nhất</div>
+                </div>
+                <div style="padding:14px 10px;border-radius:12px;background:#fef2f2;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                  <div style="color:#dc2626;font-size:20px;font-weight:900;line-height:1">${minVal ? minVal + '<span style="font-size:15px;margin-left:2px">★</span>' : '—'}</div>
+                  <div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:4px">Thấp nhất</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      } else if (['grid_radio','grid_checkbox'].includes(type)) {
+        const answers = getQuestionTextAnswers(q);
+        const getArray = val => Array.isArray(val) ? val : (typeof val === 'string' ? (val.startsWith('[') ? JSON.parse(val) : []) : []);
+        const rowLabels = getArray(q.hang_grid || q.hang || []).map(x => typeof x === 'string' ? x : x?.noi_dung).filter(Boolean);
+        const colLabels = getArray(q.cot_grid || q.cot || []).map(x => typeof x === 'string' ? x : x?.noi_dung).filter(Boolean);
+        
+        if (!rowLabels.length || !colLabels.length) {
+          if (side) side.innerHTML = '<div style="color:#94a3b8;font-size:13px;font-weight:700">Lỗi: Lưới không có hàng hoặc cột ('+rowLabels.length+' x '+colLabels.length+')</div>';
+          return;
+        }
+
+        const counts = Array(rowLabels.length).fill(0).map(() => Array(colLabels.length).fill(0));
+        answers.forEach(a => {
+          try {
+            const parsed = JSON.parse(a.text);
+            const items = Array.isArray(parsed) ? parsed : [parsed];
+            items.forEach(p => {
+              if (!p || !p.row || !p.col) return;
+              const rIdx = rowLabels.findIndex(r => r === p.row);
+              const cIdx = colLabels.findIndex(c => c === p.col);
+              if (rIdx >= 0 && cIdx >= 0) counts[rIdx][cIdx]++;
+            });
+          } catch(e) {}
+        });
+
+        const datasets = colLabels.map((colLabel, cIdx) => ({
+          label: colLabel,
+          data: rowLabels.map((_, rIdx) => counts[rIdx][cIdx]),
+          backgroundColor: PALETTE[cIdx % PALETTE.length] + 'ee',
+          borderColor: PALETTE[cIdx % PALETTE.length],
+          borderWidth: 1,
+          borderRadius: 2,
+        }));
+
+        const canvasContainer = document.getElementById(chartId)?.parentElement;
+        if (canvasContainer) {
+          canvasContainer.style.height = Math.max(300, rowLabels.length * 60) + 'px';
+        }
+
+        mkChart(chartId, {
+          type: 'bar',
+          data: { labels: rowLabels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: { 
+              legend: { 
+                position: 'bottom', 
+                labels: { usePointStyle: true, boxWidth: 10, font: { size: 12, weight: '600' }, padding: 20 } 
+              }, 
+              tooltip: { 
+                mode: 'index',
+                axis: 'y',
+                intersect: true,
+                backgroundColor: '#0f172a',
+                padding: 12,
+                titleFont: { size: 13 },
+                bodyFont: { size: 13, weight: 'bold' }
+              } 
+            },
+            scales: {
+              x: { 
+                stacked: true, 
+                ticks: { precision: 0, font: { size: 11, weight: '700' } },
+                grid: { color: '#f1f5f9' }
+              },
+              y: { 
+                stacked: true, 
+                ticks: { font: { size: 12, weight: '600' }, color: '#334155' },
+                grid: { display: false }
+              }
+            }
+          }
+        });
+        if (side) {
+          side.innerHTML = '<div style="font-size:12px;color:#64748b;font-weight:700;text-align:right">Dữ liệu từ ' + answers.length + ' phản hồi</div>';
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      const side = document.getElementById('rpt-q-side-' + q.id);
+      if (side) side.innerHTML = '<div style="color:red;font-size:12px">Lỗi hiển thị biểu đồ: ' + err.message + '</div>';
+    }
+  });
+}
+
+function renderDefaultCharts() {
+  setFormDetailOverviewVisibility(false);
+  const grid = document.getElementById('rpt-charts-grid');
+  if (!grid || !analysisData) return;
+  Object.keys(charts).filter(id => id.startsWith('rpt-q-chart-') || id === 'rpt-detail-timeline').forEach(destroyChart);
+  grid.innerHTML = `
+    <div class="dash-card report-chart-card">
+      <div class="dash-card-header" style="padding-bottom:12px;border-bottom:1px solid #f1f5f9">
+        <div>
+          <div class="dash-card-title">Phản hồi theo thời gian</div>
+        </div>
+      </div>
+      <div class="dash-card-body" id="rpt-detail-timeline-body" style="min-height:340px"></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 -6px">
+      <div style="font-size:16px;font-weight:900;color:var(--gray-900)">Thống kê theo từng câu hỏi</div>
+      <div style="font-size:12.5px;color:#64748b;font-weight:700">${(analysisData.questions || []).length} câu hỏi</div>
+    </div>
+    ${(analysisData.questions || []).map((q,i) => renderQuestionDetailCard(q,i)).join('') || '<div class="dash-card" style="padding:30px;text-align:center;color:#94a3b8;font-weight:700">Biểu mẫu này chưa có câu hỏi</div>'}
+  `;
+  setTimeout(() => {
+    renderDetailTimeline('all');
+    drawQuestionDetailCharts();
+  }, 80);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2328,101 +3657,188 @@ function renderDefaultChartsCSV() {
       const totalPoints = sorted.length;
       renderTimelineSummary('c-timeline', timelineStats, 'c-timeline');
       const vals = sorted.map(e=>e[1]);
-      mkChart('c-timeline',{
+      mkChart('c-timeline', {
         type:'line',
-        data:{
-          labels:sorted.map(e=>e[0]),
-          datasets:[{
-            label:'Phản hồi',
-            data:vals,
-            fill:true,
-            backgroundColor:(ctx)=>{
-              const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);
-              g.addColorStop(0,'rgba(37,99,235,0.22)');
-              g.addColorStop(1,'rgba(37,99,235,0.01)');
-              return g;
-            },
-            borderColor:'#2563eb',borderWidth:2.5,
-            pointBackgroundColor:'#2563eb',pointRadius:vals.map((v)=>v===timelineStats.peakValue?6:3),
-            pointHoverRadius:7,tension:0.4,
-          }]
-        },
-        options:{
-          ...rAF,
-          interaction:{mode:'index',intersect:false},
-          plugins:{
-            ...noLegend,
-            tooltip:{backgroundColor:'#0f172a',padding:12,cornerRadius:10,
-              titleFont:{size:11},bodyFont:{size:13,weight:'bold'},
-              callbacks:{title:i=>`📅 Ngày ${i[0].label}`,label:i=>`${i.raw} phản hồi`}},
+        data:{labels:sorted.map(e=>fmtDate(e[0])),datasets:[{
+          data:vals,
+          fill:true,
+          backgroundColor:ctx => {
+            const g = ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);
+            g.addColorStop(0,'rgba(59,130,246,0.08)');
+            g.addColorStop(1,'rgba(59,130,246,0.005)');
+            return g;
           },
+          borderColor:'#3b82f6',
+          borderWidth:1.5,
+          borderDash:[4,3],
+          pointRadius:vals.map(v => v === timelineStats.peakValue ? 5 : 0),
+          pointBackgroundColor:vals.map(v => v === timelineStats.peakValue ? '#2563eb' : '#3b82f6'),
+          pointBorderColor:'#fff',
+          pointBorderWidth:1.5,
+          pointHoverRadius:5,
+          pointHoverBackgroundColor:'#2563eb',
+          tension:.35
+        }]},
+        options:{...rAF,interaction:{mode:'index',intersect:false},
+          plugins:{...noLegend,tooltip:{backgroundColor:'#0f172a',padding:10,cornerRadius:8,titleFont:{size:11},bodyFont:{size:13,weight:'bold'},callbacks:{title:i=>`📅 ${i[0].label}`,label:ctx=>ctx.raw + ' phản hồi'}}},
           scales:{
-            x:{...noGrid,ticks:{font:{size:10},maxRotation:0,autoSkip:false,callback(value,index){
-              const every=Math.max(1,Math.ceil(totalPoints/7));
-              return index%every===0?fmtShortDate(sorted[index]?.[0]):'';
-            }}},
-            y:{...softGrid,beginAtZero:true,ticks:{stepSize:1,precision:0},
-              title:{display:true,text:'Số phản hồi',color:'#64748b',font:{size:11,weight:'600'}}}
-          }
-        }
+            x:{...noGrid,ticks:{font:{size:10,weight:'500'},color:'#94a3b8',maxRotation:0,autoSkip:false,
+              callback(value,index){
+                const every = Math.max(1, Math.ceil(totalPoints / 7));
+                return index % every === 0 ? fmtShortDate(sorted[index]?.[0]) : '';
+              }}},
+            y:{...softGrid,beginAtZero:true,ticks:{stepSize:1,precision:0,font:{size:10},color:'#94a3b8'},
+              title:{display:true,text:'Số phản hồi',color:'#94a3b8',font:{size:10,weight:'500'}}}
+          }}
       });
     },100);
   }
 
-  // Choice dropdown — gộp tất cả cột text/choice vào 1 card có dropdown chọn cột
-  const choiceCols=colTypes.map((t,i)=>({t,i,h:headers[i]})).filter(c=>c.t==='choice'||c.t==='text');
-  if(choiceCols.length) {
-    addChartCard('c-csv-q','Phân tích câu hỏi','full',280);
-    setTimeout(()=>{
-      const wrap=document.querySelector('#slot-c-csv-q .card-inner');
-      if(!wrap)return;
-      wrap.innerHTML=`
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <select id="csv-q-sel" class="input" style="flex:1;height:36px;font-size:13px;border-radius:9px" onchange="renderCSVQuestionChart()">
-            ${choiceCols.map(c=>`<option value="${c.i}">${esc(c.h)}</option>`).join('')}
-          </select>
+  // Loop qua các cột để render các thẻ phân tích từng cột (giống như biểu mẫu bình thường)
+  const grid = document.getElementById('rpt-charts-grid');
+  
+  colTypes.forEach((type, ci) => {
+    const title = headers[ci];
+    if (type === 'date' || /time|dấu thời gian|thời gian|ngày/i.test(title)) return;
+    
+    const qId = 'csv_col_' + ci;
+    const chartId = 'rpt-q-chart-' + qId;
+    
+    let body = '';
+    if (type === 'text') {
+      body = `
+        <div style="margin-bottom:12px">
+          <input class="input" placeholder="Tìm kiếm câu trả lời..." oninput="filterCSVTextAnswers(${ci}, this.value)" style="height:38px;border-radius:10px;font-size:13px">
         </div>
-        <div style="display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:center">
-          <div style="height:210px"><canvas id="c-csvq-detail"></canvas></div>
-          <div id="csv-q-table"></div>
+        <div id="rpt-text-answers-${qId}" style="max-height:310px;overflow-y:auto;padding-right:4px"></div>`;
+    } else {
+      body = `
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px;align-items:center">
+          <div style="height:260px"><canvas id="${chartId}"></canvas></div>
+          <div id="rpt-q-side-${qId}"></div>
         </div>`;
-      renderCSVQuestionChart();
-    },120);
-  }
+    }
+    
+    grid.insertAdjacentHTML('beforeend', `
+      <div class="dash-card report-question-card" data-question-id="${qId}" data-question-type="${type}">
+        <div class="dash-card-header" style="padding-bottom:12px;border-bottom:1px solid #f1f5f9">
+          <div style="display:flex;gap:12px;align-items:flex-start;min-width:0">
+            <div style="width:34px;height:34px;border-radius:50%;background:#00008B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0">${ci + 1}</div>
+            <div style="min-width:0">
+              <div class="dash-card-title" style="font-size:16px;line-height:1.35">${esc(title)}</div>
+              <div class="dash-card-sub" style="margin-top:4px">Dữ liệu ${type === 'text' ? 'văn bản' : (type === 'checkbox' ? 'chọn nhiều' : 'lựa chọn')}</div>
+            </div>
+          </div>
+        </div>
+        <div class="dash-card-body">${body}</div>
+      </div>
+    `);
+  });
+
+  setTimeout(() => {
+    colTypes.forEach((type, ci) => {
+      const title = headers[ci];
+      if (type === 'date' || /time|dấu thời gian|thời gian|ngày/i.test(title)) return;
+      const qId = 'csv_col_' + ci;
+      const chartId = 'rpt-q-chart-' + qId;
+      
+      const vals = rows.map(r => String(r[ci] || '').trim()).filter(Boolean);
+      
+      if (type === 'text') {
+        renderCSVTextAnswers(ci, vals);
+      } else {
+        const counts={};
+        if (type === 'checkbox') {
+          vals.forEach(v => {
+            v.split(',').map(s => s.trim()).filter(Boolean).forEach(opt => {
+              counts[opt] = (counts[opt] || 0) + 1;
+            });
+          });
+        } else {
+          vals.forEach(v=>{counts[v]=(counts[v]||0)+1;});
+        }
+        const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        const total=vals.length||1;
+        
+        mkChart(chartId, {
+          type: 'bar',
+          data:{labels:sorted.map(e=>e[0]),datasets:[{
+            data:sorted.map(e=>e[1]),
+            backgroundColor:sorted.map((_,i)=>PALETTE[i%PALETTE.length]),
+            borderWidth:0,borderRadius:8,borderSkipped:false
+          }]},
+          options:{...rAF,indexAxis:'y',plugins:{...noLegend,tooltip:{callbacks:{label:ctx=>ctx.raw+' phản hồi ('+Math.round(ctx.raw/total*100)+'%)'}}},
+            scales:{x:{...softGrid,beginAtZero:true,ticks:{precision:0}},y:{...noGrid,ticks:{font:{size:11,weight:'700'}}}}}
+        });
+        
+        const side = document.getElementById('rpt-q-side-' + qId);
+        if (side) {
+          side.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:9px">
+              ${sorted.map(([l,n],i)=>{
+                const pct=Math.round(n/total*100);
+                return `
+                <div style="margin-bottom:10px">
+                  <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">
+                    <span style="font-size:12.5px;color:var(--gray-700);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l)}</span>
+                    <span style="font-size:12px;font-weight:900;color:${PALETTE[i%PALETTE.length]}">${pct}%</span>
+                  </div>
+                  <div style="height:8px;background:#f1f5f9;border-radius:999px"><div style="height:100%;width:${pct}%;background:${PALETTE[i%PALETTE.length]};border-radius:999px"></div></div>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:3px">${n} lượt chọn</div>
+                </div>`
+              }).join('')}
+            </div>`;
+        }
+      }
+    });
+  }, 120);
 }
 
-function renderCSVQuestionChart() {
-  const ci=parseInt(document.getElementById('csv-q-sel')?.value);
-  const {rows}=csvData;
-  const vals=rows.map(r=>(r[ci]||'').trim()).filter(v=>v);
-  const counts={};vals.forEach(v=>{counts[v]=(counts[v]||0)+1;});
-  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const total=vals.length||1;
-  destroyChart('c-csvq-detail');
-  mkChart('c-csvq-detail',{
-    type:'bar',
-    data:{labels:sorted.map(e=>e[0]),datasets:[{
-      data:sorted.map(e=>e[1]),
-      backgroundColor:sorted.map((_,i)=>PALETTE[i%PALETTE.length]+'dd'),
-      borderRadius:0,borderSkipped:false,
-    }]},
-    options:{...rAF,indexAxis:'y',plugins:{...noLegend,tooltip:{callbacks:{label:ctx=>`${ctx.raw} người (${Math.round(ctx.raw/total*100)}%)`}}},
-      scales:{x:{...softGrid,beginAtZero:true,ticks:{font:{size:10}}},y:{...noGrid,ticks:{font:{size:11}}}}}
-  });
-  document.getElementById('csv-q-table').innerHTML=`
-    <div style="display:flex;flex-direction:column;gap:9px">
-      ${sorted.map(([l,n],i)=>{const pct=Math.round(n/total*100);return `
-      <div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-          <span style="font-size:12px;color:#374151;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l)}</span>
-          <span style="font-size:12px;font-weight:700;color:${PALETTE[i%PALETTE.length]};margin-left:8px">${pct}%</span>
-        </div>
-        <div style="height:7px;background:#f1f5f9;border-radius:4px">
-          <div style="height:100%;width:${pct}%;background:${PALETTE[i%PALETTE.length]};border-radius:4px"></div>
-        </div>
-      </div>`}).join('')}
-    </div>`;
+function renderCSVTextAnswers(ci, vals) {
+  window._csvTextAnswers = window._csvTextAnswers || {};
+  window._csvTextAnswers[ci] = vals;
+  filterCSVTextAnswers(ci, '');
+}
+
+function filterCSVTextAnswers(ci, q) {
+  const vals = window._csvTextAnswers[ci] || [];
+  const qId = 'csv_col_' + ci;
+  const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals;
+  
+  const el = document.getElementById('rpt-text-answers-' + qId);
+  if (!el) return;
+  
+  const colors = ['#00008B', '#ea580c', '#06b6d4', '#facc15', '#3b82f6', '#ef4444', '#0f766e', '#fdba74', '#6366f1', '#b45309', '#10b981', '#db2777', '#8b5cf6', '#84cc16', '#1e3a8a', '#f97316', '#14b8a6', '#f43f5e', '#8b1c62', '#059669'];
+  el.innerHTML = filtered.length
+    ? filtered.slice(0,50).map((v, i) => {
+        const color = colors[i % colors.length];
+        return `
+          <div style="padding:12px 0;border-bottom:1px solid #f1f5f9">
+            <div style="padding-left:12px;border-left:3px solid ${color};font-size:13px;color:var(--gray-900);line-height:1.5">
+              ${esc(v)}
+            </div>
+          </div>`;
+      }).join('')
+    : '<div style="padding:28px;text-align:center;color:#94a3b8;font-size:13px;font-weight:700">Không tìm thấy phản hồi nào phù hợp</div>';
+}
+
+window.filterCSVTextAnswersCustom = function(qId, q) {
+  const vals = window._csvTextAnswersCustom?.[qId] || [];
+  const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals;
+  const el = document.getElementById('rpt-text-answers-' + qId);
+  if (!el) return;
+  const colors = ['#00008B', '#ea580c', '#06b6d4', '#facc15', '#3b82f6', '#ef4444', '#0f766e', '#fdba74', '#6366f1', '#b45309', '#10b981', '#db2777', '#8b5cf6', '#84cc16', '#1e3a8a', '#f97316', '#14b8a6', '#f43f5e', '#8b1c62', '#059669'];
+  el.innerHTML = filtered.length
+    ? filtered.slice(0,50).map((v, i) => {
+        const color = colors[i % colors.length];
+        return `
+          <div style="padding:12px 0;border-bottom:1px solid #f1f5f9">
+            <div style="padding-left:12px;border-left:3px solid ${color};font-size:13px;color:var(--gray-900);line-height:1.5">
+              ${esc(v)}
+            </div>
+          </div>`;
+      }).join('')
+    : '<div style="padding:28px;text-align:center;color:#94a3b8;font-size:13px;font-weight:700">Không tìm thấy phản hồi nào phù hợp</div>';
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2489,7 +3905,7 @@ function addChartCard(id, title, span='half', height=210) {
   grid.appendChild(div);
 }
 
-// Biểu đồ thêm mới — có year dropdown
+// Biểu đồ thêm mới
 function addChartCardWithYear(id, title, span='half', height=210) {
   ensureReportChartPolish();
   const grid = document.getElementById('rpt-charts-grid');
@@ -2497,21 +3913,10 @@ function addChartCardWithYear(id, title, span='half', height=210) {
   div.className = 'dash-card report-chart-card'; div.id = `slot-${id}`;
   if (span === 'full') div.style.gridColumn = '1/-1';
 
-  const years = [...new Set((rawRows||[]).map(r=>(r.ngay_gui||'').slice(0,4)).filter(y=>y>'2000'))].sort();
-  const yearOpts = '<option value="">Năm</option>' + years.map(y=>`<option value="${y}">${y}</option>`).join('');
-  const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
-  const monthNames = ['T.1','T.2','T.3','T.4','T.5','T.6','T.7','T.8','T.9','T.10','T.11','T.12'];
-  const monthOpts = '<option value="">Tháng</option>' + months.map((m,i)=>`<option value="${m}">${monthNames[i]}</option>`).join('');
-
-  const selStyle = 'height:26px;font-size:11.5px;border-radius:7px;border:1.5px solid #e2e8f0;padding:0 6px;color:#64748b;cursor:pointer;margin-left:6px';
-  const monthSel = `<select id="mo-${id}" onchange="rerunPresetYear('${id}')" style="${selStyle}">${monthOpts}</select>`;
-  const yearSel  = years.length > 1
-    ? `<select id="yr-${id}" onchange="rerunPresetYear('${id}')" style="${selStyle}">${yearOpts}</select>` : '';
-
   div.innerHTML = `
     <div class="dash-card-header">
       <div style="display:flex;align-items:center;flex:1;flex-wrap:wrap;gap:4px">
-        <div class="dash-card-title">${esc(title)}</div>${monthSel}${yearSel}
+        <div class="dash-card-title">${esc(title)}</div>
       </div>
       <button class="remove-btn" onclick="removeChart('${id}')">
         <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" width="12" height="12">
@@ -2561,7 +3966,7 @@ function rerunPresetYear(cid) {
     setTimeout(() => {
       mkChart(cid,{type:'bar',data:{labels:tempData.rating_dist.map(r=>r.sao+'★'),datasets:[{
         data:tempData.rating_dist.map(r=>r.so_luong),
-        backgroundColor:tempData.rating_dist.map(r=>['#ef4444','#fb923c','#60a5fa','#2563eb','#1d4ed8'][r.sao-1]||'#94a3b8'),borderRadius:0,borderSkipped:false}]},
+        backgroundColor:tempData.rating_dist.map(r=>['#ea580c', '#f97316', '#60a5fa', '#2563eb', '#00008B'][r.sao-1]||'#94a3b8'),borderRadius:0,borderSkipped:false}]},
         options:{...rAF,plugins:{...noLegend,tooltip:{callbacks:{label:ctx=>ctx.raw+' người ('+Math.round(ctx.raw/tot*100)+'%)'}}},
           scales:{x:{...noGrid,ticks:{font:{size:12}}},y:{...softGrid,beginAtZero:true}}}});
     }, 50);
@@ -2580,7 +3985,7 @@ function rerunPresetYear(cid) {
     const dtot = dist.reduce((a,b)=>a+b,0)||1;
     setTimeout(() => {
       mkChart(cid,{type:'bar',data:{labels:['1★','2★','3★','4★','5★'],datasets:[{
-        data:dist,backgroundColor:[1,2,3,4,5].map((s=>['#ef4444','#fb923c','#60a5fa','#2563eb','#1d4ed8'][s-1]||'#94a3b8')),borderRadius:0,borderSkipped:false}]},
+        data:dist,backgroundColor:[1,2,3,4,5].map((s=>['#ea580c', '#f97316', '#60a5fa', '#2563eb', '#00008B'][s-1]||'#94a3b8')),borderRadius:0,borderSkipped:false}]},
         options:{...rAF,plugins:{...noLegend,tooltip:{callbacks:{label:ctx=>ctx.raw+' người ('+Math.round(ctx.raw/dtot*100)+'%)'}}},
           scales:{x:{...noGrid,ticks:{font:{size:12}}},y:{...softGrid,beginAtZero:true}}}});
     }, 50);
@@ -2605,6 +4010,15 @@ function addCustomChartSlot() {
 // ─────────────────────────────────────────────────────────────
 const smartFilters = { camxuc:'', danhgia:'', period:'' };
 
+function setSentimentFilterFromSelect(value) {
+  smartFilters.camxuc = value || '';
+  document.querySelectorAll('.sf-chip[data-group="camxuc"]').forEach(b => {
+    const active = b.getAttribute('data-val') === smartFilters.camxuc;
+    b.classList.toggle('sf-active', active);
+  });
+  onSmartSearch();
+}
+
 function toggleChip(btn, group) {
   document.querySelectorAll('.sf-chip[data-group="' + group + '"]').forEach(b => {
     b.classList.remove('sf-active');
@@ -2612,9 +4026,9 @@ function toggleChip(btn, group) {
     b.style.background  = '#fff';
   });
   btn.classList.add('sf-active');
-  btn.style.borderColor = '#2563eb';
-  btn.style.background  = '#eff6ff';
-  btn.style.color       = '#2563eb';
+  btn.style.borderColor = '#00008B';
+  btn.style.background  = '#00008B';
+  btn.style.color       = '#00008B';
   smartFilters[group] = btn.getAttribute('data-val');
 
   if (group === 'period') {
@@ -2634,53 +4048,80 @@ function toggleChip(btn, group) {
 function onSmartSearch() {
   if (activeSource !== 'form') return;
   if (!rawRows.length && analysisData) rawRows = buildRawRowsFromAnalysis(analysisData);
-  if (!rawRows.length) return;
-
-  const sfLop     = (document.getElementById('sf-lop-input')?.value || '').trim().toLowerCase();
-  const sfKhoa    = (document.getElementById('sf-khoa-input')?.value || '').trim().toLowerCase();
-  const sfKhoaHoc = (document.getElementById('sf-khoa-hoc-input')?.value || '').trim().toLowerCase();
-  const sfGv   = (document.getElementById('sf-giaovien-input')?.value || '').trim().toLowerCase();
-  const camxuc  = smartFilters.camxuc;
-  const danhgia = smartFilters.danhgia;
   const tuNgay  = document.getElementById('sf-tungay')?.value;
   const denNgay = document.getElementById('sf-denngay')?.value;
+  const status = document.getElementById('sf-status-select')?.value || '';
+  const keyword = normalizeReportText(document.getElementById('sf-keyword-input')?.value).toLowerCase();
+  const dynamicFilters = [...document.querySelectorAll('#sf-dynamic-filters [data-qid]')].map(el => ({
+    qid: String(el.dataset.qid),
+    type: el.dataset.filterType || '',
+    values: el.multiple ? [...el.selectedOptions].map(o => o.value).filter(Boolean) : [el.value].filter(Boolean)
+  })).filter(f => f.values.length);
 
   const filtered = rawRows.filter(r => {
-    if (camxuc  && r.cam_xuc !== camxuc) return false;
-    if (danhgia && String(r.danh_gia) !== danhgia) return false;
-    if (tuNgay  && r.ngay_gui < tuNgay) return false;
-    if (denNgay && r.ngay_gui > denNgay) return false;
-    if (sfLop     && (r.lop  ||'').toLowerCase() !== sfLop)  return false;
-    if (sfKhoaHoc && !(r.lop||'').toLowerCase().startsWith(sfKhoaHoc)) return false;
-    if (sfKhoa && (r.khoa ||'').toLowerCase() !== sfKhoa) return false;
-    if (sfGv   && (r.giao_vien||'').toLowerCase() !== sfGv) return false;
+    const rowDate = normalizeReportDate(r.ngay_gui);
+    if (tuNgay && rowDate < tuNgay) return false;
+    if (denNgay && rowDate > denNgay) return false;
+    if (keyword && !buildReportRowSearchText(r).includes(keyword)) return false;
+    
+    // Áp dụng bộ lọc cảm xúc
+    if (smartFilters.camxuc) {
+      const cx = normalizeReportText(r.cam_xuc).toLowerCase();
+      if (smartFilters.camxuc === 'positive' && !['tích cực', 'tich cuc', 'positive'].includes(cx)) return false;
+      if (smartFilters.camxuc === 'negative' && !['tiêu cực', 'tieu cuc', 'negative'].includes(cx)) return false;
+    }
+    
+    // Áp dụng bộ lọc đánh giá
+    if (smartFilters.danhgia) {
+      if (String(r.danh_gia) !== String(smartFilters.danhgia)) return false;
+    }
+
+    // Lọc theo Khoa (sf-khoa-input)
+    const selectedKhoa = document.getElementById('sf-khoa-input')?.value || '';
+    if (selectedKhoa && normalizeReportText(r.khoa) !== normalizeReportText(selectedKhoa)) return false;
+
+    for (const filter of dynamicFilters) {
+      const value = normalizeReportText(r['q_' + filter.qid]);
+      if (filter.type === 'file') {
+        if (filter.values[0] === 'has' && !value) return false;
+        if (filter.values[0] === 'empty' && value) return false;
+        continue;
+      }
+      if (['checkbox', 'multiple_choice'].includes(filter.type)) {
+        const parts = splitReportAnswer(value).map(v => v.toLowerCase());
+        if (!filter.values.some(v => parts.includes(v.toLowerCase()))) return false;
+        continue;
+      }
+      if (!filter.values.includes(value)) return false;
+    }
     return true;
   });
 
-  const hasFilter = camxuc || danhgia || tuNgay || denNgay || sfLop || sfKhoa || sfGv || sfKhoaHoc;
+  const hasFilter = Boolean(tuNgay || denNgay || keyword || dynamicFilters.length || smartFilters.camxuc || smartFilters.danhgia || document.getElementById('sf-khoa-input')?.value);
   const bar = document.getElementById('sf-result-bar');
   const lbl = document.getElementById('sf-result-label');
 
   if (hasFilter && filtered.length === 0) {
+    activeReportRows = [];
+    recomputeAnalysis([]);
     document.getElementById('rpt-charts-grid').innerHTML =
-      '<div style="grid-column:1/-1;text-align:center;padding:48px;background:#fff;border-radius:16px;border:1px solid #e8edf5">' +
-      '<div style="font-size:36px;margin-bottom:12px">🔍</div>' +
-      '<div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:6px">Không có phản hồi nào khớp</div>' +
+      '<div style="grid-column:1/-1;text-align:center;padding:48px;background:var(--gray-50);border-radius:16px;border:1px solid #e8edf5">' +
+      '<div style="font-size:14px;font-weight:600;color:var(--gray-700);margin-bottom:6px">Không có phản hồi nào khớp</div>' +
       '<div style="font-size:13px;color:#94a3b8">Thử chọn bộ lọc khác</div></div>';
     document.getElementById('rpt-kpi-row').innerHTML = '';
-    document.getElementById('rpt-dash-badge').textContent = '0 / ' + rawRows.length + ' phản hồi';
+    setReportBadge('0 / ' + rawRows.length + ' phản hồi');
     if (bar) { bar.style.display = 'block'; lbl.textContent = '⚠️ 0 / ' + rawRows.length + ' phản hồi'; }
     return;
   }
 
   const activeRows = hasFilter ? filtered : rawRows;
+  activeReportRows = activeRows.slice();
   recomputeAnalysis(activeRows);
   document.getElementById('rpt-charts-grid').innerHTML = '';
   document.getElementById('rpt-kpi-row').innerHTML = '';
   renderKPIs();
   renderDefaultCharts();
-  document.getElementById('rpt-dash-badge').textContent =
-    hasFilter ? (activeRows.length + ' / ' + rawRows.length + ' phản hồi (đã lọc)') : (rawRows.length + ' phản hồi');
+  setReportBadge(hasFilter ? (activeRows.length + ' / ' + rawRows.length + ' phản hồi (đã lọc)') : (rawRows.length + ' phản hồi'));
   if (bar) {
     bar.style.display = hasFilter ? 'block' : 'none';
     if (hasFilter) lbl.textContent = '✅ ' + activeRows.length + ' / ' + rawRows.length + ' phản hồi';
@@ -2690,65 +4131,116 @@ function onSmartSearch() {
 function resetSmartSearch() {
   const tn = document.getElementById('sf-tungay');  if (tn) tn.value = '';
   const dn = document.getElementById('sf-denngay'); if (dn) dn.value = '';
-  const khoaSel = document.getElementById('sf-khoa-input');
-  if (khoaSel) khoaSel.value = '';
-  // Reset dropdown giáo viên
-  const gvSel = document.getElementById('sf-giaovien-input');
-  if (gvSel) gvSel.value = '';
-  populateTeacherDropdown();
-  const gvRes = document.getElementById('sf-giaovien-result');
-  if (gvRes) gvRes.innerHTML = '';
+  const kw = document.getElementById('sf-keyword-input'); if (kw) kw.value = '';
+  const khoa = document.getElementById('sf-khoa-input'); if (khoa) khoa.value = '';
+  
+  document.querySelectorAll('#sf-dynamic-filters select').forEach(sel => {
+    [...sel.options].forEach(opt => { opt.selected = false; });
+    sel.value = '';
+  });
+  
   ['camxuc','danhgia','period'].forEach(g => {
     smartFilters[g] = '';
     document.querySelectorAll('.sf-chip[data-group="' + g + '"]').forEach(b => {
       const isAll = b.getAttribute('data-val') === '';
       b.classList.toggle('sf-active', isAll);
-      b.style.borderColor = isAll ? '#2563eb' : '#e2e8f0';
-      b.style.background  = isAll ? '#eff6ff' : '#fff';
-      if (isAll) b.style.color = '#2563eb';
+      b.style.borderColor = isAll ? '#00008B' : '#e2e8f0';
+      b.style.background  = isAll ? '#00008B' : '#fff';
+      if (isAll) b.style.color = '#fff'; else b.style.color = '';
     });
   });
+  
   const bar = document.getElementById('sf-result-bar');
   if (bar) bar.style.display = 'none';
-  if (analysisData && analysisData._origChoiceStats) {
-    analysisData.choice_stats = JSON.parse(JSON.stringify(analysisData._origChoiceStats));
-    analysisData.rating_stats = JSON.parse(JSON.stringify(analysisData._origRatingStats));
-  }
+  
+  activeReportRows = rawRows.slice();
   recomputeAnalysis(rawRows);
   document.getElementById('rpt-charts-grid').innerHTML = '';
   document.getElementById('rpt-kpi-row').innerHTML = '';
   renderKPIs();
   renderDefaultCharts();
-  document.getElementById('rpt-dash-badge').textContent = rawRows.length + ' phản hồi';
+  setReportBadge(rawRows.length + ' phản hồi');
   showToast('Đã xóa bộ lọc','success');
 }
 
 // ── recomputeAnalysis ──────────────────────────────────────────
 function recomputeAnalysis(rows) {
   if (!analysisData) return;
-  const rated = rows.filter(r => r.danh_gia);
-  const sum   = rated.reduce((s,r) => s + (r.danh_gia||0), 0);
-  analysisData.form.so_phan_hoi = rows.length;
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const rated = safeRows.map(r => Number(r.danh_gia)).filter(v => v >= 1);
+  const sum   = rated.reduce((s,v) => s + v, 0);
+  analysisData.form.so_phan_hoi = safeRows.length;
   analysisData.form.diem_tb     = rated.length ? sum / rated.length : null;
-  analysisData.form.tich_cuc    = rows.filter(r => r.cam_xuc === 'positive').length;
-  analysisData.form.trung_tinh  = rows.filter(r => r.cam_xuc === 'neutral').length;
-  analysisData.form.tieu_cuc    = rows.filter(r => r.cam_xuc === 'negative').length;
-  analysisData.form.ngay_dau    = rows.length ? rows.reduce((m,r) => r.ngay_gui < m ? r.ngay_gui : m, rows[0].ngay_gui) : null;
-  analysisData.form.ngay_cuoi   = rows.length ? rows.reduce((m,r) => r.ngay_gui > m ? r.ngay_gui : m, rows[0].ngay_gui) : null;
+  analysisData.form.tich_cuc    = safeRows.filter(r => r.cam_xuc === 'positive' || r.cam_xuc === 'Tích cực').length;
+  analysisData.form.trung_tinh  = safeRows.filter(r => r.cam_xuc === 'neutral' || r.cam_xuc === 'Trung lập').length;
+  analysisData.form.tieu_cuc    = safeRows.filter(r => r.cam_xuc === 'negative' || r.cam_xuc === 'Tiêu cực').length;
+  const dates = safeRows.map(r => normalizeReportDate(r.ngay_gui)).filter(Boolean).sort();
+  analysisData.form.ngay_dau    = dates[0] || null;
+  analysisData.form.ngay_cuoi   = dates[dates.length - 1] || null;
   const rMap = {};
-  rows.forEach(r => { if (r.danh_gia) rMap[r.danh_gia] = (rMap[r.danh_gia]||0)+1; });
+  rated.forEach(v => { rMap[v] = (rMap[v]||0)+1; });
   analysisData.rating_dist = Object.entries(rMap).map(([s,n]) => ({sao:parseInt(s),so_luong:n})).sort((a,b)=>a.sao-b.sao);
   const tlMap = {};
-  rows.forEach(r => { const d=(r.ngay_gui||'').slice(0,10); if(d) tlMap[d]=(tlMap[d]||0)+1; });
+  safeRows.forEach(r => { const d=normalizeReportDate(r.ngay_gui); if(d) tlMap[d]=(tlMap[d]||0)+1; });
   analysisData.timeline = Object.entries(tlMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([ngay,so_luong])=>({ngay,so_luong}));
   const stMap = {};
-  rows.forEach(r => { stMap[r.trang_thai]=(stMap[r.trang_thai]||0)+1; });
+  safeRows.forEach(r => { const st = normalizeReportText(r.trang_thai) || 'active'; stMap[st]=(stMap[st]||0)+1; });
   analysisData.status_dist = Object.entries(stMap).map(([trang_thai,so_luong])=>({trang_thai,so_luong}));
-  const ratio = rawRows.length > 0 ? rows.length / rawRows.length : 1;
-  if (analysisData._origChoiceStats)
-    analysisData.choice_stats = analysisData._origChoiceStats.map(s => ({...s, so_chon: Math.round(s.so_chon * ratio)}));
-  if (analysisData._origRatingStats)
-    analysisData.rating_stats = analysisData._origRatingStats.map(s => ({...s, so_tra_loi: Math.round(s.so_tra_loi * ratio)}));
+
+  const choiceStats = [];
+  const ratingStats = [];
+  const ratingDistByQ = [];
+  const textStats = [];
+  (analysisData.questions || []).forEach(q => {
+    const qId = String(q.id);
+    const type = reportQuestionType(q.loai || q.type);
+    if (['choice','dropdown','checkbox','multiple_choice'].includes(type)) {
+      const countMap = {};
+      getReportQuestionOptions(q).forEach(opt => { countMap[opt] = 0; });
+      safeRows.forEach(r => {
+        const val = r['q_' + qId] || r[qId] || r[q.noi_dung];
+        const parts = ['checkbox','multiple_choice'].includes(type) ? splitReportAnswer(val) : [normalizeReportText(val)].filter(Boolean);
+        parts.forEach(part => { countMap[part] = (countMap[part] || 0) + 1; });
+      });
+      Object.entries(countMap).forEach(([lua_chon, so_chon]) => choiceStats.push({ cau_hoi_id:q.id, lua_chon, so_chon }));
+    }
+    if (['rating','scale','star_rating'].includes(type)) {
+      const vals = safeRows.map(r => Number(r['q_' + qId] || r[qId] || r[q.noi_dung])).filter(v => v >= 1 && v <= 5);
+      vals.forEach(v => ratingDistByQ.push({ cau_hoi_id:q.id, sao:v, so_luong:1 }));
+      ratingStats.push({
+        cau_hoi_id:q.id,
+        diem_tb: vals.length ? vals.reduce((a,b)=>a+b,0) / vals.length : null,
+        so_tra_loi: vals.length,
+        min_diem: vals.length ? Math.min(...vals) : null,
+        max_diem: vals.length ? Math.max(...vals) : null
+      });
+    }
+    if (['text','paragraph','short_text','long_text'].includes(type)) {
+      safeRows.forEach(r => {
+        const val = r['q_' + qId] || r[qId] || r[q.noi_dung];
+        const text = normalizeReportText(val);
+        if (text) textStats.push({ cau_hoi_id:q.id, noi_dung:text, ho_ten:r.ho_ten || 'Ẩn danh', lop:r.lop || '', khoa:r.khoa || '', giao_vien:r.giao_vien || '', danh_gia:r.danh_gia || '', cam_xuc:r.cam_xuc || '' });
+      });
+    }
+  });
+  const distMap = {};
+  ratingDistByQ.forEach(item => {
+    const key = item.cau_hoi_id + '|' + item.sao;
+    distMap[key] = (distMap[key] || 0) + 1;
+  });
+  analysisData.choice_stats = choiceStats;
+  analysisData.rating_stats = ratingStats;
+  analysisData.rating_dist_by_q = Object.entries(distMap).map(([key, so_luong]) => {
+    const [cau_hoi_id, sao] = key.split('|');
+    return { cau_hoi_id, sao:Number(sao), so_luong };
+  });
+  analysisData.text_stats = textStats;
+}
+
+function buildReportRowSearchText(row) {
+  const parts = [row.ho_ten, row.email, row.noi_dung, row.lop, row.khoa, row.giao_vien, row.doi_tuong_nop];
+  (analysisData?.questions || []).forEach(q => parts.push(row['q_' + q.id]));
+  return parts.map(v => normalizeReportText(v).toLowerCase()).join(' ');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2767,29 +4259,39 @@ function addCustomChartSlot() {
       title: q.noi_dung.length > 48 ? q.noi_dung.slice(0,46)+'…' : q.noi_dung,
       desc: ({choice:'📊 Biểu đồ cột — đếm lựa chọn',checkbox:'📊 Biểu đồ cột — đếm lựa chọn',dropdown:'📊 Biểu đồ cột — đếm lựa chọn',rating:'⭐ Biểu đồ cột — phân bổ sao',text:'💬 Danh sách câu trả lời ngắn',paragraph:'💬 Danh sách đoạn văn trả lời'}[q.loai]||'📊 Biểu đồ')
     }));
+  } else if (csvData) {
+    csvData.headers.forEach((h, ci) => {
+      const type = csvData.colTypes[ci];
+      if (type === 'date' || /time|dấu thời gian|thời gian|ngày/i.test(h)) return;
+      qPresets.push({
+        id: 'csv_' + ci,
+        title: h.length > 48 ? h.slice(0,46)+'…' : h,
+        desc: ({choice:'📊 Biểu đồ — lựa chọn',checkbox:'📊 Biểu đồ — chọn nhiều',text:'💬 Danh sách câu trả lời',rating:'⭐ Biểu đồ cột — phân bổ sao',number:'📊 Biểu đồ cột — phân bổ số lượng'}[type]||'📊 Biểu đồ')
+      });
+    });
   }
 
   const mkBtn = (id, title, desc) =>
     '<button onclick="runPreset(\'' + id + '\')" ' +
-    'style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;text-align:left;width:100%;transition:all .15s" ' +
-    'onmouseenter="this.style.borderColor=\'#2563eb\';this.style.background=\'#fafbff\'" ' +
+    'style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;border:1.5px solid #e2e8f0;background:var(--gray-50);cursor:pointer;text-align:left;width:100%;transition:all .15s" ' +
+    'onmouseenter="this.style.borderColor=\'#00008b\';this.style.background=\'#fafbff\'" ' +
     'onmouseleave="this.style.borderColor=\'#e2e8f0\';this.style.background=\'#fff\'">' +
-    '<div><div style="font-size:13px;font-weight:700;color:#0f172a">' + title + '</div>' +
+    '<div><div style="font-size:13px;font-weight:700;color:var(--gray-900)">' + title + '</div>' +
     '<div style="font-size:11.5px;color:#94a3b8;margin-top:2px">' + desc + '</div></div>' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2" width="13" height="13"><polyline points="9 18 15 12 9 6"/></svg>' +
     '</button>';
   const qSection = qPresets.length
     ? '<div style="margin-top:0"><div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.7px;text-transform:uppercase;margin-bottom:7px">Câu hỏi trong form</div>' +
       qPresets.map(p => mkBtn(p.id, p.title, p.desc)).join('') + '</div>'
-    : '';
+    : '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px">Không có biểu đồ nào để thêm</div>';
 
   const modal = document.createElement('div');
   modal.id = 'custom-chart-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
   modal.innerHTML =
-    '<div style="background:#fff;border-radius:20px;padding:24px;width:460px;max-width:94vw;box-shadow:0 24px 60px rgba(0,0,0,.18);max-height:90vh;overflow-y:auto">' +
+    '<div style="background:var(--gray-50);border-radius:20px;padding:24px;width:460px;max-width:94vw;box-shadow:0 24px 60px rgba(0,0,0,.18);max-height:90vh;overflow-y:auto">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
-    '<div style="font-size:17px;font-weight:800;color:#0f172a">Thêm biểu đồ</div>' +
+    '<div style="font-size:17px;font-weight:800;color:var(--gray-900)">Thêm biểu đồ</div>' +
     '<button onclick="document.getElementById(\'custom-chart-modal\').remove()" style="width:32px;height:32px;border-radius:9px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:18px;color:#94a3b8">✕</button>' +
     '</div>' +
     '<div style="margin-bottom:12px"></div>' +
@@ -2810,7 +4312,7 @@ function runPreset(id) {
     setTimeout(() => {
       const tot = d.rating_dist.reduce((s,r)=>s+r.so_luong,0)||1;
       mkChart(cid,{type:'bar',data:{labels:d.rating_dist.map(r=>r.sao+'★'),datasets:[{data:d.rating_dist.map(r=>r.so_luong),
-        backgroundColor:d.rating_dist.map(r=>['#ef4444','#fb923c','#60a5fa','#2563eb','#1d4ed8'][r.sao-1]||'#94a3b8'),borderRadius:0,borderSkipped:false}]},
+        backgroundColor:d.rating_dist.map(r=>['#ea580c', '#f97316', '#60a5fa', '#2563eb', '#00008B'][r.sao-1]||'#94a3b8'),borderRadius:0,borderSkipped:false}]},
         options:{...rAF,plugins:{...noLegend,tooltip:{callbacks:{label:ctx=>ctx.raw+' người ('+Math.round(ctx.raw/tot*100)+'%)'}}},
           scales:{x:{...noGrid,ticks:{font:{size:12}}},y:{...softGrid,beginAtZero:true,ticks:{stepSize:1}}}}});
     },80);
@@ -2834,7 +4336,7 @@ function runPreset(id) {
     if (!q) { showToast('Không tìm thấy câu hỏi','error'); return; }
     const cid = 'cq-' + uid;
     _presetMap[cid]={type:q.loai,qId:qId};
-    const title = q.noi_dung.length > 44 ? q.noi_dung.slice(0,42)+'…' : q.noi_dung;
+    const title = q.noi_dung;
     if (q.loai === 'choice' || q.loai === 'checkbox' || q.loai === 'dropdown') {
       const stats = analysisData.choice_stats.filter(s => s.cau_hoi_id === qId);
       if (!stats.length) { showToast('Chưa có dữ liệu','error'); return; }
@@ -2848,15 +4350,148 @@ function runPreset(id) {
         const wrap = document.querySelector('#slot-'+cid+' .card-inner');
         if (wrap) wrap.innerHTML = renderRatingHTML(rs, qId);
       }, 80);
-
-    } else if (q.loai === 'text' || q.loai === 'paragraph') {
+    } else if (['grid_radio','grid_checkbox'].includes(q.loai)) {
+      const answers = analysisData.text_stats.filter(x => x.cau_hoi_id === qId);
+      const getArray = val => Array.isArray(val) ? val : (typeof val === 'string' ? (val.startsWith('[') ? JSON.parse(val) : []) : []);
+      const rowLabels = getArray(q.hang_grid || q.hang || []).map(x => typeof x === 'string' ? x : x?.noi_dung).filter(Boolean);
+      const colLabels = getArray(q.cot_grid || q.cot || []).map(x => typeof x === 'string' ? x : x?.noi_dung).filter(Boolean);
+      addChartCardWithYear(cid, title, 'full', 300);
+      const chartId = 'rpt-q-chart-' + cid;
+      const sideId = 'rpt-q-side-' + cid;
+      setTimeout(() => {
+        const wrap = document.querySelector('#slot-'+cid+' .card-inner');
+        if (wrap) {
+          wrap.style.height = 'auto';
+          wrap.innerHTML = `<div style="height:300px"><canvas id="${chartId}"></canvas></div><div id="${sideId}"></div>`;
+        }
+        const canvasContainer = document.getElementById(chartId)?.parentElement;
+        if (canvasContainer) canvasContainer.style.height = Math.max(300, rowLabels.length * 60) + 'px';
+        const counts = Array(rowLabels.length).fill(0).map(() => Array(colLabels.length).fill(0));
+        answers.forEach(a => {
+          try {
+            const parsed = JSON.parse(a.noi_dung);
+            const items = Array.isArray(parsed) ? parsed : [parsed];
+            items.forEach(p => {
+              if (!p || !p.row || !p.col) return;
+              const rIdx = rowLabels.findIndex(r => r === p.row);
+              const cIdx = colLabels.findIndex(c => c === p.col);
+              if (rIdx >= 0 && cIdx >= 0) counts[rIdx][cIdx]++;
+            });
+          } catch(e) {}
+        });
+        const datasets = colLabels.map((colLabel, cIdx) => ({
+          label: colLabel,
+          data: rowLabels.map((_, rIdx) => counts[rIdx][cIdx]),
+          backgroundColor: PALETTE[cIdx % PALETTE.length] + 'ee',
+          borderColor: PALETTE[cIdx % PALETTE.length],
+          borderWidth: 1,
+          borderRadius: 2,
+        }));
+        mkChart(chartId, {
+          type: 'bar',
+          data: { labels: rowLabels, datasets },
+          options: {
+            responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 10, font: { size: 12, weight: '600' }, padding: 20 } }, tooltip: { mode: 'index', axis: 'y', intersect: true } },
+            scales: { x: { stacked: true, ticks: { precision: 0, font: { size: 11, weight: '700' } } }, y: { stacked: true, ticks: { font: { size: 12, weight: '600' }, color: '#334155' }, grid: { display: false } } }
+          }
+        });
+        const side = document.getElementById(sideId);
+        if (side) side.innerHTML = '<div style="font-size:12px;color:#64748b;font-weight:700;text-align:right">Dữ liệu từ ' + answers.length + ' phản hồi</div>';
+      }, 80);
+    } else if (['short_text', 'long_text', 'text', 'paragraph'].includes(q.loai)) {
       const textStats = (analysisData?.text_stats || []);
       const answers = textStats.filter(r => r.cau_hoi_id === qId && (r.noi_dung||'').trim().length > 2);
       if (!answers.length) { showToast('Chưa có câu trả lời cho câu hỏi này','error'); return; }
       addChartCardWithYear(cid, title, 'full', 300);
       setTimeout(() => {
         const wrap = document.querySelector('#slot-'+cid+' .card-inner');
-        if (wrap) wrap.innerHTML = renderAnswerList(answers);
+        if (wrap) {
+          wrap.style.height = 'auto';
+          wrap.innerHTML = renderAnswerList(answers);
+        }
+      }, 80);
+    }
+  } else if (id.startsWith('csv_')) {
+    if (!csvData) return;
+    const ci = parseInt(id.replace('csv_',''));
+    const type = csvData.colTypes[ci];
+    const title = csvData.headers[ci];
+    const qId = 'csv_col_' + ci + '_' + uid;
+    const chartId = 'rpt-q-chart-' + qId;
+    const cid = 'c_csv_' + uid;
+    _presetMap[cid] = {type, ci, qId};
+
+    const vals = csvData.rows.map(r => String(r[ci] || '').trim()).filter(Boolean);
+
+    if (type === 'text') {
+      addChartCardWithYear(cid, title, 'full', 350);
+      setTimeout(() => {
+        const wrap = document.querySelector('#slot-'+cid+' .card-inner');
+        if (wrap) {
+          wrap.innerHTML = `
+            <div style="margin-bottom:12px">
+              <input class="input" placeholder="Tìm kiếm câu trả lời..." oninput="filterCSVTextAnswersCustom('${qId}', this.value)" style="height:38px;border-radius:10px;font-size:13px">
+            </div>
+            <div id="rpt-text-answers-${qId}" style="max-height:310px;overflow-y:auto;padding-right:4px"></div>`;
+          window._csvTextAnswersCustom = window._csvTextAnswersCustom || {};
+          window._csvTextAnswersCustom[qId] = vals;
+          filterCSVTextAnswersCustom(qId, '');
+        }
+      }, 80);
+    } else {
+      addChartCardWithYear(cid, title, 'full', 280);
+      setTimeout(() => {
+        const wrap = document.querySelector('#slot-'+cid+' .card-inner');
+        if (!wrap) return;
+        wrap.innerHTML = `
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px;align-items:center">
+            <div style="height:260px"><canvas id="${chartId}"></canvas></div>
+            <div id="rpt-q-side-${qId}"></div>
+          </div>`;
+          
+        const counts={};
+        if (type === 'checkbox') {
+          vals.forEach(v => {
+            v.split(',').map(s => s.trim()).filter(Boolean).forEach(opt => {
+              counts[opt] = (counts[opt] || 0) + 1;
+            });
+          });
+        } else {
+          vals.forEach(v=>{counts[v]=(counts[v]||0)+1;});
+        }
+        const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        const total=vals.length||1;
+        
+        mkChart(chartId, {
+          type: 'bar',
+          data:{labels:sorted.map(e=>e[0]),datasets:[{
+            data:sorted.map(e=>e[1]),
+            backgroundColor:sorted.map((_,i)=>PALETTE[i%PALETTE.length]),
+            borderWidth:0,borderRadius:8,borderSkipped:false
+          }]},
+          options:{...rAF,indexAxis:'y',plugins:{...noLegend,tooltip:{callbacks:{label:ctx=>ctx.raw+' phản hồi ('+Math.round(ctx.raw/total*100)+'%)'}}},
+            scales:{x:{...softGrid,beginAtZero:true,ticks:{precision:0}},y:{...noGrid,ticks:{font:{size:11,weight:'700'}}}}}
+        });
+        
+        const side = document.getElementById('rpt-q-side-' + qId);
+        if (side) {
+          side.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:9px">
+              ${sorted.map(([l,n],i)=>{
+                const pct=Math.round(n/total*100);
+                return `
+                <div style="margin-bottom:10px">
+                  <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">
+                    <span style="font-size:12.5px;color:var(--gray-700);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l)}</span>
+                    <span style="font-size:12px;font-weight:900;color:${PALETTE[i%PALETTE.length]}">${pct}%</span>
+                  </div>
+                  <div style="height:8px;background:#f1f5f9;border-radius:999px"><div style="height:100%;width:${pct}%;background:${PALETTE[i%PALETTE.length]};border-radius:999px"></div></div>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:3px">${n} lượt chọn</div>
+                </div>`
+              }).join('')}
+            </div>`;
+        }
       }, 80);
     }
   }
@@ -2895,21 +4530,30 @@ async function _getExportRows() {
 
   // ── Gọi API export để lấy toàn bộ phản hồi + câu trả lời ──
   const token = localStorage.getItem('token') || '';
-  const res = await fetch(`${API}/reports/export/${currentFormId}`, {
-    headers: token ? { Authorization: 'Bearer ' + token } : {}
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error('Không tải được dữ liệu xuất: ' + (errText || res.status));
+  let data = null;
+  try {
+    const res = await fetch(`${API}/reports/export/${currentFormId}`, {
+      headers: token ? { Authorization: 'Bearer ' + token } : {}
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(errText || res.status);
+    }
+    data = await res.json().catch(() => null);
+    if (!data) throw new Error('Dữ liệu xuất không hợp lệ');
+  } catch(e) {
+    const fallback = _getExportRowsFromDashboard();
+    if (fallback) {
+      showToast('API xuất đang lỗi, đã xuất bằng dữ liệu đang hiển thị', 'warning');
+      return fallback;
+    }
+    throw new Error('Không tải được dữ liệu xuất: ' + e.message);
   }
-  const data = await res.json().catch(() => null);
-  if (!data) throw new Error('Dữ liệu xuất không hợp lệ');
 
   const questions = Array.isArray(data.questions) ? data.questions : [];
   const rows      = Array.isArray(data.rows)      ? data.rows      : [];
 
-  // Header: thông tin người dùng + từng câu hỏi (tên đầy đủ)
-  const fixedHeaders = ['Dấu thời gian', 'Họ và tên', 'Email', 'Lớp', 'Khoa', 'Giáo viên', 'Điểm đánh giá'];
+  const fixedHeaders = ['Dấu thời gian'];
   const qHeaders = questions.map(q => q.noi_dung || ('Câu hỏi ' + q.id));
   const headers = [...fixedHeaders, ...qHeaders];
 
@@ -2919,20 +4563,56 @@ async function _getExportRows() {
       const d = new Date(r.ngay_gui);
       ts = d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
     }
-    const fixed = [
-      ts,
-      r.ho_ten    || '',
-      r.email     || '',
-      r.lop       || '',
-      r.khoa      || '',
-      r.giao_vien || '',
-      r.danh_gia  || '',
-    ];
+    const fixed = [ts];
+    
     const qAnswers = questions.map(q => r['q_' + q.id] || '');
     return [...fixed, ...qAnswers];
   });
 
   return { headers, rows: exportRows };
+}
+
+function _getExportRowsFromDashboard() {
+  if (!analysisData) return null;
+  const questions = Array.isArray(analysisData.questions) ? analysisData.questions : [];
+  const sourceRows = Array.isArray(rawRows) ? rawRows : [];
+
+  const fixedHeaders = ['Dấu thời gian'];
+  const headers = [...fixedHeaders, ...questions.map(q => q.noi_dung || ('Câu hỏi ' + q.id))];
+
+  if (sourceRows.length) {
+    const rows = sourceRows.map(r => {
+      const ts = r.ngay_gui ? new Date(r.ngay_gui).toLocaleString('vi-VN') : '';
+      const fixed = [ts];
+      
+      return [...fixed, ...questions.map(q => r['q_' + q.id] || '')];
+    });
+    return { headers, rows };
+  }
+
+  const form = analysisData.form || {};
+  const summaryRows = [
+    ['Tổng phản hồi', form.so_phan_hoi || 0],
+    ['Điểm hài lòng TB', form.diem_tb ? Number(form.diem_tb).toFixed(1) : ''],
+    ['Tích cực', form.tich_cuc || 0],
+    ['Trung tính', form.trung_tinh || 0],
+    ['Tiêu cực', form.tieu_cuc || 0],
+    ['Ngày đầu', form.ngay_dau ? new Date(form.ngay_dau).toLocaleDateString('vi-VN') : ''],
+    ['Ngày cuối', form.ngay_cuoi ? new Date(form.ngay_cuoi).toLocaleDateString('vi-VN') : '']
+  ];
+  const questionRows = questions.map((q, idx) => {
+    const stats = (analysisData.choice_stats || [])
+      .filter(s => Number(s.cau_hoi_id) === Number(q.id))
+      .map(s => `${s.lua_chon}: ${s.so_chon}`)
+      .join('; ');
+    const rating = (analysisData.rating_stats || []).find(s => Number(s.cau_hoi_id) === Number(q.id));
+    return [`Câu ${idx + 1}`, q.noi_dung || '', q.loai || '', stats || (rating ? `TB ${Number(rating.diem_tb || 0).toFixed(1)} (${rating.so_tra_loi || 0} trả lời)` : '')];
+  });
+
+  return {
+    headers: ['Mục', 'Nội dung', 'Loại', 'Thống kê'],
+    rows: [...summaryRows.map(r => [r[0], r[1], '', '']), ...questionRows]
+  };
 }
 
 function _exportCSVDirect({ headers, rows }, title) {
@@ -3024,53 +4704,97 @@ function _exportExcelRaw(XLSX_lib, headers, rows, title) {
 }
 
 async function _exportPDF(title) {
-  const { headers, rows } = await _getExportRows();
   const d = analysisData;
-  const total = d?.form?.so_phan_hoi || rows.length || 0;
+  let total = 0;
+  if (d && d.form) total = d.form.so_phan_hoi || 0;
+  else if (csvData && csvData.rows) total = csvData.rows.length;
 
-  // Inject print style + mini preview modal, rồi window.print()
   const id = 'pdf-preview-overlay';
   document.getElementById(id)?.remove();
 
-  const kpi = d ? `
-    <div style="display:flex;gap:10px;margin:12px 0">
-      ${[
-        ['Tổng phản hồi', total, '#2563eb'],
-        ['Điểm TB', d.form.diem_tb ? parseFloat(d.form.diem_tb).toFixed(1)+'★' : '—', '#d97706'],
-        ['Tích cực', total ? Math.round((d.form.tich_cuc||0)/total*100)+'%' : '—', '#059669'],
-        ['Tiêu cực', total ? Math.round((d.form.tieu_cuc||0)/total*100)+'%' : '—', '#dc2626'],
-      ].map(([l,v,c]) => `<div style="flex:1;background:${c}10;border-left:3px solid ${c};border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:${c}">${v}</div><div style="font-size:10px;color:#64748b;margin-top:2px">${l}</div></div>`).join('')}
-    </div>` : '';
+  const chartsGrid = document.getElementById('rpt-charts-grid');
+  if (!chartsGrid) {
+    showToast('Vui lòng xem báo cáo để tải biểu đồ trước', 'error');
+    return;
+  }
 
-  const tbl = `<table style="width:100%;border-collapse:collapse;font-size:11px">
-    <thead><tr>${headers.map(h=>`<th style="background:#2563eb;color:#fff;padding:7px 8px;text-align:left">${h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.slice(0,200).map((r,i)=>`<tr style="background:${i%2?'#f8fafc':'#fff'}">${r.map(v=>`<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${v??''}</td>`).join('')}</tr>`).join('')}</tbody>
-  </table>`;
+  const clone = chartsGrid.cloneNode(true);
+  const originalCanvases = chartsGrid.querySelectorAll('canvas');
+  const clonedCanvases = clone.querySelectorAll('canvas');
+  originalCanvases.forEach((canvas, i) => {
+    try {
+      const img = document.createElement('img');
+      img.src = canvas.toDataURL('image/png');
+      img.style.width = '100%';
+      img.style.maxWidth = '100%';
+      img.style.height = 'auto';
+      clonedCanvases[i].parentNode.replaceChild(img, clonedCanvases[i]);
+    } catch(e) { console.error(e); }
+  });
+
+  // Xóa các ô tìm kiếm trong bản clone để không hiện lên UI xem trước xuất PDF
+  const searchInputs = clone.querySelectorAll('input');
+  searchInputs.forEach(input => {
+    if (input.parentNode) input.parentNode.remove();
+  });
+
+  const exportTime = new Date().toLocaleString('vi-VN');
 
   const overlay = document.createElement('div');
   overlay.id = id;
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
   overlay.innerHTML = `
-    <div style="background:#fff;border-radius:16px;width:720px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,.25)">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f1f5f9">
-        <div style="font-size:15px;font-weight:800;color:#0f172a">📄 Xem trước PDF — ${title}</div>
+    <div style="background:var(--gray-50);border-radius:16px;width:850px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,.2);font-family:'Inter','Segoe UI',system-ui,sans-serif">
+      <!-- Header bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid #f1f5f9">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:10px;background:#00008B;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="18" height="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:800;color:var(--gray-900);letter-spacing:-0.01em">Xem trước xuất báo cáo biểu đồ</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:1px">${total} phản hồi · ${exportTime}</div>
+          </div>
+        </div>
         <div style="display:flex;gap:8px">
-          <button onclick="window.print()" style="padding:7px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🖨️ In / Lưu PDF</button>
-          <button onclick="document.getElementById('${id}').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:16px;color:#94a3b8">✕</button>
+          <button onclick="window.print()" style="padding:8px 18px;background:#00008B;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;transition:opacity .15s" onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            In / Lưu PDF
+          </button>
+          <button onclick="document.getElementById('${id}').remove()" style="width:34px;height:34px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:16px;color:#94a3b8;display:flex;align-items:center;justify-content:center;font-family:inherit;transition:all .15s" onmouseenter="this.style.background='#fee2e2';this.style.color='#ef4444';this.style.borderColor='#fecaca'" onmouseleave="this.style.background='var(--gray-100)';this.style.color='#94a3b8';this.style.borderColor='var(--gray-200)'">✕</button>
         </div>
       </div>
-      <div id="pdf-body" style="overflow-y:auto;padding:20px;flex:1">
-        <div style="font-size:18px;font-weight:800;color:#0f172a">${title}</div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:2px">Xuất lúc ${new Date().toLocaleString('vi-VN')} · ${total} phản hồi</div>
-        ${kpi}${tbl}
-        ${rows.length>200?`<div style="text-align:center;font-size:11px;color:#94a3b8;margin-top:8px">Hiển thị 200/${rows.length} dòng</div>`:''}
+      <!-- PDF body -->
+      <div id="pdf-body" style="overflow-y:auto;padding:28px 28px 24px;flex:1;font-family:'Inter','Segoe UI',system-ui,sans-serif">
+        <!-- Title area -->
+        <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #00008B">
+          <div style="font-size:18px;font-weight:800;color:var(--gray-900);letter-spacing:-0.02em;line-height:1.3">${title}</div>
+          <div style="font-size:11.5px;color:#64748b;margin-top:6px;display:flex;align-items:center;gap:12px">
+            <span>📅 Xuất lúc ${exportTime}</span>
+            <span style="width:4px;height:4px;border-radius:50%;background:#cbd5e1"></span>
+            <span>📊 ${total} phản hồi</span>
+          </div>
+        </div>
+        <!-- Charts Content -->
+        <div style="border-radius:10px">${clone.innerHTML}</div>
       </div>
     </div>`;
 
-  // Print chỉ phần pdf-body
+  // Print style
   const style = document.createElement('style');
   style.id = 'pdf-print-style';
-  style.textContent = `@media print{body>*:not(#${id}){display:none!important}#${id}{position:static!important;background:none!important;backdrop-filter:none!important;display:block!important}#${id}>div{box-shadow:none!important;border-radius:0!important;max-height:none!important;width:100%!important}#${id} button{display:none!important}}`;
+  style.textContent = `@media print{
+    @page{margin:12mm 10mm}
+    body>*:not(#${id}){display:none!important}
+    #${id}{position:static!important;background:none!important;backdrop-filter:none!important;display:block!important;width:100%!important;max-width:100%!important}
+    #${id}>div{box-shadow:none!important;border-radius:0!important;max-height:none!important;width:100%!important;max-width:100%!important}
+    #${id} button{display:none!important}
+    #pdf-body{overflow:visible!important;padding:0!important;width:100%!important}
+    #pdf-body>div{border-radius:0!important;border:none!important;width:100%!important}
+    #pdf-body .dash-card {page-break-inside: avoid; margin-bottom: 24px !important; border: 1px solid #e2e8f0; border-radius: 8px;}
+    #pdf-body input {display:none!important}
+    #pdf-body [id^="rpt-text-answers-"], #pdf-body [style*="overflow-y"] {max-height:none!important;overflow:visible!important}
+  }`;
   document.head.appendChild(style);
   overlay.addEventListener('remove', () => style.remove());
 
@@ -3153,7 +4877,7 @@ function minimizeAIAnalysis() {
   bubble.id = 'ai-mini-bubble';
   bubble.type = 'button';
   bubble.onclick = restoreAIAnalysis;
-  bubble.style.cssText = 'position:fixed;right:24px;bottom:24px;z-index:100000;width:62px;height:62px;border:none;border-radius:18px;background:linear-gradient(135deg,#7c3aed,#4f46e5);box-shadow:0 20px 40px rgba(79,70,229,.28);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff';
+  bubble.style.cssText = 'position:fixed;right:24px;bottom:24px;z-index:100000;width:62px;height:62px;border:none;border-radius:18px;background:linear-gradient(135deg,#38bdf8,#0369a1);box-shadow:0 20px 40px rgba(79,70,229,.28);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff';
   bubble.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:18px;line-height:1">✦</span><span style="font-size:10px;font-weight:700;line-height:1">AI</span></div>';
   document.body.appendChild(bubble);
 }
@@ -3183,46 +4907,46 @@ function openAIAnalysis() {
   modal.id = 'ai-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
   modal.innerHTML = `
-    <div style="background:#fff;border-radius:20px;width:760px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,.22);overflow:hidden">
-      <div style="padding:20px 24px 16px;border-bottom:1px solid #f1f5f9;background:linear-gradient(135deg,#faf5ff,#eff6ff)">
+    <div style="background:var(--gray-50);border-radius:20px;width:760px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,.22);overflow:hidden">
+      <div style="padding:20px 24px 16px;border-bottom:1px solid #f1f5f9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe)">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center">
+            <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#38bdf8,#0369a1);display:flex;align-items:center;justify-content:center">
               <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="20" height="20"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
             </div>
             <div>
-              <div style="font-size:16px;font-weight:800;color:#0f172a">Phân tích AI</div>
-              <div style="font-size:11.5px;color:#7c3aed;font-weight:600">Powered by Google Gemini</div>
+              <div style="font-size:16px;font-weight:800;color:var(--gray-900)">Phân tích AI</div>
+              <div style="font-size:11.5px;color:#0284c7;font-weight:600">Powered by Google Gemini</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <button onclick="minimizeAIAnalysis()" title="Thu nhỏ" style="width:32px;height:32px;border-radius:9px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:16px;color:#94a3b8">—</button>
-            <button onclick="closeAIAnalysis()" style="width:32px;height:32px;border-radius:9px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:16px;color:#94a3b8">✕</button>
+            <button onclick="minimizeAIAnalysis()" title="Thu nhỏ" style="width:32px;height:32px;border-radius:9px;border:1px solid #e2e8f0;background:var(--gray-50);cursor:pointer;font-size:16px;color:#94a3b8">—</button>
+            <button onclick="closeAIAnalysis()" style="width:32px;height:32px;border-radius:9px;border:1px solid #e2e8f0;background:var(--gray-50);cursor:pointer;font-size:16px;color:#94a3b8">✕</button>
           </div>
         </div>
       </div>
       <div id="ai-body" style="flex:1;overflow-y:auto;padding:20px 24px"></div>
       <div id="ai-chat-wrap" style="display:none;padding:0 24px 18px">
         <div style="border:1px solid #e2e8f0;border-radius:16px;background:#fcfcff;overflow:hidden">
-          <div style="padding:12px 14px;border-bottom:1px solid #eef2ff;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#faf5ff,#eff6ff)">
+          <div style="padding:12px 14px;border-bottom:1px solid #00008B;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#f0f9ff,#e0f2fe)">
             <div>
-              <div style="font-size:13px;font-weight:700;color:#0f172a">Trao đổi với bot</div>
+              <div style="font-size:13px;font-weight:700;color:var(--gray-900)">Trao đổi với bot</div>
               <div style="font-size:11.5px;color:#64748b">Hỏi thêm về chính báo cáo đang xem</div>
             </div>
           </div>
           <div id="ai-chat-messages" style="max-height:220px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px"></div>
           <div id="ai-chat-quick" style="padding:0 14px 12px;display:flex;gap:8px;flex-wrap:wrap"></div>
-          <div style="padding:12px;border-top:1px solid #eef2ff;display:flex;gap:10px;align-items:flex-end;background:#fff">
-            <textarea id="ai-chat-input" rows="2" placeholder="Ví dụ: Điểm yếu lớn nhất là gì? Tôi nên ưu tiên cải thiện mục nào trước?" style="flex:1;resize:none;border:1px solid #dbe5f0;border-radius:12px;padding:10px 12px;font:inherit;color:#334155;outline:none;min-height:44px;max-height:120px"></textarea>
-            <button id="ai-chat-send-btn" onclick="sendAIChat()" style="padding:10px 16px;border-radius:12px;border:none;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Gửi câu hỏi</button>
+          <div style="padding:12px;border-top:1px solid #00008B;display:flex;gap:10px;align-items:flex-end;background:var(--gray-50)">
+            <textarea id="ai-chat-input" rows="2" placeholder="Ví dụ: Điểm yếu lớn nhất là gì? Tôi nên ưu tiên cải thiện mục nào trước?" style="flex:1;resize:none;border:1px solid #dbe5f0;border-radius:12px;padding:10px 12px;font:inherit;color:var(--gray-700);outline:none;min-height:44px;max-height:120px"></textarea>
+            <button id="ai-chat-send-btn" onclick="sendAIChat()" style="padding:10px 16px;border-radius:12px;border:none;background:linear-gradient(135deg,#38bdf8,#0369a1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Gửi câu hỏi</button>
           </div>
         </div>
       </div>
       <div style="padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;gap:8px;flex-wrap:wrap">
-        <button id="ai-run-btn" onclick="runAIAnalysis()" style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-size:13px;font-weight:700;cursor:pointer"
+        <button id="ai-run-btn" onclick="runAIAnalysis()" style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#38bdf8,#0369a1);color:#fff;font-size:13px;font-weight:700;cursor:pointer"
           onmouseenter="this.style.opacity='.88'" onmouseleave="this.style.opacity='1'">✨ Bắt đầu phân tích</button>
-        <button id="ai-rerun-btn" onclick="runAIAnalysis()" style="display:none;padding:10px 18px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;font-size:13px;font-weight:600;cursor:pointer">🔄 Phân tích lại</button>
-        <button id="ai-chat-toggle-btn" onclick="toggleAIChat()" style="display:none;padding:10px 18px;border-radius:10px;border:1.5px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;font-size:13px;font-weight:700;cursor:pointer">💬 Trao đổi với bot</button>
+        <button id="ai-rerun-btn" onclick="runAIAnalysis()" style="display:none;padding:10px 18px;border-radius:10px;border:1.5px solid #e2e8f0;background:var(--gray-50);color:#64748b;font-size:13px;font-weight:600;cursor:pointer">🔄 Phân tích lại</button>
+        <button id="ai-chat-toggle-btn" onclick="toggleAIChat()" style="display:none;padding:10px 18px;border-radius:10px;border:1.5px solid #bae6fd;background:#f0f9ff;color:#0369a1;font-size:13px;font-weight:700;cursor:pointer">💬 Trao đổi với bot</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -3251,7 +4975,7 @@ function renderAIQuickPrompts() {
   const wrap = document.getElementById('ai-chat-quick');
   if (!wrap) return;
   wrap.innerHTML = AI_QUICK_PROMPTS.map(prompt => `
-    <button onclick="useAIQuickPrompt('${prompt.replace(/'/g, "\\'")}')" style="padding:8px 10px;border-radius:999px;border:1px solid #ddd6fe;background:#faf5ff;color:#6d28d9;font-size:11.5px;font-weight:700;cursor:pointer">
+    <button onclick="useAIQuickPrompt('${prompt.replace(/'/g, "\\'")}')" style="padding:8px 10px;border-radius:999px;border:1px solid #ddd6fe;background:#faf5ff;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer">
       ${esc(prompt)}
     </button>
   `).join('');
@@ -3269,8 +4993,8 @@ function renderAIChatMessages() {
   if (!wrap) return;
   if (!aiChatHistory.length) {
     wrap.innerHTML = `<div style="display:flex;gap:10px;align-items:flex-start">
-      <div style="width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0">✦</div>
-      <div style="max-width:85%;padding:11px 13px;border-radius:14px;font-size:12.5px;line-height:1.7;background:#f8fafc;color:#334155;border:1px solid #e2e8f0">
+      <div style="width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#38bdf8,#0369a1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0">✦</div>
+      <div style="max-width:85%;padding:11px 13px;border-radius:14px;font-size:12.5px;line-height:1.7;background:#f8fafc;color:var(--gray-700);border:1px solid #e2e8f0">
         Mình đã sẵn sàng trao đổi thêm về báo cáo này.
         <br>Bạn có thể dùng câu hỏi nhanh bên dưới hoặc hỏi tự do theo điều bạn đang quan tâm.
       </div>
@@ -3280,9 +5004,9 @@ function renderAIChatMessages() {
   }
   wrap.innerHTML = aiChatHistory.map(item => `
     <div style="display:flex;justify-content:${item.role === 'user' ? 'flex-end' : 'flex-start'};gap:10px;align-items:flex-end">
-      ${item.role === 'assistant' ? `<div style="width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0">✦</div>` : ''}
-      <div style="max-width:85%;padding:10px 12px;border-radius:14px;font-size:12.5px;line-height:1.7;white-space:pre-wrap;background:${item.role === 'user' ? 'linear-gradient(135deg,#7c3aed,#4f46e5)' : '#f8fafc'};color:${item.role === 'user' ? '#fff' : '#334155'};border:${item.role === 'user' ? 'none' : '1px solid #e2e8f0'}">${esc(item.text || '')}</div>
-      ${item.role === 'user' ? `<div style="width:34px;height:34px;border-radius:12px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#475569;font-size:14px;font-weight:800;flex-shrink:0">B</div>` : ''}
+      ${item.role === 'assistant' ? `<div style="width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#38bdf8,#0369a1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0">✦</div>` : ''}
+      <div style="max-width:85%;padding:10px 12px;border-radius:14px;font-size:12.5px;line-height:1.7;white-space:pre-wrap;background:${item.role === 'user' ? 'linear-gradient(135deg,#38bdf8,#0369a1)' : '#f8fafc'};color:${item.role === 'user' ? '#fff' : 'var(--gray-700)'};border:${item.role === 'user' ? 'none' : '1px solid #e2e8f0'}">${esc(item.text || '')}</div>
+      ${item.role === 'user' ? `<div style="width:34px;height:34px;border-radius:12px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:var(--gray-600);font-size:14px;font-weight:800;flex-shrink:0">B</div>` : ''}
     </div>
   `).join('');
   renderAIQuickPrompts();
@@ -3311,7 +5035,7 @@ async function sendAIChat() {
   if (wrap) {
     wrap.innerHTML += `
       <div id="ai-chat-typing" style="display:flex;justify-content:flex-start;gap:10px;align-items:flex-end">
-        <div style="width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0">✦</div>
+        <div style="width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#38bdf8,#0369a1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0">✦</div>
         <div style="padding:10px 12px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;font-size:12px">
           Bot đang suy nghĩ...
         </div>
@@ -3370,7 +5094,7 @@ async function runAIAnalysis() {
     <div style="display:flex;flex-direction:column;gap:10px;padding:8px 0">
       ${['Đọc dữ liệu form...','Phân tích xu hướng...','Đánh giá điểm mạnh / yếu...','Tạo đề xuất cải thiện...'].map((t,i)=>`
         <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f8fafc;border-radius:10px">
-          <div style="width:8px;height:8px;border-radius:50%;background:#7c3aed;animation:aipulse 1s infinite ${i*0.2}s"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:#0284c7;animation:aipulse 1s infinite ${i*0.2}s"></div>
           <span style="font-size:13px;color:#64748b">${t}</span>
         </div>`).join('')}
     </div>
@@ -3388,9 +5112,10 @@ async function runAIAnalysis() {
 
     const result = await resp.json();
     if (!resp.ok) {
+      const isKeyError = /key/i.test(result.message || '');
       body.innerHTML = `<div style="padding:20px;background:#fff1f2;border-radius:12px;border-left:4px solid #ef4444">
         <div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:6px">❌ ${esc(result.message||'Lỗi không xác định')}</div>
-        <div style="font-size:12px;color:#94a3b8">${resp.status===503 ? 'Server chưa cấu hình GEMINI_API_KEY.' : resp.status===429 ? 'Gemini đang hết quota hoặc bị rate limit, thử lại sau.' : 'Backend đã gọi Gemini nhưng phản hồi chưa đúng định dạng mong đợi.'}</div>
+        <div style="font-size:12px;color:#94a3b8">${resp.status===503 ? 'Server chưa cấu hình GEMINI_API_KEY.' : resp.status===429 ? 'Gemini đang hết quota hoặc bị rate limit, thử lại sau.' : isKeyError ? 'Lỗi API Key từ phía Google.' : 'Vui lòng kiểm tra lại cấu hình hoặc thử lại sau.'}</div>
       </div>`;
       return;
     }
@@ -3399,8 +5124,8 @@ async function runAIAnalysis() {
       aiLastAnalysisText = result.analysis;
       body.innerHTML = `
         <div style="padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px">
-          <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:10px">Kết quả phân tích</div>
-          <div style="font-size:13px;color:#334155;line-height:1.8">
+          <div style="font-size:14px;font-weight:700;color:var(--gray-900);margin-bottom:10px">Kết quả phân tích</div>
+          <div style="font-size:13px;color:var(--gray-700);line-height:1.8">
             <p style="margin:0 0 12px">${formatAIAnalysisText(result.analysis)}</p>
           </div>
         </div>`;
@@ -3422,8 +5147,8 @@ async function runAIAnalysis() {
           <div style="font-size:11px;color:${sc};font-weight:700;margin-top:2px">/ 100 điểm</div>
         </div>
         <div>
-          <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px">Đánh giá tổng quan</div>
-          <div style="font-size:13px;color:#374151;line-height:1.6">${esc(result.nhan_xet_tong||'')}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--gray-900);margin-bottom:6px">Đánh giá tổng quan</div>
+          <div style="font-size:13px;color:var(--gray-700);line-height:1.6">${esc(result.nhan_xet_tong||'')}</div>
         </div>
       </div>
       ${result.canh_bao?`<div style="padding:12px 16px;background:#fff7ed;border-radius:10px;border-left:4px solid #f97316;margin-bottom:16px;display:flex;gap:10px">
@@ -3440,24 +5165,24 @@ async function runAIAnalysis() {
         </div>
       </div>
       <div style="margin-bottom:16px">
-        <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:10px">🎯 Đề xuất cải thiện</div>
+        <div style="font-size:13px;font-weight:700;color:var(--gray-900);margin-bottom:10px">🎯 Đề xuất cải thiện</div>
         <div style="display:flex;flex-direction:column;gap:8px">
           ${(result.de_xuat||[]).map((dx,i)=>{const u=uuMap[dx.uu_tien]||uuMap.thap;return `
           <div style="padding:12px 14px;background:#fafbff;border-radius:10px;border:1px solid #e8edf5;border-left:3px solid ${u.c}">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-              <div style="font-size:13px;font-weight:700;color:#0f172a">${i+1}. ${esc(dx.tieu_de)}</div>
+              <div style="font-size:13px;font-weight:700;color:var(--gray-900)">${i+1}. ${esc(dx.tieu_de)}</div>
               <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${u.b};color:${u.c}">${u.l}</span>
             </div>
-            <div style="font-size:12px;color:#475569;line-height:1.6">${esc(dx.noi_dung)}</div>
+            <div style="font-size:12px;color:var(--gray-600);line-height:1.6">${esc(dx.noi_dung)}</div>
           </div>`;}).join('')}
         </div>
       </div>
-      ${result.cau_hoi_phan_tich?`<div style="padding:12px 16px;background:#f0f9ff;border-radius:10px;border-left:4px solid #0891b2;margin-bottom:10px">
-        <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px">📋 Nhận xét câu hỏi</div>
+      ${result.cau_hoi_phan_tich?`<div style="padding:12px 16px;background:#f0f9ff;border-radius:10px;border-left:4px solid #00008B;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--brand-color);margin-bottom:4px">📋 Nhận xét câu hỏi</div>
         <div style="font-size:12px;color:#0c4a6e;line-height:1.6">${esc(result.cau_hoi_phan_tich)}</div>
       </div>`:''}
-      ${result.du_bao?`<div style="padding:12px 16px;background:#faf5ff;border-radius:10px;border-left:4px solid #7c3aed">
-        <div style="font-size:12px;font-weight:700;color:#6d28d9;margin-bottom:4px">🔮 Dự báo xu hướng</div>
+      ${result.du_bao?`<div style="padding:12px 16px;background:#faf5ff;border-radius:10px;border-left:4px solid #0284c7">
+        <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px">🔮 Dự báo xu hướng</div>
         <div style="font-size:12px;color:#4c1d95;line-height:1.6">${esc(result.du_bao)}</div>
       </div>`:''}`;
 
@@ -3486,3 +5211,211 @@ loadFormList().then(() => {
     } catch(e) {}
   }
 });
+
+let globalDashboardChartInstance = null;
+
+async function initGlobalDashboardChart(range = '7') {
+  const token = localStorage.getItem('token') || '';
+  try {
+    // 1. Lấy dữ liệu tổng quan cho KPI cards
+    const overviewData = await fetchReportJson(`${API}/reports/overview`, token);
+    
+    const formsVal = document.getElementById('rpt-total-forms-value');
+    if(formsVal) formsVal.textContent = overviewData.tong_form || 0;
+    
+    const responsesVal = document.getElementById('rpt-total-responses-value');
+    if(responsesVal) responsesVal.textContent = overviewData.tong_phan_hoi || 0;
+    
+    const formsTrend = document.getElementById('rpt-total-forms-trend');
+    if(formsTrend) {
+      updateTrendUI(formsTrend, overviewData.form_thang_nay || 0, overviewData.form_thang_truoc || 0);
+    }
+    
+    const resTrend = document.getElementById('rpt-total-responses-trend');
+    if(resTrend) {
+      updateTrendUI(resTrend, overviewData.phan_hoi_thang_nay || 0, overviewData.phan_hoi_thang_truoc || 0);
+    }
+    const activeVal = document.getElementById('rpt-active-forms-value');
+    const activeTotal = document.getElementById('rpt-active-forms-total');
+    const activeBar = document.getElementById('rpt-active-rate-bar');
+    
+    if(activeVal && activeTotal && activeBar) {
+      let active = overviewData.form_hoat_dong || 0;
+      let total = overviewData.tong_form || 0;
+      activeVal.textContent = active;
+      activeTotal.textContent = total;
+      let pct = total > 0 ? (active / total) * 100 : 0;
+      setTimeout(() => {
+        activeBar.style.width = pct + '%';
+      }, 300);
+    }
+
+    // 2. Lấy dữ liệu biểu đồ
+    const chartData = await fetchReportJson(`${API}/reports/activity-chart?range=${range}`, token);
+    
+    const labels = [];
+    const formsDataset = [];
+    const responsesDataset = [];
+    
+    if(Array.isArray(chartData) && chartData.length > 0) {
+      chartData.forEach(item => {
+        let shortDay = item.ten_ngay;
+        const enMap = {
+          'Monday': 'T2', 'Tuesday': 'T3', 'Wednesday': 'T4',
+          'Thursday': 'T5', 'Friday': 'T6', 'Saturday': 'T7', 'Sunday': 'CN'
+        };
+        if (enMap[shortDay]) shortDay = enMap[shortDay];
+        else if (shortDay.includes('Thứ')) shortDay = shortDay.replace('Thứ ', 'T');
+        else if (shortDay.includes('Chủ Nhật')) shortDay = 'CN';
+        
+        // Dùng tên ngày (T2, T3) cho 7 ngày, dùng ngày tháng (14/06) cho các range khác
+        let labelToShow = (range === '7' || range === 7) ? shortDay : item.ngay;
+        labels.push(labelToShow);
+        
+        formsDataset.push(item.so_form || 0);
+        responsesDataset.push(item.so_phan_hoi || 0);
+      });
+    }
+
+    const ctx = document.getElementById('rpt-global-chart');
+    if(!ctx) return;
+    
+    if (globalDashboardChartInstance) {
+      globalDashboardChartInstance.destroy();
+    }
+
+    globalDashboardChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels.length ? labels : ['T5', 'T6', 'T7', 'CN', 'T2', 'T3', 'T4'],
+        datasets: [
+          {
+            label: 'Biểu mẫu tạo mới',
+            data: formsDataset.length ? formsDataset : [0, 0, 0, 0, 0, 0, 0],
+            borderColor: '#00008B',
+            backgroundColor: 'rgba(0,0,139,0.12)',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#00008B',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            fill: true,
+            tension: 0.4,
+            clip: false,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Phản hồi nhận được',
+            data: responsesDataset.length ? responsesDataset : [0, 0, 0, 0, 0, 0, 0],
+            borderColor: '#f97316',
+            backgroundColor: 'transparent',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#f97316',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            fill: false,
+            tension: 0.4,
+            clip: false,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+          padding: { top: 20, bottom: 20, left: 10, right: 10 }
+        },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            position: 'top',
+            align: 'end',
+            labels: {
+              usePointStyle: true, boxWidth: 8, padding: 20,
+              font: { size: 12, weight: '600', family: "'Be Vietnam Pro', sans-serif" },
+              color: '#475569'
+            }
+          },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            titleFont: { size: 13, family: "'Be Vietnam Pro', sans-serif" },
+            bodyFont: { size: 13, family: "'Be Vietnam Pro', sans-serif" },
+            padding: 12, cornerRadius: 8, usePointStyle: true
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { 
+              font: { size: 12, weight: '600', family: "'Be Vietnam Pro', sans-serif" }, 
+              color: '#64748b', 
+              padding: 10,
+              autoSkip: true,
+              maxTicksLimit: 8,
+              maxRotation: 0
+            }
+          },
+          y: {
+            type: 'linear', display: true, position: 'left',
+            title: { display: true, text: 'Biểu mẫu', color: '#00008B', font: { size: 12, weight: '600', family: "'Be Vietnam Pro', sans-serif" }, padding: {bottom: 10} },
+            grid: { color: '#f1f5f9' },
+            ticks: { stepSize: 1, color: '#00008B', font: { size: 11, weight: '600', family: "'Be Vietnam Pro', sans-serif" }, padding: 8 },
+            min: 0, suggestedMax: 6
+          },
+          y1: {
+            type: 'linear', display: true, position: 'right',
+            title: { display: true, text: 'Phản hồi', color: '#f97316', font: { size: 12, weight: '600', family: "'Be Vietnam Pro', sans-serif" }, padding: {bottom: 10} },
+            grid: { drawOnChartArea: false },
+            ticks: { stepSize: 5, color: '#f97316', font: { size: 11, weight: '600', family: "'Be Vietnam Pro', sans-serif" }, padding: 8 },
+            min: 0, suggestedMax: 35
+          }
+        }
+      }
+    });
+  } catch(err) {
+    console.error('Lỗi khởi tạo biểu đồ:', err);
+  }
+}
+
+function updateTrendUI(element, current, previous) {
+  let percent = 0;
+  if(previous === 0) {
+    percent = current > 0 ? 100 : 0;
+  } else {
+    percent = Math.round(((current - previous) / previous) * 100);
+  }
+  
+  if (percent >= 0) {
+    element.style.color = '#10b981';
+    element.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      +${percent}% <span style="color:#94a3b8;font-weight:500;">so với tháng trước</span>
+    `;
+  } else {
+    element.style.color = '#ef4444';
+    element.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+      ${percent}% <span style="color:#94a3b8;font-weight:500;">so với tháng trước</span>
+    `;
+  }
+}
+
+window.setActivityRange = function(days, btn) {
+  const btns = btn.parentElement.querySelectorAll('.rpt-range-btn');
+  btns.forEach(b => {
+    b.style.background = 'transparent';
+    b.style.color = '#64748b';
+    b.style.boxShadow = 'none';
+  });
+  btn.style.background = '#fff';
+  btn.style.color = 'var(--gray-900)';
+  btn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+  
+  initGlobalDashboardChart(days);
+};
+
+setTimeout(initGlobalDashboardChart, 100);

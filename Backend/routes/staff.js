@@ -21,6 +21,57 @@ function normalizePermissions(q = {}) {
   return Object.fromEntries(PERM_KEYS.map(k => [k, !!q[k]]));
 }
 
+async function ensurePermissionSchema() {
+  const table = await sql.query`
+    SELECT CASE WHEN OBJECT_ID('dbo.Quyen', 'U') IS NULL THEN 0 ELSE 1 END AS exists_table
+  `;
+
+  if (!table.recordset[0]?.exists_table) {
+    await sql.query`
+      CREATE TABLE dbo.Quyen (
+        nhan_vien_id INT NOT NULL PRIMARY KEY REFERENCES dbo.NhanVien(id) ON DELETE CASCADE,
+        view_form BIT NOT NULL DEFAULT 0,
+        add_form BIT NOT NULL DEFAULT 0,
+        edit_form BIT NOT NULL DEFAULT 0,
+        delete_form BIT NOT NULL DEFAULT 0,
+        view_approval BIT NOT NULL DEFAULT 0,
+        approve BIT NOT NULL DEFAULT 0,
+        share_form BIT NOT NULL DEFAULT 0,
+        view_report BIT NOT NULL DEFAULT 0,
+        export_data BIT NOT NULL DEFAULT 0,
+        view_staff BIT NOT NULL DEFAULT 0,
+        manage_staff BIT NOT NULL DEFAULT 0,
+        view_notif BIT NOT NULL DEFAULT 0,
+        send_notif BIT NOT NULL DEFAULT 0,
+        view_library BIT NOT NULL DEFAULT 0,
+        add_library BIT NOT NULL DEFAULT 0,
+        edit_library BIT NOT NULL DEFAULT 0,
+        delete_library BIT NOT NULL DEFAULT 0,
+        view_feedback BIT NOT NULL DEFAULT 0,
+        delete_feedback BIT NOT NULL DEFAULT 0
+      )
+    `;
+    return;
+  }
+
+  const columns = await sql.query`
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Quyen'
+  `;
+  const existingColumns = new Set(columns.recordset.map(row => row.COLUMN_NAME));
+
+  if (!existingColumns.has('nhan_vien_id')) {
+    throw new Error('Bảng Quyen thiếu cột nhan_vien_id');
+  }
+
+  for (const key of PERM_KEYS) {
+    if (!existingColumns.has(key)) {
+      await sql.query(`ALTER TABLE dbo.Quyen ADD [${key}] BIT NOT NULL DEFAULT 0 WITH VALUES`);
+    }
+  }
+}
+
 async function getStaffById(id) {
   const r = await sql.query`SELECT id,ho_ten,email,so_dien_thoai,ten_dang_nhap,vai_tro,phong_ban,trang_thai,ngay_tao,ngay_cap_nhat FROM NhanVien WHERE id=${id}`;
   return r.recordset[0] || null;
@@ -35,7 +86,31 @@ async function checkDuplicateStaff({ email, ten_dang_nhap, excludeId = null }) {
   return r.recordset[0] || null;
 }
 
+async function getStaffByEmail(email, excludeId = null) {
+  if (excludeId) {
+    const r = await sql.query`SELECT TOP 1 id,email FROM NhanVien WHERE email=${email} AND id<>${excludeId}`;
+    return r.recordset[0] || null;
+  }
+  const r = await sql.query`SELECT TOP 1 id,email FROM NhanVien WHERE email=${email}`;
+  return r.recordset[0] || null;
+}
+
+async function makeUniqueUsername(baseUsername) {
+  const rawBase = String(baseUsername || 'user').trim().toLowerCase();
+  const safeBase = rawBase.replace(/[^a-z0-9._-]/g, '') || 'user';
+
+  for (let i = 0; i < 100; i += 1) {
+    const suffix = i === 0 ? '' : String(i + 1);
+    const candidate = `${safeBase}${suffix}`.slice(0, 50);
+    const existing = await sql.query`SELECT TOP 1 id FROM NhanVien WHERE ten_dang_nhap=${candidate}`;
+    if (!existing.recordset[0]) return candidate;
+  }
+
+  return `${safeBase}${Date.now().toString(36)}`.slice(0, 50);
+}
+
 async function upsertPermission(nhanVienId, quyen) {
+  await ensurePermissionSchema();
   const p = normalizePermissions(quyen);
   const exists = await sql.query`SELECT TOP 1 nhan_vien_id FROM Quyen WHERE nhan_vien_id=${nhanVienId}`;
 
@@ -80,20 +155,23 @@ async function upsertPermission(nhanVienId, quyen) {
 // GET /api/staff
 router.get('/', authMiddleware, authorize('view_staff'), async (req, res) => {
   try {
+    await ensurePermissionSchema();
     const search = req.query.search ? String(req.query.search).trim() : null;
     let result;
     if (search) {
       const req2 = new sql.Request();
       req2.input('s', sql.NVarChar, `%${search}%`);
       result = await req2.query(`
-        SELECT n.id,n.ho_ten,n.email,n.so_dien_thoai,n.ten_dang_nhap,n.vai_tro,n.phong_ban,n.trang_thai,n.ngay_tao,q.view_staff,q.manage_staff
+        SELECT n.id,n.ho_ten,n.email,n.so_dien_thoai,n.ten_dang_nhap,n.vai_tro,n.phong_ban,n.trang_thai,n.ngay_tao,q.view_staff,q.manage_staff,
+               (SELECT COUNT(*) FROM Form f WHERE f.nhan_vien_id = n.id AND f.trang_thai != 'deleted') as forms
         FROM NhanVien n LEFT JOIN Quyen q ON q.nhan_vien_id=n.id
         WHERE n.trang_thai='active' AND (n.ho_ten LIKE @s OR n.email LIKE @s OR n.ten_dang_nhap LIKE @s)
         ORDER BY n.ho_ten ASC
       `);
     } else {
       result = await sql.query`
-        SELECT n.id,n.ho_ten,n.email,n.so_dien_thoai,n.ten_dang_nhap,n.vai_tro,n.phong_ban,n.trang_thai,n.ngay_tao,q.view_staff,q.manage_staff
+        SELECT n.id,n.ho_ten,n.email,n.so_dien_thoai,n.ten_dang_nhap,n.vai_tro,n.phong_ban,n.trang_thai,n.ngay_tao,q.view_staff,q.manage_staff,
+               (SELECT COUNT(*) FROM Form f WHERE f.nhan_vien_id = n.id AND f.trang_thai != 'deleted') as forms
         FROM NhanVien n LEFT JOIN Quyen q ON q.nhan_vien_id=n.id ORDER BY n.ngay_tao DESC
       `;
     }
@@ -108,6 +186,7 @@ router.get('/:id', authMiddleware, authorize('view_staff'), async (req, res) => 
   const staffId = Number(req.params.id);
   if (!validId(staffId)) return res.status(400).json({ message: 'ID nhân viên không hợp lệ' });
   try {
+    await ensurePermissionSchema();
     const result = await sql.query`
       SELECT
         n.id, n.ho_ten, n.email, n.so_dien_thoai, n.ten_dang_nhap,
@@ -132,16 +211,18 @@ router.get('/:id', authMiddleware, authorize('view_staff'), async (req, res) => 
 // POST /api/staff
 router.post('/', authMiddleware, authorize('manage_staff'), async (req, res) => {
   const { ho_ten, email, so_dien_thoai, ten_dang_nhap, mat_khau, vai_tro, phong_ban, trang_thai, quyen } = req.body;
-  if (!ho_ten || !email || !ten_dang_nhap || !mat_khau)
+  if (!ho_ten || !email || !mat_khau)
     return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin bắt buộc' });
 
   try {
+    await ensurePermissionSchema();
     const cleanEmail = String(email).trim();
-    const cleanUser  = String(ten_dang_nhap).trim();
+    const usernameBase = String(ten_dang_nhap || cleanEmail.split('@')[0] || 'user').trim();
+    const cleanUser  = await makeUniqueUsername(usernameBase);
     const cleanName  = String(ho_ten).trim();
 
-    if (await checkDuplicateStaff({ email: cleanEmail, ten_dang_nhap: cleanUser }))
-      return res.status(400).json({ message: 'Email hoặc tên đăng nhập đã tồn tại' });
+    if (await getStaffByEmail(cleanEmail))
+      return res.status(400).json({ message: 'Email đã tồn tại' });
 
     const hash = await bcrypt.hash(String(mat_khau), 10);
     const insertResult = await sql.query`

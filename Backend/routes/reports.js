@@ -8,6 +8,18 @@ const { cleanExcel } = require("../utils/cleanExcel");
 const authMiddleware = require("../middleware/auth").authMiddleware;
 const authorize = require("../middleware/authorize");
 
+async function getDefaultLoaiKhaoSatId() {
+  let result = await sql.query`SELECT TOP 1 id FROM LoaiKhaoSat ORDER BY id`;
+  if (result.recordset[0]) return result.recordset[0].id;
+
+  result = await sql.query`
+    INSERT INTO LoaiKhaoSat (danh_muc, ten_loai, mo_ta, trang_thai)
+    OUTPUT INSERTED.id
+    VALUES (N'Tin học', N'Import', N'Tạo tự động khi import Excel', 'active')
+  `;
+  return result.recordset[0].id;
+}
+
 const ALLOWED_EXCEL_MIMES = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-excel',
@@ -30,10 +42,28 @@ const upload = multer({
 
 router.get("/overview", authMiddleware, authorize("view_report"), async (req, res) => {
   try {
-    const forms    = await sql.query`SELECT COUNT(*) AS tong_form, SUM(CASE WHEN trang_thai='active' THEN 1 ELSE 0 END) AS form_hoat_dong, SUM(luot_xem) AS tong_luot_xem FROM Form`;
-    const feedback = await sql.query`SELECT COUNT(*) AS tong_phan_hoi, AVG(CAST(danh_gia AS FLOAT)) AS diem_tb FROM PhanHoi`;
+    const phanHoiColumns = await getPhanHoiColumns(sql);
+    const ratingExpr = phanHoiColumns.has("danh_gia") ? "AVG(CAST(danh_gia AS FLOAT))" : "NULL";
+
+    const forms    = await sql.query`SELECT COUNT(*) AS tong_form, SUM(CASE WHEN trang_thai='active' THEN 1 ELSE 0 END) AS form_hoat_dong, SUM(luot_xem) AS tong_luot_xem FROM Form WHERE trang_thai != 'deleted'`;
+    const feedback = await new sql.Request().query(`SELECT COUNT(*) AS tong_phan_hoi, ${ratingExpr} AS diem_tb FROM PhanHoi`);
     const staff    = await sql.query`SELECT COUNT(*) AS tong_nhan_vien FROM NhanVien WHERE trang_thai='active'`;
     const pending  = await sql.query`SELECT COUNT(*) AS cho_duyet FROM PheDuyet WHERE trang_thai='pending'`;
+    const trends   = await sql.query`
+      SELECT
+        (SELECT COUNT(*) FROM Form
+         WHERE trang_thai != 'deleted'
+           AND ngay_tao >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)) AS form_thang_nay,
+        (SELECT COUNT(*) FROM Form
+         WHERE trang_thai != 'deleted'
+           AND ngay_tao >= DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+           AND ngay_tao <  DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)) AS form_thang_truoc,
+        (SELECT COUNT(*) FROM PhanHoi
+         WHERE ngay_gui >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)) AS phan_hoi_thang_nay,
+        (SELECT COUNT(*) FROM PhanHoi
+         WHERE ngay_gui >= DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+           AND ngay_gui <  DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)) AS phan_hoi_thang_truoc
+    `;
     res.json({
       tong_form:       forms.recordset[0].tong_form,
       form_hoat_dong:  forms.recordset[0].form_hoat_dong,
@@ -42,19 +72,50 @@ router.get("/overview", authMiddleware, authorize("view_report"), async (req, re
       diem_trung_binh: feedback.recordset[0].diem_tb,
       tong_nhan_vien:  staff.recordset[0].tong_nhan_vien,
       cho_duyet:       pending.recordset[0].cho_duyet,
+      ...trends.recordset[0],
     });
   } catch (err) { err500(res, err); }
 });
-
 router.get("/forms-by-week", authMiddleware, authorize("view_report"), async (req, res) => {
   try {
     const result = await sql.query`
-      SELECT FORMAT(ngay_tao,'ddd') AS ngay, DATENAME(WEEKDAY,ngay_tao) AS ten_ngay,
+      SELECT FORMAT(dates.ngay_tao,'dd/MM') AS ngay, DATENAME(WEEKDAY,dates.ngay_tao) AS ten_ngay,
              COUNT(DISTINCT f.id) AS so_form, COUNT(DISTINCT ph.id) AS so_phan_hoi
       FROM (SELECT DATEADD(DAY,-n,CAST(GETDATE() AS DATE)) AS ngay_tao FROM (VALUES(0),(1),(2),(3),(4),(5),(6)) AS d(n)) AS dates
-      LEFT JOIN Form f ON CAST(f.ngay_tao AS DATE)=dates.ngay_tao
+      LEFT JOIN Form f ON CAST(f.ngay_tao AS DATE)=dates.ngay_tao AND f.trang_thai != 'deleted'
       LEFT JOIN PhanHoi ph ON CAST(ph.ngay_gui AS DATE)=dates.ngay_tao
-      GROUP BY FORMAT(ngay_tao,'ddd'),DATENAME(WEEKDAY,ngay_tao),dates.ngay_tao ORDER BY dates.ngay_tao`;
+      GROUP BY dates.ngay_tao ORDER BY dates.ngay_tao`;
+    res.json(result.recordset);
+  } catch (err) { err500(res, err); }
+});
+
+router.get("/activity-chart", authMiddleware, authorize("view_report"), async (req, res) => {
+  const range = req.query.range || req.query.days || '7';
+  try {
+    let daysToFetch = 7;
+    if (range === 'this_month') {
+      const now = new Date();
+      daysToFetch = now.getDate(); // Lấy ngày hiện tại trong tháng
+    } else {
+      daysToFetch = parseInt(range) || 7;
+    }
+
+    const result = await new sql.Request()
+      .input('days', sql.Int, daysToFetch)
+      .query(`
+        WITH cte AS (
+            SELECT 0 AS n
+            UNION ALL
+            SELECT n + 1 FROM cte WHERE n < @days - 1
+        )
+        SELECT FORMAT(dates.ngay_tao,'dd/MM') AS ngay, DATENAME(WEEKDAY,dates.ngay_tao) AS ten_ngay,
+               COUNT(DISTINCT f.id) AS so_form, COUNT(DISTINCT ph.id) AS so_phan_hoi
+        FROM (SELECT DATEADD(DAY, -n, CAST(GETDATE() AS DATE)) AS ngay_tao FROM cte) AS dates
+        LEFT JOIN Form f ON CAST(f.ngay_tao AS DATE)=dates.ngay_tao AND f.trang_thai != 'deleted'
+        LEFT JOIN PhanHoi ph ON CAST(ph.ngay_gui AS DATE)=dates.ngay_tao
+        GROUP BY dates.ngay_tao ORDER BY dates.ngay_tao
+        OPTION (MAXRECURSION 0)
+      `);
     res.json(result.recordset);
   } catch (err) { err500(res, err); }
 });
@@ -62,11 +123,13 @@ router.get("/forms-by-week", authMiddleware, authorize("view_report"), async (re
 router.get("/top-forms", authMiddleware, authorize("view_report"), async (req, res) => {
   try {
     const result = await sql.query`
-      SELECT TOP 5 f.id, f.ten_form, f.danh_muc,
+      SELECT TOP 5 f.id, f.ten_form, lk.danh_muc,
              COUNT(ph.id) AS so_phan_hoi, AVG(CAST(ph.danh_gia AS FLOAT)) AS diem_tb
-      FROM Form f LEFT JOIN PhanHoi ph ON ph.form_id=f.id
+      FROM Form f
+      LEFT JOIN LoaiKhaoSat lk ON lk.id=f.loai_khao_sat_id
+      LEFT JOIN PhanHoi ph ON ph.form_id=f.id
       WHERE f.trang_thai='active'
-      GROUP BY f.id,f.ten_form,f.danh_muc ORDER BY so_phan_hoi DESC`;
+      GROUP BY f.id,f.ten_form,lk.danh_muc ORDER BY so_phan_hoi DESC`;
     res.json(result.recordset);
   } catch (err) { err500(res, err); }
 });
@@ -86,7 +149,13 @@ router.get("/feedback-by-month", authMiddleware, authorize("view_report"), async
 
 router.get("/forms-by-category", authMiddleware, authorize("view_report"), async (req, res) => {
   try {
-    const result = await sql.query`SELECT danh_muc,COUNT(*) AS so_form,SUM(luot_xem) AS tong_luot_xem FROM Form GROUP BY danh_muc ORDER BY so_form DESC`;
+    const result = await sql.query`
+      SELECT lk.danh_muc, COUNT(*) AS so_form, SUM(f.luot_xem) AS tong_luot_xem
+      FROM Form f
+      LEFT JOIN LoaiKhaoSat lk ON lk.id=f.loai_khao_sat_id
+      GROUP BY lk.danh_muc
+      ORDER BY so_form DESC
+    `;
     res.json(result.recordset);
   } catch (err) { err500(res, err); }
 });
@@ -115,54 +184,89 @@ router.get("/approval-summary", authMiddleware, authorize("view_report"), async 
 // GET /api/reports/forms-with-data
 router.get("/forms-with-data", authMiddleware, authorize("view_report"), async (req, res) => {
   try {
-    const result = await sql.query`
-      SELECT f.id, f.ten_form, f.danh_muc, f.trang_thai,
+    const phanHoiColumns = await getPhanHoiColumns(sql);
+    const ratingExpr = phanHoiColumns.has("danh_gia") ? "ph.danh_gia" : "NULL";
+    const result = await new sql.Request().query(`
+      SELECT f.id, f.ten_form, lk.danh_muc, lk.ten_loai AS loai_khao_sat,
+             f.doi_tuong, f.mo_ta, f.trang_thai, f.ngay_tao, f.ngay_dong,
+             nv.ho_ten AS nguoi_tao,
              COUNT(ph.id)                        AS so_phan_hoi,
-             AVG(CAST(ph.danh_gia AS FLOAT))     AS diem_tb,
+             AVG(CAST(${ratingExpr} AS FLOAT))   AS diem_tb,
              MAX(ph.ngay_gui)                    AS phan_hoi_moi_nhat,
              (SELECT COUNT(*) FROM CauHoi WHERE form_id = f.id) AS so_cau_hoi
       FROM Form f
+      LEFT JOIN LoaiKhaoSat lk ON lk.id = f.loai_khao_sat_id
+      LEFT JOIN NhanVien nv ON nv.id = f.nhan_vien_id
       INNER JOIN PhanHoi ph ON ph.form_id = f.id
       WHERE f.trang_thai != 'deleted'
-      GROUP BY f.id, f.ten_form, f.danh_muc, f.trang_thai
+      GROUP BY f.id, f.ten_form, lk.danh_muc, lk.ten_loai, f.doi_tuong, f.mo_ta,
+               f.trang_thai, f.ngay_tao, f.ngay_dong, nv.ho_ten
       HAVING COUNT(ph.id) > 0
       ORDER BY so_phan_hoi DESC
-    `;
+    `);
     res.json(result.recordset);
   } catch (err) { err500(res, err); }
 });
 
 // ── API MỚI: Lấy toàn bộ dữ liệu phân tích của 1 form ──
 // GET /api/reports/form-analysis/:form_id
-router.get("/form-analysis/:form_id", authMiddleware, authorize("view_report"), async (req, res) => {
+router.get("/form-analysis/:form_id", async (req, res) => {
   const formId = parseInt(req.params.form_id);
   if (isNaN(formId)) return res.status(400).json({ message: "form_id không hợp lệ" });
 
   try {
     const phanHoiColumns = await getPhanHoiColumns(sql);
+    const chiTietColumnsRes = await sql.query`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'ChiTietPhanHoi'
+    `;
+    const chiTietColumns = new Set(chiTietColumnsRes.recordset.map(row => row.COLUMN_NAME));
+    const ratingExpr = phanHoiColumns.has("danh_gia") ? "ph.danh_gia" : "NULL";
+    const sentimentExpr = phanHoiColumns.has("cam_xuc") ? "ph.cam_xuc" : "NULL";
+    const senderNameExpr = phanHoiColumns.has("ho_ten")
+      ? "ph.ho_ten"
+      : (phanHoiColumns.has("ho_ten_nguoi_gui") ? "ph.ho_ten_nguoi_gui" : "NULL");
+    const senderEmailExpr = phanHoiColumns.has("email")
+      ? "ph.email"
+      : (phanHoiColumns.has("email_nguoi_gui") ? "ph.email_nguoi_gui" : "NULL");
+    const contentExpr = phanHoiColumns.has("noi_dung") ? "ph.noi_dung" : "NULL";
+    const statusExpr = phanHoiColumns.has("trang_thai") ? "ph.trang_thai" : "NULL";
+    const answerExpr = chiTietColumns.has("noi_dung_tra_loi")
+      ? "ctph.noi_dung_tra_loi"
+      : (chiTietColumns.has("cau_tra_loi") ? "ctph.cau_tra_loi" : "NULL");
     // 1. Thông tin form
-    const formRes = await sql.query`
-      SELECT f.id, f.ten_form, f.danh_muc, f.mo_ta, f.trang_thai, f.luot_xem,
+    const formRes = await new sql.Request()
+      .input("formId", sql.Int, formId)
+      .query(`
+      SELECT f.id, f.ten_form, lk.danh_muc, lk.ten_loai AS loai_khao_sat,
+             f.doi_tuong, f.mo_ta, f.trang_thai, f.luot_xem,
+             f.ngay_tao, f.ngay_dong, nv.ho_ten AS nguoi_tao,
              COUNT(ph.id)                    AS so_phan_hoi,
-             AVG(CAST(ph.danh_gia AS FLOAT)) AS diem_tb,
+             AVG(CAST(${ratingExpr} AS FLOAT)) AS diem_tb,
              MIN(ph.ngay_gui)                AS ngay_dau,
              MAX(ph.ngay_gui)                AS ngay_cuoi,
-             SUM(CASE WHEN ph.cam_xuc='positive' THEN 1 ELSE 0 END) AS tich_cuc,
-             SUM(CASE WHEN ph.cam_xuc='neutral'  THEN 1 ELSE 0 END) AS trung_tinh,
-             SUM(CASE WHEN ph.cam_xuc='negative' THEN 1 ELSE 0 END) AS tieu_cuc
+             SUM(CASE WHEN ${sentimentExpr}='positive' THEN 1 ELSE 0 END) AS tich_cuc,
+             SUM(CASE WHEN ${sentimentExpr}='neutral'  THEN 1 ELSE 0 END) AS trung_tinh,
+             SUM(CASE WHEN ${sentimentExpr}='negative' THEN 1 ELSE 0 END) AS tieu_cuc
       FROM Form f
+      LEFT JOIN LoaiKhaoSat lk ON lk.id = f.loai_khao_sat_id
+      LEFT JOIN NhanVien nv ON nv.id = f.nhan_vien_id
       LEFT JOIN PhanHoi ph ON ph.form_id = f.id
-      WHERE f.id = ${formId}
-      GROUP BY f.id,f.ten_form,f.danh_muc,f.mo_ta,f.trang_thai,f.luot_xem
-    `;
-    if (!formRes.recordset[0]) return res.status(404).json({ message: "Không tìm thấy form" });
+      WHERE f.id = @formId
+      GROUP BY f.id,f.ten_form,lk.danh_muc,lk.ten_loai,f.doi_tuong,f.mo_ta,
+               f.trang_thai,f.luot_xem,f.ngay_tao,f.ngay_dong,nv.ho_ten
+    `);
+    if (!formRes.recordset[0]) return res.status(404).json({ message: "Không tìm thấy biểu mẫu" });
 
     // 2. Phân bổ rating tổng (1-5 sao) — từ PhanHoi.danh_gia
-    const ratingRes = await sql.query`
-      SELECT danh_gia AS sao, COUNT(*) AS so_luong
-      FROM PhanHoi WHERE form_id = ${formId} AND danh_gia IS NOT NULL
-      GROUP BY danh_gia ORDER BY danh_gia
-    `;
+    const ratingRes = phanHoiColumns.has("danh_gia")
+      ? await sql.query`
+          SELECT danh_gia AS sao, COUNT(*) AS so_luong
+          FROM PhanHoi WHERE form_id = ${formId} AND danh_gia IS NOT NULL
+          GROUP BY danh_gia ORDER BY danh_gia
+        `
+      : { recordset: [] };
 
     // 2b. Phân bổ rating per câu hỏi — từ ChiTietPhanHoi.diem_danh_gia
     const ratingDistByQRes = await sql.query`
@@ -183,9 +287,28 @@ router.get("/form-analysis/:form_id", authMiddleware, authorize("view_report"), 
 
     // 4. Câu hỏi + lựa chọn + thống kê câu trả lời
     const questionsRes = await sql.query`
-      SELECT ch.id, ch.noi_dung, ch.loai, ch.thu_tu, ch.bat_buoc
-      FROM CauHoi ch WHERE ch.form_id = ${formId} ORDER BY ch.thu_tu
+      SELECT ch.id, ch.noi_dung, ch.loai, ch.thu_tu, ch.bat_buoc,
+             ch.mo_ta_cau_hoi, ch.hang_grid, ch.cot_grid, ch.section_id
+      FROM CauHoi ch 
+      LEFT JOIN FormSection fs ON fs.id = ch.section_id
+      WHERE ch.form_id = ${formId} 
+      ORDER BY ISNULL(fs.thu_tu, 0), ch.thu_tu
     `;
+    const questions = questionsRes.recordset;
+
+    const optionsRes = await sql.query`
+      SELECT lc.id, lc.cau_hoi_id, lc.noi_dung, lc.thu_tu
+      FROM LuaChon lc
+      INNER JOIN CauHoi ch ON ch.id = lc.cau_hoi_id
+      WHERE ch.form_id = ${formId}
+      ORDER BY lc.cau_hoi_id, lc.thu_tu
+    `;
+    const optionsByQuestion = {};
+    for (const opt of optionsRes.recordset) {
+      if (!optionsByQuestion[opt.cau_hoi_id]) optionsByQuestion[opt.cau_hoi_id] = [];
+      optionsByQuestion[opt.cau_hoi_id].push(opt);
+    }
+    questions.forEach(q => { q.lua_chon = optionsByQuestion[q.id] || []; });
 
     // 5. Với mỗi câu hỏi choice: đếm từng lựa chọn
     const choiceStatsRes = await sql.query`
@@ -209,47 +332,110 @@ router.get("/form-analysis/:form_id", authMiddleware, authorize("view_report"), 
              MAX(ctph.diem_danh_gia) AS max_diem
       FROM CauHoi ch
       LEFT JOIN ChiTietPhanHoi ctph ON ctph.cau_hoi_id = ch.id
-      WHERE ch.form_id = ${formId} AND ch.loai = 'rating'
+      WHERE ch.form_id = ${formId} AND ch.loai IN ('rating', 'scale', 'star_rating')
       GROUP BY ch.id
     `;
 
     // 7. Trạng thái phản hồi
-    const statusRes = await sql.query`
-      SELECT trang_thai, COUNT(*) AS so_luong
-      FROM PhanHoi WHERE form_id = ${formId}
-      GROUP BY trang_thai
-    `;
+    const statusRes = phanHoiColumns.has("trang_thai")
+      ? await sql.query`
+          SELECT trang_thai, COUNT(*) AS so_luong
+          FROM PhanHoi WHERE form_id = ${formId}
+          GROUP BY trang_thai
+        `
+      : { recordset: [{ trang_thai: "new", so_luong: formRes.recordset[0].so_phan_hoi || 0 }] };
 
     // 8. Câu trả lời dạng text + paragraph — kèm tên sinh viên
-    const textStatsRes = await new sql.Request()
-      .input("formId", sql.Int, formId)
-      .query(`
+    const textStatsRes = answerExpr === "NULL"
+      ? { recordset: [] }
+      : await new sql.Request()
+        .input("formId", sql.Int, formId)
+        .query(`
         SELECT ch.id AS cau_hoi_id,
-               ctph.noi_dung_tra_loi AS noi_dung,
-               ph.ho_ten,
+               ${answerExpr} AS noi_dung,
+               ${senderNameExpr} AS ho_ten,
                ${optionalField(phanHoiColumns, "lop")},
                ${optionalField(phanHoiColumns, "khoa")},
                ${optionalField(phanHoiColumns, "giao_vien")},
-               ph.danh_gia, ph.cam_xuc
+               ${ratingExpr} AS danh_gia, ${sentimentExpr} AS cam_xuc
         FROM CauHoi ch
         INNER JOIN ChiTietPhanHoi ctph ON ctph.cau_hoi_id = ch.id
         INNER JOIN PhanHoi ph ON ph.id = ctph.phan_hoi_id
-        WHERE ch.form_id = @formId AND ch.loai IN ('text', 'paragraph')
-          AND ctph.noi_dung_tra_loi IS NOT NULL
-          AND LEN(ctph.noi_dung_tra_loi) > 2
-        ORDER BY ch.id, ph.danh_gia DESC
+        WHERE ch.form_id = @formId AND ch.loai IN ('short_text', 'long_text', 'text', 'paragraph', 'grid_radio', 'grid_checkbox')
+          AND ${answerExpr} IS NOT NULL
+          AND LEN(${answerExpr}) > 2
+        ORDER BY ch.id
       `);
+
+    const phanHoiRes = await new sql.Request()
+      .input("formId", sql.Int, formId)
+      .query(`
+        SELECT ph.id, ${senderNameExpr} AS ho_ten, ${senderEmailExpr} AS email, ph.ngay_gui,
+               ${ratingExpr} AS danh_gia,
+               ${contentExpr} AS noi_dung, ${sentimentExpr} AS cam_xuc, ${statusExpr} AS trang_thai,
+               ${optionalField(phanHoiColumns, "doi_tuong_nop")},
+               ${optionalField(phanHoiColumns, "lop")},
+               ${optionalField(phanHoiColumns, "khoa")},
+               ${optionalField(phanHoiColumns, "giao_vien")}
+        FROM PhanHoi ph
+        WHERE ph.form_id = @formId
+        ORDER BY ph.ngay_gui
+      `);
+
+    const chitietRes = await new sql.Request()
+      .input("formId", sql.Int, formId)
+      .query(`
+        SELECT ctph.phan_hoi_id, ctph.cau_hoi_id,
+               ${answerExpr} AS noi_dung,
+               ctph.diem_danh_gia,
+               lc.noi_dung AS lua_chon_text
+        FROM ChiTietPhanHoi ctph
+        INNER JOIN CauHoi ch ON ch.id = ctph.cau_hoi_id
+        LEFT JOIN LuaChon lc ON lc.id = ctph.lua_chon_id
+        WHERE ch.form_id = @formId
+        ORDER BY ctph.phan_hoi_id, ctph.cau_hoi_id
+      `);
+
+    const answerMap = {};
+    for (const ct of chitietRes.recordset) {
+      if (!answerMap[ct.phan_hoi_id]) answerMap[ct.phan_hoi_id] = {};
+      const prev = answerMap[ct.phan_hoi_id][ct.cau_hoi_id];
+      const val = ct.lua_chon_text || ct.noi_dung || (ct.diem_danh_gia != null ? String(ct.diem_danh_gia) : "");
+      answerMap[ct.phan_hoi_id][ct.cau_hoi_id] = prev ? prev + "; " + val : val;
+    }
+
+    const responses = phanHoiRes.recordset.map(ph => {
+      const base = {
+        id: ph.id,
+        ngay_gui: ph.ngay_gui,
+        ho_ten: ph.ho_ten || "",
+        email: ph.email || "",
+        noi_dung: ph.noi_dung || "",
+        cam_xuc: ph.cam_xuc || "",
+        trang_thai: ph.trang_thai || "",
+        doi_tuong_nop: ph.doi_tuong_nop || "",
+        lop: ph.lop || "",
+        khoa: ph.khoa || "",
+        giao_vien: ph.giao_vien || "",
+        danh_gia: ph.danh_gia || "",
+      };
+      for (const q of questions) {
+        base["q_" + q.id] = (answerMap[ph.id] || {})[q.id] || "";
+      }
+      return base;
+    });
 
     res.json({
       form:                  formRes.recordset[0],
       rating_dist:           ratingRes.recordset,
       rating_dist_by_q:     ratingDistByQRes.recordset,
       timeline:              timelineRes.recordset,
-      questions:             questionsRes.recordset,
+      questions,
       choice_stats:          choiceStatsRes.recordset,
       rating_stats:          ratingStatsRes.recordset,
       status_dist:           statusRes.recordset,
       text_stats:            textStatsRes.recordset,
+      responses,
     });
 
   } catch (err) { err500(res, err); }
@@ -385,10 +571,11 @@ router.post("/import-excel", uploadExcel, authMiddleware, authorize("export_data
     const nhanVienId = req.user?.id || null;
 
     // 1. Tạo Form
+    const loaiKhaoSatId = await getDefaultLoaiKhaoSatId();
     const insertForm = await sql.query`
-      INSERT INTO Form (ten_form, danh_muc, trang_thai, nhan_vien_id, luot_xem, ngay_tao)
+      INSERT INTO Form (ten_form, loai_khao_sat_id, trang_thai, nhan_vien_id, luot_xem, ngay_tao)
       OUTPUT INSERTED.id
-      VALUES (${tenForm}, N'Import', 'active', ${nhanVienId}, 0, GETDATE())`;
+      VALUES (${tenForm}, ${loaiKhaoSatId}, 'active', ${nhanVienId}, 0, GETDATE())`;
     const formId = insertForm.recordset[0].id;
 
     // 2. Phân loại cột từ cleanExcel → tạo CauHoi
@@ -418,7 +605,7 @@ router.post("/import-excel", uploadExcel, authMiddleware, authorize("export_data
     }
 
     res.status(201).json({
-      message: "Import thành công — form đã lưu vào Quản lý biểu mẫu",
+      message: "Import thành công — biểu mẫu đã lưu vào Quản lý biểu mẫu",
       form_id: formId, ten_form: tenForm,
       so_cau_hoi: colMeta.length, so_hang: dataRows.length,
       skipped,
@@ -614,6 +801,25 @@ router.get("/export/:form_id", authMiddleware, authorize("export_data"), async (
 
   try {
     const phanHoiColumns = await getPhanHoiColumns(sql);
+    const chiTietColumnsRes = await sql.query`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'ChiTietPhanHoi'
+    `;
+    const chiTietColumns = new Set(chiTietColumnsRes.recordset.map(row => row.COLUMN_NAME));
+    const senderNameExpr = phanHoiColumns.has("ho_ten")
+      ? "ph.ho_ten"
+      : (phanHoiColumns.has("ho_ten_nguoi_gui") ? "ph.ho_ten_nguoi_gui" : "NULL");
+    const senderEmailExpr = phanHoiColumns.has("email")
+      ? "ph.email"
+      : (phanHoiColumns.has("email_nguoi_gui") ? "ph.email_nguoi_gui" : "NULL");
+    const ratingExpr = phanHoiColumns.has("danh_gia") ? "ph.danh_gia" : "NULL";
+    const contentExpr = phanHoiColumns.has("noi_dung") ? "ph.noi_dung" : "NULL";
+    const sentimentExpr = phanHoiColumns.has("cam_xuc") ? "ph.cam_xuc" : "NULL";
+    const statusExpr = phanHoiColumns.has("trang_thai") ? "ph.trang_thai" : "NULL";
+    const answerExpr = chiTietColumns.has("noi_dung_tra_loi")
+      ? "ctph.noi_dung_tra_loi"
+      : (chiTietColumns.has("cau_tra_loi") ? "ctph.cau_tra_loi" : "NULL");
 
     // 1. Lấy danh sách câu hỏi
     const questionsRes = await sql.query`
@@ -626,8 +832,9 @@ router.get("/export/:form_id", authMiddleware, authorize("export_data"), async (
     const phanHoiRes = await new sql.Request()
       .input("formId", sql.Int, formId)
       .query(`
-        SELECT ph.id, ph.ho_ten, ph.email, ph.ngay_gui, ph.danh_gia,
-               ph.noi_dung, ph.cam_xuc, ph.trang_thai,
+        SELECT ph.id, ${senderNameExpr} AS ho_ten, ${senderEmailExpr} AS email, ph.ngay_gui,
+               ${ratingExpr} AS danh_gia,
+               ${contentExpr} AS noi_dung, ${sentimentExpr} AS cam_xuc, ${statusExpr} AS trang_thai,
                ${optionalField(phanHoiColumns, "lop")},
                ${optionalField(phanHoiColumns, "khoa")},
                ${optionalField(phanHoiColumns, "giao_vien")}
@@ -641,7 +848,7 @@ router.get("/export/:form_id", authMiddleware, authorize("export_data"), async (
       .input("formId", sql.Int, formId)
       .query(`
         SELECT ctph.phan_hoi_id, ctph.cau_hoi_id,
-               ctph.noi_dung_tra_loi AS noi_dung,
+               ${answerExpr} AS noi_dung,
                ctph.diem_danh_gia,
                lc.noi_dung AS lua_chon_text
         FROM ChiTietPhanHoi ctph

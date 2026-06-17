@@ -26,28 +26,29 @@ let deleteStaffId = null;
 let activeStaffDetail = null;
 
 const roleBadge = (r) =>
-  (r === "admin" || r === "manager")
+  r === "admin"
     ? '<span class="badge" style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa">Quản lý</span>'
-    : '<span class="badge badge-gray">Nhân viên</span>';
+    : '<span class="badge" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe">Nhân viên</span>';
 
 const roleLabel = (r) =>
-  r === "admin" ? "Quản lý" : r === "manager" ? "Quản lý" : "Nhân viên";
+  r === "admin" ? "Quản lý" : "Nhân viên";
 
 function mapStaff(s) {
   return {
     id: s.id,
     name: s.ho_ten,
     email: s.email,
+    ten_dang_nhap: s.ten_dang_nhap,
     phone: s.so_dien_thoai || "---",
     role: s.vai_tro,
     dept: s.phong_ban || "Chưa phân công",
     status: s.trang_thai,
-    forms: 0,
+    forms: s.forms || 0,
     last: s.ngay_tao
       ? new Date(s.ngay_tao).toLocaleDateString("vi-VN")
       : "---",
     seed: s.email,
-    color: "#0ea5e9",
+    color: "#00008B",
   };
 }
 
@@ -139,6 +140,14 @@ function updateStats() {
 }
 
 document.getElementById("page-content").innerHTML = `
+  <style>
+    #add-staff-modal input[type="password"]::-ms-reveal,
+    #add-staff-modal input[type="password"]::-ms-clear,
+    #staff-edit-modal input[type="password"]::-ms-reveal,
+    #staff-edit-modal input[type="password"]::-ms-clear {
+      display: none;
+    }
+  </style>
   <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between">
     <div>
       <h2 class="page-title">Quản lý nhân viên</h2>
@@ -152,16 +161,16 @@ document.getElementById("page-content").innerHTML = `
   <div class="grid-3" style="margin-bottom:20px">
     ${statCard(
       "Tổng nhân viên",
-      `<span id="stat-total">0</span>`,
-      "#0ea5e9",
-      "#e0f2fe",
+      `<span id="stat-total" style="color:#00008B">0</span>`,
+      "#00008B",
+      "#eff6ff",
       '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>'
     )}
     ${statCard(
       "Đang hoạt động",
-      `<span id="stat-active" style="color:#10b981">0</span>`,
-      "#10b981",
-      "#dcfce7",
+      `<span id="stat-active" style="color:#f97316">0</span>`,
+      "#f97316",
+      "#ffedd5",
       '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'
     )}
     ${statCard(
@@ -194,7 +203,7 @@ document.getElementById("page-content").innerHTML = `
   </div>
 
   <div class="modal-overlay" id="add-staff-modal">
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:580px">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:580px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">
       <div class="modal-header">
         <div>
           <div class="modal-title">Thêm nhân viên mới</div>
@@ -202,7 +211,7 @@ document.getElementById("page-content").innerHTML = `
         </div>
         <button class="icon-btn close-btn" onclick="closeModal('add-staff-modal')">${IC.close}</button>
       </div>
-      <div class="modal-body" style="max-height:72vh;overflow-y:auto">
+      <div class="modal-body" style="flex:1 1 auto;min-height:0;overflow-y:auto">
         <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;font-size:13px;color:#1e40af;line-height:1.5">
           Nhân viên mới sẽ nhận email hướng dẫn kích hoạt tài khoản và thiết lập mật khẩu lần đầu.
         </div>
@@ -210,29 +219,29 @@ document.getElementById("page-content").innerHTML = `
         <div style="border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:20px;margin-bottom:14px">
           <div style="font-size:15px;font-weight:700;color:var(--sky);margin-bottom:16px">Thông tin cá nhân</div>
           <div class="form-group">
-            <label class="form-label">Họ và tên <span style="color:var(--red)">*</span></label>
-            <input type="text" class="input" id="as-name" placeholder="VD: Nguyễn Văn A">
+            <label class="form-label">Họ và tên <span style="color:#ea580c">*</span></label>
+            <input type="text" class="input" id="as-name" placeholder="Ví dụ: Nguyễn Văn A">
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">Email <span style="color:var(--red)">*</span></label>
+              <label class="form-label">Email <span style="color:#ea580c">*</span></label>
               <input type="email" class="input" id="as-email" placeholder="name@flic.edu.vn">
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label">Số điện thoại</label>
-              <input type="tel" class="input" id="as-phone" placeholder="0912345678">
+              <input type="tel" class="input" id="as-phone" placeholder="Nhập số điện thoại">
             </div>
           </div>
         </div>
 
         <div style="border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:20px;margin-bottom:14px">
-          <div style="font-size:15px;font-weight:700;color:#0284c7;margin-bottom:16px">Thông tin công việc</div>
+          <div style="font-size:15px;font-weight:700;color:#00008B;margin-bottom:16px">Thông tin công việc</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
             <div>
-              <label class="form-label">Vai trò <span style="color:var(--red)">*</span></label>
+              <label class="form-label">Vai trò <span style="color:#ea580c">*</span></label>
               <select class="input" style="width:100%" id="as-role">
                 <option value="staff">Nhân viên</option>
-                <option value="manager">Quản lý</option>
+                <option value="admin">Quản lý</option>
               </select>
             </div>
             <div>
@@ -243,21 +252,30 @@ document.getElementById("page-content").innerHTML = `
               </select>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div>
-              <label class="form-label">Mật khẩu <span style="color:var(--red)">*</span></label>
-              <input type="password" class="input" id="as-pw" placeholder="Nhập mật khẩu">
-            </div>
-            <div>
-              <label class="form-label">Nhập lại mật khẩu <span style="color:var(--red)">*</span></label>
-              <input type="password" class="input" id="as-pw2" placeholder="Xác nhận mật khẩu">
+          <div class="form-group">
+            <label class="form-label">Phòng ban</label>
+            <select class="input" id="as-dept" style="width:100%">
+              <option value="">Chưa phân công</option>
+              <option value="Ngoại ngữ">Ngoại ngữ</option>
+              <option value="Tin học">Tin học</option>
+              <option value="Ban Giám Đốc">Ban Giám Đốc</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Mật khẩu <span style="color:#ea580c">*</span></label>
+            <div style="position:relative">
+              <input type="password" class="input" id="as-pw" placeholder="Nhập mật khẩu" style="padding-right:44px" onmousedown="event.stopPropagation()">
+              <button type="button" class="icon-btn" onclick="generateRandomPassword('as-pw')" title="Tạo mật khẩu ngẫu nhiên"
+                style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:30px;height:30px;color:var(--gray-400)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              </button>
             </div>
           </div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline" onclick="closeModal('add-staff-modal')">Hủy bỏ</button>
-        <button id="btn-open-permission" class="btn btn-outline" style="color:#7c3aed;border-color:#7c3aed" onclick="openPermissionModalForAdd()">
+        <button id="btn-open-permission" class="btn btn-outline" style="color:#f97316;border-color:#f97316" onclick="openPermissionModalForAdd()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
           Phân quyền
         </button>
@@ -278,30 +296,45 @@ document.getElementById("page-content").innerHTML = `
       <div class="modal-body">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
           <div class="form-group" style="margin:0">
-            <label class="form-label">Họ và tên <span style="color:var(--red)">*</span></label>
+            <label class="form-label">Họ và tên <span style="color:#ea580c">*</span></label>
             <input type="text" class="input" id="se-name" placeholder="Nguyễn Văn A">
           </div>
           <div class="form-group" style="margin:0">
-            <label class="form-label">Email <span style="color:var(--red)">*</span></label>
+            <label class="form-label">Email <span style="color:#ea580c">*</span></label>
             <input type="email" class="input" id="se-email" placeholder="name@flic.edu.vn">
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label">Số điện thoại</label>
-            <input type="tel" class="input" id="se-phone" placeholder="0912345678">
+            <input type="tel" class="input" id="se-phone" placeholder="Nhập số điện thoại">
           </div>
           <div class="form-group" style="margin:0">
-            <label class="form-label">Vai trò <span style="color:var(--red)">*</span></label>
+            <label class="form-label">Phòng ban</label>
+            <select class="input" id="se-dept">
+              <option value="">Chưa phân công</option>
+              <option value="Ngoại ngữ">Ngoại ngữ</option>
+              <option value="Tin học">Tin học</option>
+              <option value="Ban Giám Đốc">Ban Giám Đốc</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Vai trò <span style="color:#ea580c">*</span></label>
             <select class="input" id="se-role">
-              <option value="manager">Quản lý</option>
+              <option value="admin">Quản lý</option>
               <option value="staff">Nhân viên</option>
             </select>
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label">Mật khẩu mới</label>
-            <input type="password" class="input" id="se-pw" placeholder="Để trống nếu không đổi">
+            <div style="position:relative">
+              <input type="password" class="input" id="se-pw" placeholder="Để trống nếu không đổi" style="padding-right:44px" onmousedown="event.stopPropagation()">
+              <button type="button" class="icon-btn" onclick="generateRandomPassword('se-pw')" title="Tạo mật khẩu ngẫu nhiên"
+                style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:30px;height:30px;color:var(--gray-400)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              </button>
+            </div>
           </div>
           <div class="form-group" style="margin:0">
-            <label class="form-label">Trạng thái <span style="color:var(--red)">*</span></label>
+            <label class="form-label">Trạng thái <span style="color:#ea580c">*</span></label>
             <select class="input" id="se-status">
               <option value="active">Hoạt động</option>
               <option value="inactive">Không hoạt động</option>
@@ -310,7 +343,7 @@ document.getElementById("page-content").innerHTML = `
         </div>
 
         <div style="display:flex;justify-content:flex-end">
-          <button id="btn-edit-permission" class="btn btn-outline" style="color:#7c3aed;border-color:#7c3aed" onclick="openPermissionModalForEdit()">
+          <button id="btn-edit-permission" class="btn btn-outline" style="color:#f97316;border-color:#f97316" onclick="openPermissionModalForEdit()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
             Sửa phân quyền
           </button>
@@ -334,7 +367,7 @@ document.getElementById("page-content").innerHTML = `
       </div>
       <div class="modal-body">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--gray-100)">
-          <img id="sd-avatar" src="" style="width:72px;height:72px;border-radius:50%;border:3px solid #e0f2fe;object-fit:cover">
+          <img id="sd-avatar" src="" style="width:72px;height:72px;border-radius:50%;border:3px solid #00008B;object-fit:cover">
           <div>
             <div id="sd-name" style="font-size:18px;font-weight:800;color:var(--gray-900);margin-bottom:2px"></div>
             <div id="sd-dept" style="font-size:13px;color:var(--gray-500);margin-bottom:8px"></div>
@@ -390,58 +423,46 @@ document.getElementById("page-content").innerHTML = `
         ${[
           {
             group: "Quản lý biểu mẫu",
-            color: "#0ea5e9",
-            bg: "#e0f2fe",
             perms: [
               { id: "p-view-form",   label: "Xem danh sách biểu mẫu",  checked: true  },
-              { id: "p-add-form",    label: "Thêm biểu mẫu",           checked: false },
-              { id: "p-edit-form",   label: "Sửa biểu mẫu",            checked: false },
-              { id: "p-delete-form", label: "Xóa biểu mẫu",            checked: false },
+              { id: "p-add-form",    label: "Thêm biểu mẫu",           checked: true },
+              { id: "p-edit-form",   label: "Sửa biểu mẫu",            checked: true },
+              { id: "p-delete-form", label: "Xóa biểu mẫu",            checked: true },
             ],
           },
           {
             group: "Thư viện câu hỏi",
-            color: "#06b6d4",
-            bg: "#cffafe",
             perms: [
               { id: "p-view-library",   label: "Xem danh sách câu hỏi", checked: true  },
-              { id: "p-add-library",    label: "Thêm câu hỏi",          checked: false },
-              { id: "p-edit-library",   label: "Sửa câu hỏi",           checked: false },
-              { id: "p-delete-library", label: "Xóa câu hỏi",           checked: false },
+              { id: "p-add-library",    label: "Thêm câu hỏi",          checked: true },
+              { id: "p-edit-library",   label: "Sửa câu hỏi",           checked: true },
+              { id: "p-delete-library", label: "Xóa câu hỏi",           checked: true },
             ],
           },
           {
             group: "Phê duyệt",
-            color: "#10b981",
-            bg: "#dcfce7",
             perms: [
-              { id: "p-view-appr", label: "Xem yêu cầu phê duyệt", checked: true },
+              { id: "p-view-appr", label: "Xem yêu cầu phê duyệt", checked: false },
               { id: "p-approve", label: "Phê duyệt / Từ chối", checked: false },
-              { id: "p-share-form", label: "Chia sẻ form", checked: false },
+              { id: "p-share-form", label: "Chia sẻ biểu mẫu", checked: false },
             ],
           },
           {
             group: "Báo cáo & Thống kê",
-            color: "#8b5cf6",
-            bg: "#f3e8ff",
             perms: [
               { id: "p-view-report", label: "Xem báo cáo", checked: true },
-              { id: "p-export", label: "Xuất dữ liệu", checked: false },
+              { id: "p-export", label: "Xuất dữ liệu", checked: true },
             ],
           },
           {
             group: "Quản lý nhân viên",
-            color: "#f97316",
-            bg: "#ffedd5",
             perms: [
-              { id: "p-view-staff", label: "Xem danh sách nhân viên", checked: true },
+              { id: "p-view-staff", label: "Xem danh sách nhân viên", checked: false },
               { id: "p-manage-staff", label: "Thêm / Sửa / Xóa / Vô hiệu hóa nhân viên", checked: false },
             ],
           },
           {
             group: "Thông báo",
-            color: "#ec4899",
-            bg: "#fce7f3",
             perms: [
               { id: "p-view-notif", label: "Xem thông báo", checked: true },
               { id: "p-send-notif", label: "Tạo & Gửi thông báo", checked: false },
@@ -449,8 +470,6 @@ document.getElementById("page-content").innerHTML = `
           },
           {
             group: "Quản lý phản hồi",
-            color: "#f59e0b",
-            bg: "#fef3c7",
             perms: [
               { id: "p-view-feedback", label: "Xem phản hồi", checked: true },
               { id: "p-delete-feedback", label: "Xóa phản hồi", checked: false },
@@ -461,17 +480,19 @@ document.getElementById("page-content").innerHTML = `
             (g) => `
           <div style="margin-bottom:18px">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-              <span style="width:10px;height:10px;border-radius:50%;background:${g.color};display:inline-block"></span>
-              <span style="font-size:13.5px;font-weight:700;color:var(--gray-800)">${g.group}</span>
+              <div style="width:24px;height:24px;border-radius:6px;background:#e0e7ff;display:flex;align-items:center;justify-content:center;color:#00008B">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"/></svg>
+              </div>
+              <span style="font-size:14px;font-weight:700;color:#00008B">${g.group}</span>
             </div>
-            <div style="background:${g.bg}30;border:1px solid ${g.color}30;border-radius:var(--radius-lg);padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+            <div style="background:#f4f8ff;border:1px solid #dbeafe;border-radius:var(--radius-lg);padding:14px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.02)">
               ${g.perms
                 .map(
                   (p) => `
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:var(--gray-700)">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:var(--gray-800);font-weight:500;transition:all 0.2s" onmouseover="this.style.color='#00008B'" onmouseout="this.style.color='var(--gray-800)'">
                   <input type="checkbox" id="${p.id}" ${
                     p.checked ? "checked" : ""
-                  } style="width:16px;height:16px;accent-color:${g.color};cursor:pointer">
+                  } style="width:16px;height:16px;accent-color:#00008B;cursor:pointer;flex-shrink:0">
                   ${p.label}
                 </label>
               `
@@ -492,48 +513,71 @@ document.getElementById("page-content").innerHTML = `
     </div>
   </div>
 
-  <div class="modal-overlay" id="staff-delete-modal">
-    <div class="modal" style="max-width:420px" onclick="event.stopPropagation()">
+  <div class="modal-overlay" id="staff-delete-modal" style="z-index:9999;">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;border-radius:14px">
       <div class="modal-header">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:36px;height:36px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            ${IC.trashSm}
-          </div>
-          <span class="modal-title">Xác nhận xóa</span>
-        </div>
-        <button class="icon-btn close-btn" onclick="closeModal('staff-delete-modal')">${IC.close}</button>
+        <div><div class="modal-title" style="color:var(--red)">Xóa nhân viên</div>
+        <div style="font-size:12.5px;color:var(--gray-400);margin-top:2px">Xác nhận hành động</div></div>
+        <button class="icon-btn close-btn" onclick="closeModal('staff-delete-modal')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
-      <div class="modal-body">
-        <p style="color:var(--gray-700);margin:0 0 14px">Bạn có chắc muốn xóa nhân viên này?</p>
-        <div style="background:var(--gray-50);border-radius:var(--radius);padding:12px;display:flex;align-items:center;gap:12px">
-          <div id="sdel-avatar" class="avatar-initials" style="background:#0ea5e9;font-size:13px;width:40px;height:40px;flex-shrink:0"></div>
-          <div>
-            <div id="sdel-name" style="font-weight:700;font-size:14px"></div>
-            <div id="sdel-dept" style="font-size:12px;color:var(--gray-500)"></div>
-          </div>
-        </div>
-        <p style="font-size:12.5px;color:var(--gray-500);margin:12px 0 0">* Lưu ý: Hành động này không thể hoàn tác sau khi xác nhận.</p>
+      <div style="padding:20px;font-size:14px;color:var(--gray-700)">
+        Bạn có chắc chắn muốn xóa nhân viên <strong id="sdel-name"></strong> này không? Hành động này không thể hoàn tác.
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeModal('staff-delete-modal')">Hủy</button>
-        <button class="btn btn-primary" style="background:#dc2626;border-color:#dc2626" onclick="confirmDeleteStaff()">${IC.trashSm}Xóa</button>
+        <button class="btn btn-outline" onclick="closeModal('staff-delete-modal')">Hủy bỏ</button>
+        <button class="btn" style="background:var(--red);color:#fff" onclick="confirmDeleteStaff()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          Xóa nhân viên
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="staff-disable-modal" style="z-index:9999;">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;border-radius:14px">
+      <div class="modal-header">
+        <div><div class="modal-title" style="color:#d97706" id="sdisable-title">Vô hiệu hóa nhân viên</div>
+        <div style="font-size:12.5px;color:var(--gray-400);margin-top:2px">Xác nhận hành động</div></div>
+        <button class="icon-btn close-btn" onclick="closeModal('staff-disable-modal')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="padding:20px;font-size:14px;color:var(--gray-700)">
+        Bạn có chắc chắn muốn <strong id="sdisable-action"></strong> nhân viên <strong id="sdisable-name"></strong> này không?
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('staff-disable-modal')">Hủy bỏ</button>
+        <button class="btn" style="background:#d97706;color:#fff;border:none;" onclick="confirmDisableStaff()" id="btn-confirm-disable">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+          Xác nhận
+        </button>
       </div>
     </div>
   </div>
 `;
 
 function renderStaff(list) {
+  const sortedList = [...list].sort((a, b) => {
+    if (a.role === 'admin' && b.role !== 'admin') return -1;
+    if (a.role !== 'admin' && b.role === 'admin') return 1;
+    return a.id - b.id;
+  });
+
   document.getElementById("staff-grid").innerHTML =
-    list.length === 0
+    sortedList.length === 0
       ? '<div style="text-align:center;padding:40px;color:var(--gray-400)">Không có nhân viên nào</div>'
-      : list
+      : sortedList
           .map(
             (s) => `
-      <div style="background:#fff;border-radius:var(--radius-lg);border:1px solid var(--gray-200);overflow:hidden;box-shadow:var(--shadow-sm)">
-        <div style="height:72px;background:linear-gradient(135deg,#1976d2,#42a5f5)"></div>
+      <div style="background:#fff;border-radius:var(--radius-lg);border:1px solid var(--gray-200);overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,.05);transition:transform .2s">
+        <div style="height:72px;background:linear-gradient(135deg,#e0e7ff 0%, #bfdbfe 100%)"></div>
         <div style="padding:0 16px 16px">
           <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:-32px;margin-bottom:10px">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${s.seed}" style="width:64px;height:64px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.15)" loading="lazy">
+            ${localStorage.getItem('flic_avatar_' + s.id) 
+              ? `<img src="${localStorage.getItem('flic_avatar_' + s.id)}" style="width:64px;height:64px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.15);object-fit:cover" loading="lazy">` 
+              : `<div style="width:64px;height:64px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.15);background:#00008B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;letter-spacing:1px">${(s.name||'A').split(' ').map(w=>w[0]).join('').slice(-2).toUpperCase()}</div>`}
             <div style="position:relative" onclick="event.stopPropagation()">
               <button onclick="toggleStaffMenu('${s.id}')" style="background:none;border:none;cursor:pointer;color:var(--gray-400);padding:4px;border-radius:4px" onmouseenter="this.style.background='rgba(0,0,0,.05)'" onmouseleave="this.style.background='none'">${IC.dots}</button>
               <div id="smenu-${s.id}" class="export-drop-menu" style="right:0;top:calc(100% + 2px);min-width:120px">
@@ -555,11 +599,12 @@ function renderStaff(list) {
             }">${s.status === "active" ? "Hoạt động" : "Không hoạt động"}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;font-size:12.5px;color:var(--gray-500)">
-            <div style="display:flex;align-items:center;gap:6px">${s.email}</div>
-            <div style="display:flex;align-items:center;gap:6px">${s.phone}</div>
+            <div style="display:flex;align-items:center;gap:6px" title="Tên đăng nhập"><strong style="font-weight:600;color:var(--gray-600)">Tài khoản:</strong> ${s.ten_dang_nhap}</div>
+            <div style="display:flex;align-items:center;gap:6px" title="Email"><strong style="font-weight:600;color:var(--gray-600)">Email:</strong> ${s.email}</div>
+            ${s.phone && s.phone !== 'null' ? `<div style="display:flex;align-items:center;gap:6px" title="Số điện thoại"><strong style="font-weight:600;color:var(--gray-600)">SĐT:</strong> ${s.phone}</div>` : ''}
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:10px;border-top:1px solid var(--gray-100);text-align:center">
-            <div><div style="font-size:20px;font-weight:800;color:#1976d2">${s.forms}</div><div style="font-size:11px;color:var(--gray-500)">Form tạo</div></div>
+            <div><div style="font-size:20px;font-weight:800;color:#00008B">${s.forms}</div><div style="font-size:11px;color:var(--gray-500)">Form tạo</div></div>
             <div><div style="font-size:12px;font-weight:600;color:var(--gray-800)">${s.last}</div><div style="font-size:11px;color:var(--gray-500)">Ngày tạo</div></div>
           </div>
         </div>
@@ -580,10 +625,11 @@ function openAddStaffModal() {
   document.getElementById("as-name").value = "";
   document.getElementById("as-email").value = "";
   document.getElementById("as-phone").value = "";
+  document.getElementById("as-dept").value = "";
   document.getElementById("as-role").value = "staff";
   document.getElementById("as-status").value = "active";
   document.getElementById("as-pw").value = "";
-  document.getElementById("as-pw2").value = "";
+  document.getElementById("as-pw").type = "password";
   resetPermissionData();
   openModal("add-staff-modal");
 }
@@ -609,7 +655,24 @@ async function openStaffDetail(id) {
   if (!s) return;
 
   activeStaffId = id;
-  document.getElementById("sd-avatar").src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.seed}`;
+  const savedAv = localStorage.getItem('flic_avatar_' + s.id);
+  const initStr = (s.name||'A').split(' ').map(w=>w[0]).join('').slice(-2).toUpperCase();
+  const sdAvatar = document.getElementById("sd-avatar");
+  if (savedAv) {
+    sdAvatar.style.display = 'block';
+    sdAvatar.src = savedAv;
+    document.getElementById("sd-avatar-initials")?.remove();
+  } else {
+    sdAvatar.style.display = 'none';
+    let initEl = document.getElementById("sd-avatar-initials");
+    if(!initEl){
+      initEl = document.createElement('div');
+      initEl.id = "sd-avatar-initials";
+      initEl.style.cssText = "width:72px;height:72px;border-radius:50%;border:3px solid #00008B;background:#00008B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;letter-spacing:1px;flex-shrink:0";
+      sdAvatar.parentNode.insertBefore(initEl, sdAvatar);
+    }
+    initEl.textContent = initStr;
+  }
   document.getElementById("sd-name").textContent = s.name;
   document.getElementById("sd-dept").textContent = s.dept;
   document.getElementById("sd-role-badge").innerHTML = roleBadge(s.role);
@@ -643,6 +706,7 @@ async function openStaffEdit(id) {
   document.getElementById("se-name").value = s.name;
   document.getElementById("se-email").value = s.email;
   document.getElementById("se-phone").value = s.phone === "---" ? "" : s.phone;
+  document.getElementById("se-dept").value = s.dept === "Chưa phân công" ? "" : s.dept;
   document.getElementById("se-role").value = s.role;
   document.getElementById("se-status").value = s.status;
   document.getElementById("se-pw").value = "";
@@ -660,6 +724,7 @@ async function openStaffEdit(id) {
       document.getElementById("se-name").value = data.ho_ten || "";
       document.getElementById("se-email").value = data.email || "";
       document.getElementById("se-phone").value = data.so_dien_thoai || "";
+      document.getElementById("se-dept").value = data.phong_ban || "";
       document.getElementById("se-role").value = data.vai_tro || "staff";
       document.getElementById("se-status").value = data.trang_thai || "active";
       setPermissionData(data);
@@ -698,7 +763,8 @@ async function saveStaffEdit() {
   const body = {
     ho_ten: name,
     email,
-    so_dien_thoai: phone,
+    so_dien_thoai: phone || null,
+    phong_ban: document.getElementById("se-dept")?.value?.trim() || null,
     vai_tro: document.getElementById("se-role").value,
     trang_thai: document.getElementById("se-status").value,
     quyen: getPermissionData(),
@@ -736,7 +802,6 @@ async function saveAddStaff() {
   const name = document.getElementById("as-name")?.value?.trim();
   const email = document.getElementById("as-email")?.value?.trim();
   const pw = document.getElementById("as-pw")?.value;
-  const pw2 = document.getElementById("as-pw2")?.value;
 
   if (!name) {
     showToast("Vui lòng nhập họ và tên!", "error");
@@ -754,15 +819,12 @@ async function saveAddStaff() {
     showToast("Mật khẩu phải có ít nhất 6 ký tự!", "error");
     return;
   }
-  if (pw !== pw2) {
-    showToast("Mật khẩu nhập lại không khớp!", "error");
-    return;
-  }
 
   const body = {
     ho_ten: name,
     email,
-    so_dien_thoai: document.getElementById("as-phone")?.value || "",
+    so_dien_thoai: document.getElementById("as-phone")?.value?.trim() || null,
+    phong_ban: document.getElementById("as-dept")?.value?.trim() || null,
     ten_dang_nhap: email.split("@")[0],
     mat_khau: pw,
     vai_tro: document.getElementById("as-role")?.value || "staff",
@@ -803,14 +865,9 @@ function deleteStaff(id) {
   const s = STAFF.find((x) => x.id === id);
   if (!s) return;
 
-  document.getElementById("sdel-avatar").textContent = s.name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  document.getElementById("sdel-name").textContent = s.name;
-  document.getElementById("sdel-dept").textContent = s.dept;
+  const sdelName = document.getElementById("sdel-name");
+  if (sdelName) sdelName.textContent = s.name;
+  
   openModal("staff-delete-modal");
 }
 
@@ -837,7 +894,9 @@ async function confirmDeleteStaff() {
   closeModal("staff-delete-modal");
 }
 
-async function disableStaff(id) {
+let disableStaffId = null;
+
+function disableStaff(id) {
   if (!canManageStaff()) {
     showToast("Bạn không có quyền thực hiện thao tác này", "error");
     return;
@@ -845,11 +904,42 @@ async function disableStaff(id) {
   document.getElementById("smenu-" + id)?.classList.remove("open");
   const s = STAFF.find(x => x.id === id);
   if (!s) return;
+  
+  disableStaffId = id;
+  const newStatus = s.status === "active" ? "inactive" : "active";
+  const label = newStatus === "inactive" ? "vô hiệu hóa" : "kích hoạt lại";
+  
+  const titleEl = document.getElementById("sdisable-title");
+  if (titleEl) {
+    titleEl.textContent = newStatus === "inactive" ? "Vô hiệu hóa nhân viên" : "Kích hoạt nhân viên";
+    titleEl.style.color = newStatus === "inactive" ? "#d97706" : "#16a34a";
+  }
+  
+  const actionEl = document.getElementById("sdisable-action");
+  if (actionEl) actionEl.textContent = label;
+  
+  const nameEl = document.getElementById("sdisable-name");
+  if (nameEl) nameEl.textContent = s.name;
+  
+  const btnEl = document.getElementById("btn-confirm-disable");
+  if (btnEl) {
+    btnEl.style.background = newStatus === "inactive" ? "#d97706" : "#16a34a";
+  }
+  
+  openModal("staff-disable-modal");
+}
+
+async function confirmDisableStaff() {
+  if (!disableStaffId) return;
+  const id = disableStaffId;
+  const s = STAFF.find(x => x.id === id);
+  if (!s) return;
+  
   const newStatus = s.status === "active" ? "inactive" : "active";
   const label = newStatus === "inactive" ? "vô hiệu hóa" : "kích hoạt lại";
   try {
     const headers = authHeaders();
-    if (!headers) return;
+    if (!headers) { closeModal("staff-disable-modal"); return; }
     const res = await fetch(`${API}/${id}/status`, {
       method: "PATCH",
       headers: { ...headers, "Content-Type": "application/json" },
@@ -865,6 +955,7 @@ async function disableStaff(id) {
   } catch (err) {
     showToast("Lỗi kết nối server!", "error");
   }
+  closeModal("staff-disable-modal");
 }
 
 function filterStaff(q) {
@@ -1004,7 +1095,7 @@ async function openStaffSetting(id) {
 
   document.getElementById('smenu-' + id)?.classList.remove('open');
 
-  const roleLabel = s.role === 'admin' ? 'Quản trị viên' : s.role === 'manager' ? 'Quản lý' : 'Nhân viên';
+  const roleLabel = s.role === 'admin' ? 'Quản lý' : 'Nhân viên';
   const statusBadge = s.status === 'active'
     ? '<span class="badge badge-green">Hoạt động</span>'
     : '<span class="badge badge-gray">Ngừng hoạt động</span>';
@@ -1023,7 +1114,7 @@ async function openStaffSetting(id) {
 
   const permGroups = [
     {
-      label: 'Quản lý biểu mẫu', color: '#0ea5e9',
+      label: 'Quản lý biểu mẫu', color: '#00008B',
       items: [
         { key: 'view_form',   label: 'Xem danh sách biểu mẫu' },
         { key: 'add_form',    label: 'Thêm biểu mẫu' },
@@ -1032,7 +1123,7 @@ async function openStaffSetting(id) {
       ]
     },
     {
-      label: 'Thư viện câu hỏi', color: '#06b6d4',
+      label: 'Thư viện câu hỏi', color: '#00008B',
       items: [
         { key: 'view_library',   label: 'Xem danh sách câu hỏi' },
         { key: 'add_library',    label: 'Thêm câu hỏi' },
@@ -1045,7 +1136,7 @@ async function openStaffSetting(id) {
       items: [
         { key: 'view_approval', label: 'Xem phê duyệt' },
         { key: 'approve',       label: 'Phê duyệt / Từ chối' },
-        { key: 'share_form',    label: 'Chia sẻ form' },
+        { key: 'share_form',    label: 'Chia sẻ biểu mẫu' },
       ]
     },
     {
@@ -1081,7 +1172,7 @@ async function openStaffSetting(id) {
   document.getElementById('staff-setting-body').innerHTML = `
     <!-- Thông tin cơ bản -->
     <div style="display:flex;align-items:center;gap:16px;padding:16px;background:#f8fafc;border-radius:12px;margin-bottom:20px">
-      <div style="width:56px;height:56px;border-radius:50%;background:#0ea5e9;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:700;flex-shrink:0">
+      <div style="width:56px;height:56px;border-radius:50%;background:#00008B;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:700;flex-shrink:0">
         ${(s.name||'U')[0].toUpperCase()}
       </div>
       <div style="flex:1">
@@ -1097,7 +1188,7 @@ async function openStaffSetting(id) {
     <!-- Tabs -->
     <div style="display:flex;gap:0;border-bottom:2px solid var(--gray-200);margin-bottom:20px">
       <button onclick="switchSettingTab('tab-info')" id="stab-info"
-        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #0ea5e9;color:#0ea5e9;margin-bottom:-2px">
+        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #00008B;color:#00008B;margin-bottom:-2px">
         Thông tin
       </button>
       <button onclick="switchSettingTab('tab-perm')" id="stab-perm"
@@ -1118,9 +1209,14 @@ async function openStaffSetting(id) {
         <div class="form-group"><label class="form-label">Email</label>
           <input type="email" id="ss-email" class="input" value="${s.email || ''}"></div>
         <div class="form-group"><label class="form-label">Số điện thoại</label>
-          <input type="tel" id="ss-phone" class="input" value="${s.phone !== '---' ? s.phone : ''}"></div>
+          <input type="tel" id="ss-phone" class="input" placeholder="Nhập số điện thoại" value="${s.phone !== '---' ? s.phone : ''}"></div>
         <div class="form-group"><label class="form-label">Phòng ban</label>
-          <input type="text" id="ss-dept" class="input" value="${s.dept || ''}" readonly style="background:var(--gray-50)"></div>
+          <select id="ss-dept" class="input">
+            <option value="" ${!s.dept || s.dept === 'Chưa phân công' ? 'selected' : ''}>Chưa phân công</option>
+            <option value="Ngoại ngữ" ${s.dept === 'Ngoại ngữ' ? 'selected' : ''}>Ngoại ngữ</option>
+            <option value="Tin học" ${s.dept === 'Tin học' ? 'selected' : ''}>Tin học</option>
+            <option value="Ban Giám Đốc" ${s.dept === 'Ban Giám Đốc' ? 'selected' : ''}>Ban Giám Đốc</option>
+          </select></div>
         <div class="form-group"><label class="form-label">Vai trò</label>
           <input type="text" class="input" value="${roleLabel}" readonly style="background:var(--gray-50)"></div>
         <div class="form-group"><label class="form-label">Ngày tạo</label>
@@ -1192,25 +1288,47 @@ function switchSettingTab(tabId) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
     const active = tabMap[tabId] === btnId;
-    btn.style.borderBottomColor = active ? '#0ea5e9' : 'transparent';
-    btn.style.color = active ? '#0ea5e9' : 'var(--gray-400)';
+    btn.style.borderBottomColor = active ? '#00008B' : 'transparent';
+    btn.style.color = active ? '#00008B' : 'var(--gray-400)';
   });
 }
 
-function togglePwField(id) {
+function togglePwField(id, btn) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.type = el.type === 'password' ? 'text' : 'password';
+  const isPw = el.type === 'password';
+  el.type = isPw ? 'text' : 'password';
+  if (btn) {
+    if (btn.classList.contains('icon-btn')) {
+      btn.innerHTML = isPw ? IC.eye_off : IC.eye;
+    } else {
+      btn.innerText = isPw ? 'Ẩn' : 'Hiện';
+    }
+  }
+  el.focus();
+}
+
+function generateRandomPassword(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const randomPw = 'FLIC@' + Math.floor(100000 + Math.random() * 900000);
+  el.type = 'text';
+  el.value = randomPw;
+  el.focus();
+  el.select();
+  showToast('Đã tạo mật khẩu ngẫu nhiên (Vui lòng copy gửi cho nhân viên)', 'success');
 }
 
 async function saveStaffSetting() {
   const modal = document.getElementById('staff-setting-modal');
   const id = parseInt(modal.dataset.staffId, 10);
   if (!id) return;
+  const staff = STAFF.find(x => x.id === id);
 
   const name  = document.getElementById('ss-name')?.value?.trim();
   const email = document.getElementById('ss-email')?.value?.trim();
   const phone = document.getElementById('ss-phone')?.value?.trim();
+  const dept  = document.getElementById('ss-dept')?.value?.trim();
   const pw    = document.getElementById('ss-pw')?.value || '';
 
   if (!name)  { showToast('Họ tên không được để trống!', 'error'); switchSettingTab('tab-info'); return; }
@@ -1232,7 +1350,15 @@ async function saveStaffSetting() {
     quyen[k] = el ? el.checked : false;
   });
 
-  const body = { ho_ten: name, email, so_dien_thoai: phone, quyen };
+  const body = {
+    ho_ten: name,
+    email,
+    so_dien_thoai: phone || null,
+    phong_ban: dept || null,
+    vai_tro: staff?.role || 'staff',
+    trang_thai: staff?.status || 'active',
+    quyen,
+  };
   if (pw) body.mat_khau = pw;
 
   try {

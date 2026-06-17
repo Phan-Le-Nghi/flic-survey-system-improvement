@@ -32,12 +32,22 @@ function applyPageQuyen(rules) {
 
 // ===== SHARED LAYOUT GENERATOR =====
 function renderLayout(pageId, pageTitle, contentHTML) {
-  const logo = '../src/assets/bb21610d5fa0b1d8a65b7ce9827d83c61bf7a2c5.png';
   const user  = getUser() || {};
+  const avatarSrc = localStorage.getItem('flic_avatar_' + user.id) || '';
   const q     = getQuyen();
   const isAdm = user.vai_tro === 'admin' || user.vai_tro === 'manager';
+  const logo = '../src/assets/bb21610d5fa0b1d8a65b7ce9827d83c61bf7a2c5.png';
   const displayName = user.ho_ten || 'User';
   const roleLabel   = (user.vai_tro==='admin' || user.vai_tro==='manager') ? 'Quản lý' : 'Nhân viên';
+  const initials = displayName.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase();
+  const headerAvatarHtml = avatarSrc
+    ? `<img id="header-user-avatar" src="${avatarSrc}" alt="Avatar" class="user-avatar-logo" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
+    : `<div id="header-user-avatar" class="avatar-initials" style="background:#00008B;width:100%;height:100%;font-size:14px;display:flex;align-items:center;justify-content:center;color:#fff;border-radius:50%;font-weight:600">${initials}</div>`;
+
+  const fixedLabels = {
+    feedbackManagement: 'Qu\u1ea3n l\u00fd ph\u1ea3n h\u1ed3i',
+    staffManagement: 'Qu\u1ea3n l\u00fd nh\u00e2n vi\u00ean',
+  };
 
   const navItems = [
     { id:'home',      label:'Trang chủ',           href:'dashboard.html', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>' },
@@ -48,8 +58,8 @@ function renderLayout(pageId, pageTitle, contentHTML) {
     { id:'library',                 label:'Thư viện câu hỏi',   href:'library.html',           show:()=>q.view_form||q.add_form||isAdm, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>' },
     { id:'approval-management',     label:'Quản lý phê duyệt', href:'approval.html',          show:()=>q.view_approval||q.approve, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>' },
     { id:'reports-statistics',      label:'Báo cáo - thống kê',href:'reports.html',           show:()=>q.view_report||q.export_data, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>' },
-    { id:'feedback-management',     label:'Quản lý phản hồi',  href:'feedback.html',          show:()=>q.view_feedback||q.delete_feedback, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>' },
-    { id:'staff-management',        label:'Quản lý nhân viên', href:'staff.html',             show:()=>q.view_staff||q.manage_staff, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>' },
+    { id:'feedback-management',     label:fixedLabels.feedbackManagement,  href:'feedback.html',          show:()=>q.view_feedback||q.delete_feedback, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>' },
+    { id:'staff-management',        label:fixedLabels.staffManagement, href:'staff.html',             show:()=>q.view_staff||q.manage_staff, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>' },
     { id:'notification-management', label:'Quản lý thông báo', href:'notifications-mgmt.html',show:()=>q.view_notif||q.send_notif, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>' },
     { id:'trash',                   label:'Thùng rác',          href:'trash.html',             show:()=>q.delete_form||isAdm, icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V4h6v2"/></svg>' },
   ];
@@ -62,23 +72,26 @@ function renderLayout(pageId, pageTitle, contentHTML) {
     <aside class="sidebar">
       <div class="sidebar-logo">
         <img src="${logo}" alt="FLIC Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-        <div style="display:none;font-size:20px;font-weight:700;color:#38bdf8">FLIC</div>
+        <div style="display:none;font-size:20px;font-weight:700;color:#fff">FLIC</div>
         <div class="sidebar-tagline">TT Ngoại ngữ - Tin học (FLIC)</div>
       </div>
-      <nav class="sidebar-nav">
-        ${navItems.map(ni).join('')}
-        ${visibleMgmt.length?'<div class="sidebar-section-label">Quản lý</div>':''}
-        ${visibleMgmt.map(ni).join('')}
-      </nav>
-      <div class="sidebar-bottom">
-        <a href="settings.html" class="sidebar-item${pageId==='settings'?' active':''}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-          <span>Cài đặt</span>
-        </a>
-        <button onclick="logout()" class="sidebar-item logout" style="width:100%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          <span>Đăng xuất</span>
-        </button>
+      <div class="sidebar-scroll">
+        <nav class="sidebar-nav">
+          ${navItems.map(ni).join('')}
+          ${visibleMgmt.length?'<div class="sidebar-section-label">Quản lý</div>':''}
+          ${visibleMgmt.map(ni).join('')}
+        </nav>
+        <div class="sidebar-bottom">
+          <a href="settings.html" class="sidebar-item${pageId==='settings'?' active':''}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <span>Cài đặt</span>
+          </a>
+          
+          <a href="audit-logs.html" class="sidebar-item${pageId==='audit-logs'?' active':''}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Nhật ký hoạt động</span>
+          </a>
+        </div>
       </div>
     </aside>
     <div class="main-content">
@@ -94,7 +107,7 @@ function renderLayout(pageId, pageTitle, contentHTML) {
             <span id="bell-badge" style="display:none;position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:999px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px"></span>
           </button>
           <div class="user-chip" onclick="toggleUserDropdown(event)" style="cursor:pointer;position:relative;user-select:none">
-            <div class="user-avatar"><img src="${logo}" alt="FLIC Logo" class="user-avatar-logo" onerror="this.style.display='none';this.parentElement.textContent='F'"></div>
+            <div class="user-avatar" id="header-avatar-container">${headerAvatarHtml}</div>
             <span class="user-name">${displayName}</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-left:4px;opacity:0.6"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
@@ -163,47 +176,154 @@ function logout() {
 }
 
 // ===== BELL NOTIFICATIONS =====
-const BELL_LS_NOTIFS = 'flic_notifications';
-const BELL_READ_KEY  = 'flic_bell_read_count';
+const BELL_API_BASE = 'http://localhost:3000/api/notifications';
 const _bellIcon = {
-  info:    `<svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  info:    `<svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="2" width="18" height="18"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>`,
   success: `<svg viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" width="18" height="18"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
   warning: `<svg viewBox="0 0 24 24" fill="none" stroke="#ca8a04" stroke-width="2" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  error:   `<svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  error:   `<svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
 };
-const _bellBg = { info:'#dbeafe', success:'#dcfce7', warning:'#fef9c3', error:'#fee2e2' };
-const getBellNotifs = () => { try { return JSON.parse(localStorage.getItem(BELL_LS_NOTIFS))||[]; } catch { return []; } };
+const _bellBg = { info:'#eff6ff', success:'#dcfce7', warning:'#fef9c3', error:'#fee2e2' };
+
+let currentBellNotifs = [];
+let currentUnreadCount = 0;
+
+window.fetchUnreadNotifications = async function() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const res = await fetch(BELL_API_BASE, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (res.ok) {
+      const allNotifs = await res.json();
+      const user = getUser();
+      
+      currentBellNotifs = allNotifs.filter(n => {
+        if (n.trang_thai !== 'sent') return false;
+        if (!n.nguoi_nhan) return true;
+        const r = String(n.nguoi_nhan).toLowerCase();
+        if (r === 'tất cả' || r === 'all') return true;
+        
+        const recips = String(n.nguoi_nhan).split(',').map(s => s.trim().toLowerCase());
+        const uName = (user?.ho_ten || '').toLowerCase();
+        const uEmail = (user?.email || '').toLowerCase();
+        const uId = String(user?.id).toLowerCase();
+        
+        return recips.includes(uName) || recips.includes(uEmail) || recips.includes(uId);
+      });
+      
+      const readStateStr = localStorage.getItem('flic_bell_read_state') || '{}';
+      let readState = {};
+      try { readState = JSON.parse(readStateStr); } catch(e){}
+      
+      currentUnreadCount = currentBellNotifs.filter(n => !readState[n.id]).length;
+      updateBellBadge();
+      renderBellNotifs();
+    }
+  } catch(e) { console.error("fetchUnreadNotifications error", e); }
+};
 
 function updateBellBadge() {
   const badge = document.getElementById('bell-badge');
   if (!badge) return;
-  const unread = Math.max(0, getBellNotifs().length - parseInt(localStorage.getItem(BELL_READ_KEY)||'0', 10));
-  badge.textContent = unread > 99 ? '99+' : unread;
-  badge.style.display = unread > 0 ? 'inline-block' : 'none';
+  badge.textContent = currentUnreadCount > 99 ? '99+' : currentUnreadCount;
+  badge.style.display = currentUnreadCount > 0 ? 'inline-block' : 'none';
 }
+
 function renderBellNotifs() {
   const body = document.getElementById('notif-panel-body');
   if (!body) return;
-  const notifs = getBellNotifs().slice(0, 10);
+  
+  const readStateStr = localStorage.getItem('flic_bell_read_state') || '{}';
+  let readState = {};
+  try { readState = JSON.parse(readStateStr); } catch(e){}
+  
+  const notifs = currentBellNotifs.slice(0, 10);
   body.innerHTML = notifs.length
     ? notifs.map(n => {
-        const t = n.type || 'info';
-        return `<div class="notif-item${n._bellNew?' unread':''}">
-          <div class="notif-icon" style="background:${_bellBg[t]||'#dbeafe'}">${_bellIcon[t]||_bellIcon.info}</div>
-          <div><div class="notif-title">${n.title||''}</div><div class="notif-msg">${n.msg||''}</div><div class="notif-time">${n.date||''}</div></div>
+        const t = n.loai || 'info';
+        const isUnread = !readState[n.id];
+        
+        const dateStr = n.ngay_gui || n.ngay_tao;
+        let timeDisplay = '';
+        if (dateStr) {
+          const d = new Date(dateStr);
+          timeDisplay = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        }
+        
+        return `<div class="notif-item${isUnread?' unread':''}" onclick="handleNotifClick('${n.id}', this)" style="cursor:pointer;">
+          <div class="notif-icon" style="background:${_bellBg[t]||'#eff6ff'}">${_bellIcon[t]||_bellIcon.info}</div>
+          <div><div class="notif-title">${n.tieu_de||''}</div><div class="notif-msg">${n.noi_dung||''}</div><div class="notif-time">${timeDisplay}</div></div>
         </div>`;
       }).join('')
     : '<div style="text-align:center;padding:32px;color:var(--gray-400);font-size:13px">Chưa có thông báo nào</div>';
-  updateBellBadge();
 }
-function markBellRead() { localStorage.setItem(BELL_READ_KEY, String(getBellNotifs().length)); updateBellBadge(); }
+
+function markBellRead() { 
+  const readStateStr = localStorage.getItem('flic_bell_read_state') || '{}';
+  let readState = {};
+  try { readState = JSON.parse(readStateStr); } catch(e){}
+  
+  currentBellNotifs.forEach(n => { readState[n.id] = true; });
+  localStorage.setItem('flic_bell_read_state', JSON.stringify(readState));
+  
+  currentUnreadCount = 0;
+  updateBellBadge(); 
+  renderBellNotifs();
+}
+
+window.handleNotifClick = async function(id, el) {
+  try {
+    const token = localStorage.getItem('token');
+    if (token) {
+      await fetch(BELL_API_BASE + '/' + id + '/read', {
+         method: 'POST',
+         headers: { 'Authorization': 'Bearer ' + token }
+      });
+    }
+  } catch(e) {}
+  
+  const readStateStr = localStorage.getItem('flic_bell_read_state') || '{}';
+  let readState = {};
+  try { readState = JSON.parse(readStateStr); } catch(e){}
+  readState[id] = true;
+  localStorage.setItem('flic_bell_read_state', JSON.stringify(readState));
+  
+  if (el) el.classList.remove('unread');
+  if (currentUnreadCount > 0) currentUnreadCount--;
+  updateBellBadge();
+  
+  if (window.location.pathname.endsWith('notifications-mgmt.html') && typeof openNotifDetail === 'function') {
+    closePanel('notif-panel');
+    openNotifDetail(id);
+  } else {
+    window.location.href = 'notifications-mgmt.html?view=' + id;
+  }
+};
 
 const _origOpenPanel = window.openPanel;
 window.openPanel = function(id) {
   _origOpenPanel?.(id);
-  if (id === 'notif-panel') { renderBellNotifs(); markBellRead(); }
+  if (id === 'notif-panel') { fetchUnreadNotifications(); markBellRead(); }
 };
-window.addEventListener('storage', e => { if (e.key===BELL_LS_NOTIFS) { renderBellNotifs(); updateBellBadge(); } });
-setInterval(updateBellBadge, 3000);
-renderBellNotifs();
-updateBellBadge();
+
+setInterval(fetchUnreadNotifications, 5000);
+fetchUnreadNotifications();
+
+// ===== INACTIVITY TIMEOUT (30 MINUTES) =====
+let inactivityTimer;
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(() => {
+    alert('Phiên đăng nhập đã tự động kết thúc do bạn không thao tác trong 30 phút. Vui lòng đăng nhập lại để tiếp tục.');
+    logout();
+  }, 30 * 60 * 1000); // 30 phút
+}
+
+['mousemove', 'keydown', 'scroll', 'click', 'touchstart'].forEach(evt => {
+  document.addEventListener(evt, resetInactivityTimer, { passive: true });
+});
+
+resetInactivityTimer();
+

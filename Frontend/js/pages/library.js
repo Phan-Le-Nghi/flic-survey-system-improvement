@@ -9,16 +9,36 @@ let expandedId = null;
 let addingNew  = false;
 let searchVal  = '';
 let _loading   = false;
+let libraryPage = 1;
+const LIB_PAGE_SIZE = 10;
+let libraryFilters = { category: 'Tất cả', survey: 'Tất cả', target: 'Tất cả' };
 
 const esc  = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const TOKEN = () => localStorage.getItem('token') || '';
 const AUTH  = () => TOKEN() ? { Authorization: `Bearer ${TOKEN()}` } : {};
 
 const TYPE_LABELS  = {choice:'Trắc nghiệm',checkbox:'Hộp kiểm',dropdown:'Thả xuống',paragraph:'Đoạn văn',short_text:'Đoạn văn',long_text:'Đoạn văn',text:'Đoạn văn',rating:'Xếp hạng',star_rating:'Xếp hạng',scale:'Tuyến tính',grid_radio:'Lưới trắc nghiệm',grid_checkbox:'Lưới hộp kiểm'};
-const TYPE_COLORS  = {choice:'#eff6ff;color:#1d4ed8',checkbox:'#f0fdf4;color:#166534',dropdown:'#fef9c3;color:#854d0e',paragraph:'#eef2ff;color:#4338ca',short_text:'#eef2ff;color:#4338ca',long_text:'#eef2ff;color:#4338ca',text:'#eef2ff;color:#4338ca',rating:'#fff7ed;color:#b45309',star_rating:'#fff7ed;color:#b45309',scale:'#eef2ff;color:#4338ca',grid_radio:'#fdf4ff;color:#6b21a8',grid_checkbox:'#f0fdf4;color:#065f46'};
+const TYPE_COLORS  = {choice:'#00008B;color:#00008B',checkbox:'#f0fdf4;color:#166534',dropdown:'#fef9c3;color:#854d0e',paragraph:'#00008B;color:#00008B',short_text:'#00008B;color:#00008B',long_text:'#00008B;color:#00008B',text:'#00008B;color:#00008B',rating:'#fff7ed;color:#b45309',star_rating:'#fff7ed;color:#b45309',scale:'#00008B;color:#00008B',grid_radio:'#fdf4ff;color:#6b21a8',grid_checkbox:'#f0fdf4;color:#065f46'};
 const NEEDS_OPTS   = ['choice','checkbox','dropdown','rating','scale'];
 const DEFAULT_RATING_OPTS = ['1','2','3','4','5'];
 const NEEDS_GRID   = ['grid_radio','grid_checkbox'];
+const CATEGORY_OPTIONS = ['Ngoại ngữ', 'Tin học'];
+const TARGET_OPTIONS = ['Tất cả', 'Sinh viên', 'Người đi làm'];
+const FALLBACK_SURVEY_TYPES = {
+  'Ngoại ngữ': ['VSTEP', 'TOEIC'],
+  'Tin học': ['CNTT Cơ bản', 'CNTT Nâng cao', 'Tableau', 'Python', 'MOS', 'IC3'],
+};
+const SURVEY_ALIASES = {
+  'Ngoại ngữ': {
+    'Khảo sát chất lượng giảng dạy': 'VSTEP',
+    'Khảo sát nguyện vọng chứng chỉ': 'TOEIC',
+  },
+  'Tin học': {
+    'Khảo sát cơ sở vật chất': 'CNTT Cơ bản',
+    'Khảo sát dịch vụ hỗ trợ': 'CNTT Nâng cao',
+    'Khảo sát đăng ký lịch thi': 'MOS',
+  },
+};
 const TYPE_OPTION_LABELS = {
   choice:'◉ Trắc nghiệm',
   checkbox:'☑ Hộp kiểm',
@@ -34,12 +54,60 @@ function normalizeQuestionType(type) {
   if (type === 'star_rating') return 'rating';
   return type;
 }
+function getLibraryImage(item) {
+  return item?.image || item?.image_url || item?.hinh_anh_url || '';
+}
+function getLibraryVideo(item) {
+  return item?.video || item?.video_url || '';
+}
+function normalizeCategory(value) {
+  const text = String(value || '').trim();
+  if (text.includes('Ngoại ngữ')) return 'Ngoại ngữ';
+  if (text.includes('Tin học')) return 'Tin học';
+  return CATEGORY_OPTIONS.includes(text) ? text : 'Khác';
+}
+function normalizeTarget(value) {
+  const text = String(value || 'Tất cả').trim();
+  return TARGET_OPTIONS.includes(text) ? text : 'Tất cả';
+}
+function normalizeSurveyName(category, value) {
+  const text = String(value || '').trim();
+  return SURVEY_ALIASES[category]?.[text] || text;
+}
+function getLibrarySurvey(item) {
+  const category = normalizeCategory(item?.category || item?.bo_mon || item?.danh_muc);
+  return normalizeSurveyName(category, item?.loai_khao_sat || item?.survey_type || item?.ten_loai);
+}
+function normalizeLibraryItem(item) {
+  const image = getLibraryImage(item);
+  const video = getLibraryVideo(item);
+  const category = normalizeCategory(item?.category || item?.bo_mon || item?.danh_muc);
+  const survey = normalizeSurveyName(category, item?.loai_khao_sat || item?.survey_type || item?.ten_loai);
+  const target = normalizeTarget(item?.doi_tuong || item?.target);
+  return {
+    ...item,
+    bo_mon: category,
+    category,
+    loai_khao_sat: survey,
+    survey_type: survey,
+    doi_tuong: target,
+    target,
+    image,
+    image_url: image,
+    hinh_anh_url: image,
+    video,
+    video_url: video,
+    opts: Array.isArray(item?.opts) ? item.opts : [],
+    rows: Array.isArray(item?.rows) ? item.rows : [],
+    cols: Array.isArray(item?.cols) ? item.cols : [],
+  };
+}
 function renderTextPreview(type) {
   const normalizedType = normalizeQuestionType(type);
   if (normalizedType === 'paragraph') {
     return `
-      <div style="font-size:11px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Câu trả lời mẫu</div>
-      <textarea disabled class="input" rows="4" placeholder="Người trả lời sẽ nhập văn bản tại đây" style="height:auto;padding:10px 12px;font-size:12.5px;background:#eef2ff;color:#94a3b8;border-color:#c7d2fe;resize:none"></textarea>`;
+      <div style="font-size:11px;font-weight:700;color:#00008B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Câu trả lời mẫu</div>
+      <textarea disabled class="input" rows="4" placeholder="Người trả lời sẽ nhập văn bản tại đây" style="height:auto;padding:10px 12px;font-size:12.5px;background:#00008B;color:#fff;border-color:#fff;resize:none"></textarea>`;
   }
   return '';
 }
@@ -62,29 +130,44 @@ document.getElementById('page-content').innerHTML = `
   </div>
 </div>
 
-<!-- Tabs -->
-<div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:20px">
-  <button id="tab-nn" onclick="switchTab('ngoaingu')"
-    style="padding:10px 24px;border:none;background:none;font-size:13.5px;font-weight:700;cursor:pointer;border-bottom:3px solid #2563eb;color:#2563eb;margin-bottom:-2px;transition:all .15s">
-    🌐 Ngoại ngữ (<span id="count-ngoaingu">0</span>)
-  </button>
-  <button id="tab-th" onclick="switchTab('tinhoc')"
-    style="padding:10px 24px;border:none;background:none;font-size:13.5px;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;color:#94a3b8;margin-bottom:-2px;transition:all .15s">
-    💻 Tin học (<span id="count-tinhoc">0</span>)
-  </button>
+<!-- Filters -->
+<div style="display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px;border-bottom:2px solid #e2e8f0;margin-bottom:18px;padding-bottom:16px">
+  <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.35px">
+    Danh mục
+    <select id="lib-filter-category" class="input" style="height:40px;font-size:13px;text-transform:none;letter-spacing:0" onchange="setLibraryFilter('category', this.value)">
+      <option value="Tất cả">Tất cả danh mục</option>
+      <option value="Ngoại ngữ">Ngoại ngữ</option>
+      <option value="Tin học">Tin học</option>
+    </select>
+  </label>
+  <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.35px">
+    Loại khảo sát
+    <select id="lib-filter-survey" class="input" style="height:40px;font-size:13px;text-transform:none;letter-spacing:0" onchange="setLibraryFilter('survey', this.value)">
+      <option value="Tất cả">Tất cả loại khảo sát</option>
+    </select>
+  </label>
+  <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.35px">
+    Đối tượng
+    <select id="lib-filter-target" class="input" style="height:40px;font-size:13px;text-transform:none;letter-spacing:0" onchange="setLibraryFilter('target', this.value)">
+      <option value="Tất cả">Tất cả đối tượng</option>
+      <option value="Sinh viên">Sinh viên</option>
+      <option value="Người đi làm">Người đi làm</option>
+    </select>
+  </label>
 </div>
 
 <!-- Search -->
 <div style="margin-bottom:16px">
   <div class="input-wrap" style="margin:0">
     <div class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
-    <input type="text" id="lib-search" class="input" placeholder="Tìm câu hỏi..." oninput="searchVal=this.value;renderList()">
+    <input type="text" id="lib-search" class="input" placeholder="Tìm câu hỏi..." oninput="searchVal=this.value;libraryPage=1;expandedId=null;renderList()">
   </div>
   <div id="lib-result-count" style="font-size:12.5px;color:#94a3b8;margin-top:6px"></div>
 </div>
 
 <!-- List -->
 <div id="lib-list" style="display:flex;flex-direction:column;gap:0;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.05)"></div>
+<div id="lib-pagination" style="display:none"></div>
 
 <!-- Confirm delete -->
 <div id="del-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9999;align-items:center;justify-content:center">
@@ -111,8 +194,29 @@ async function apiFetch(url, options = {}) {
     headers: { 'Content-Type': 'application/json', ...AUTH(), ...(options.headers || {}) },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || `Lỗi ${res.status}`);
+  if (!res.ok) throw new Error(data.error ? `${data.message || `Lỗi ${res.status}`}: ${data.error}` : (data.message || `Lỗi ${res.status}`));
   return data;
+}
+
+function buildLibraryPayload(item, overrides = {}) {
+  const next = normalizeLibraryItem({ ...item, ...overrides });
+  return {
+    bo_mon: next.bo_mon,
+    category: next.bo_mon,
+    loai_khao_sat: next.loai_khao_sat || next.survey_type || '',
+    survey_type: next.loai_khao_sat || next.survey_type || '',
+    doi_tuong: normalizeTarget(next.doi_tuong || next.target),
+    target: normalizeTarget(next.doi_tuong || next.target),
+    text: next.text,
+    type: normalizeQuestionType(next.type || 'choice'),
+    opts: next.opts || [],
+    rows: next.rows || [],
+    cols: next.cols || [],
+    required: !!next.required,
+    bat_buoc: !!next.bat_buoc,
+    image: getLibraryImage(next) || null,
+    video: getLibraryVideo(next) || null,
+  };
 }
 
 // ── Load từ API ───────────────────────────────────────────────────
@@ -121,7 +225,7 @@ async function loadLibFromAPI() {
   _loading = true;
   renderList();
   try {
-    const list = await apiFetch('/library');
+    const list = (await apiFetch('/library')).map(normalizeLibraryItem);
     libData.ngoaingu = list.filter(q => q.bo_mon === 'Ngoại ngữ');
     libData.tinhoc   = list.filter(q => q.bo_mon === 'Tin học');
     syncFlatCache();
@@ -144,31 +248,107 @@ function syncFlatCache() {
   } catch {}
 }
 
-// ── Tab ───────────────────────────────────────────────────────────
+function getAllLibraryItems() {
+  return [...(libData.ngoaingu || []), ...(libData.tinhoc || [])].map(normalizeLibraryItem);
+}
+
+function getSurveyOptionsForCategory(category = libraryFilters.category) {
+  const dataOptions = getAllLibraryItems()
+    .filter(item => category === 'Tất cả' || item.category === category)
+    .map(getLibrarySurvey)
+    .filter(Boolean);
+  const fallbackOptions = category === 'Tất cả'
+    ? Object.values(FALLBACK_SURVEY_TYPES).flat()
+    : (FALLBACK_SURVEY_TYPES[category] || []);
+  return [...new Set([...dataOptions, ...fallbackOptions])].sort((a, b) => a.localeCompare(b, 'vi'));
+}
+
+function getFilteredLibraryItems() {
+  const q = (searchVal || '').toLowerCase().trim();
+  return getAllLibraryItems().filter(item => {
+    const matchCategory = libraryFilters.category === 'Tất cả' || item.category === libraryFilters.category;
+    const matchSurvey = libraryFilters.survey === 'Tất cả' || getLibrarySurvey(item) === libraryFilters.survey;
+    const matchTarget = libraryFilters.target === 'Tất cả' || normalizeTarget(item.doi_tuong || item.target) === libraryFilters.target;
+    const matchSearch = !q || String(item.text || '').toLowerCase().includes(q);
+    return matchCategory && matchSurvey && matchTarget && matchSearch;
+  });
+}
+
+function renderLibraryFilterOptions() {
+  const categoryEl = document.getElementById('lib-filter-category');
+  const surveyEl = document.getElementById('lib-filter-survey');
+  const targetEl = document.getElementById('lib-filter-target');
+  if (categoryEl) categoryEl.value = libraryFilters.category;
+  if (targetEl) targetEl.value = libraryFilters.target;
+  if (surveyEl) {
+    const surveys = getSurveyOptionsForCategory();
+    if (libraryFilters.survey !== 'Tất cả' && !surveys.includes(libraryFilters.survey)) {
+      libraryFilters.survey = 'Tất cả';
+    }
+    surveyEl.innerHTML = `<option value="Tất cả">Tất cả loại khảo sát</option>` +
+      surveys.map(type => `<option value="${esc(type)}" ${libraryFilters.survey === type ? 'selected' : ''}>${esc(type)}</option>`).join('');
+  }
+}
+
+function setLibraryFilter(key, value) {
+  libraryFilters[key] = value || 'Tất cả';
+  if (key === 'category') libraryFilters.survey = 'Tất cả';
+  expandedId = null;
+  addingNew = false;
+  libraryPage = 1;
+  renderLibraryFilterOptions();
+  renderList();
+}
+
+function surveyOptionsMarkup(category, selected = '', includeAll = false) {
+  const options = getSurveyOptionsForCategory(category);
+  return `${includeAll ? '<option value="Tất cả">Tất cả loại khảo sát</option>' : '<option value="">Chọn loại khảo sát</option>'}` +
+    options.map(type => `<option value="${esc(type)}" ${selected === type ? 'selected' : ''}>${esc(type)}</option>`).join('');
+}
+
+function syncNewSurveyOptions() {
+  const category = document.getElementById('new-q-category')?.value || 'Ngoại ngữ';
+  const survey = document.getElementById('new-q-survey');
+  if (!survey) return;
+  const current = survey.value;
+  survey.innerHTML = surveyOptionsMarkup(category, current, false);
+  if ([...survey.options].some(option => option.value === current)) survey.value = current;
+}
+
+function syncEditSurveyOptions(id) {
+  const category = document.getElementById('edit-bomon-' + id)?.value || 'Ngoại ngữ';
+  const survey = document.getElementById('edit-survey-' + id);
+  if (!survey) return;
+  const current = survey.value;
+  survey.innerHTML = surveyOptionsMarkup(category, current, false);
+  if ([...survey.options].some(option => option.value === current)) survey.value = current;
+}
+
+// ── Filter compatibility ──────────────────────────────────────────
 
 function switchTab(tab) {
-  activeTab  = tab;
+  activeTab = tab;
+  libraryFilters.category = tab === 'tinhoc' ? 'Tin học' : 'Ngoại ngữ';
+  libraryFilters.survey = 'Tất cả';
   expandedId = null;
   addingNew  = false;
   searchVal  = '';
+  libraryPage = 1;
   const s = document.getElementById('lib-search');
   if (s) s.value = '';
-  document.getElementById('tab-nn').style.borderBottom = tab==='ngoaingu' ? '3px solid #2563eb' : '3px solid transparent';
-  document.getElementById('tab-nn').style.color        = tab==='ngoaingu' ? '#2563eb' : '#94a3b8';
-  document.getElementById('tab-th').style.borderBottom = tab==='tinhoc'   ? '3px solid #2563eb' : '3px solid transparent';
-  document.getElementById('tab-th').style.color        = tab==='tinhoc'   ? '#2563eb' : '#94a3b8';
+  renderLibraryFilterOptions();
   renderList();
 }
 
 function updateCounts() {
-  document.getElementById('count-ngoaingu').textContent = libData.ngoaingu.length;
-  document.getElementById('count-tinhoc').textContent   = libData.tinhoc.length;
+  renderLibraryFilterOptions();
 }
 
 // ── Render list ───────────────────────────────────────────────────
 
 function renderList() {
   const list = document.getElementById('lib-list');
+  const pager = document.getElementById('lib-pagination');
   if (!list) return;
 
   if (_loading) {
@@ -176,14 +356,28 @@ function renderList() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28" style="animation:spin 1s linear infinite;margin:0 auto 12px;display:block"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-dasharray="28" stroke-dashoffset="10"/></svg>
       <div style="font-size:13.5px;font-weight:600">Đang tải dữ liệu từ server...</div>
     </div>`;
+    if (pager) pager.style.display = 'none';
     return;
   }
 
   const q     = (searchVal || '').toLowerCase().trim();
-  const items = (libData[activeTab] || []).filter(item => !q || item.text.toLowerCase().includes(q));
+  const totalInScope = getAllLibraryItems().filter(item => {
+    const matchCategory = libraryFilters.category === 'Tất cả' || item.category === libraryFilters.category;
+    const matchSurvey = libraryFilters.survey === 'Tất cả' || getLibrarySurvey(item) === libraryFilters.survey;
+    const matchTarget = libraryFilters.target === 'Tất cả' || normalizeTarget(item.doi_tuong || item.target) === libraryFilters.target;
+    return matchCategory && matchSurvey && matchTarget;
+  }).length;
+  const items = getFilteredLibraryItems();
+  const totalPages = Math.max(1, Math.ceil(items.length / LIB_PAGE_SIZE));
+  if (libraryPage > totalPages) libraryPage = totalPages;
+  if (libraryPage < 1) libraryPage = 1;
+  const start = (libraryPage - 1) * LIB_PAGE_SIZE;
+  const pageItems = items.slice(start, start + LIB_PAGE_SIZE);
 
   document.getElementById('lib-result-count').textContent =
-    q ? `${items.length} / ${libData[activeTab].length} câu hỏi` : `${items.length} câu hỏi`;
+    q
+      ? `${items.length} / ${totalInScope} câu hỏi${items.length ? ` · Hiển thị ${start + 1}-${Math.min(start + LIB_PAGE_SIZE, items.length)}` : ''}`
+      : `${items.length} câu hỏi${items.length ? ` · Hiển thị ${start + 1}-${Math.min(start + LIB_PAGE_SIZE, items.length)}` : ''}`;
   updateCounts();
 
   if (!items.length && !addingNew) {
@@ -192,13 +386,14 @@ function renderList() {
       <div style="font-size:14px;font-weight:600;margin-bottom:4px">${q ? 'Không tìm thấy câu hỏi phù hợp' : 'Chưa có câu hỏi nào'}</div>
       <div style="font-size:12.5px">${q ? 'Thử từ khóa khác' : 'Bấm "+ Thêm câu hỏi" để bắt đầu'}</div>
     </div>`;
+    if (pager) pager.style.display = 'none';
     return;
   }
 
   let html = '';
   if (addingNew) html += renderAddForm();
 
-  items.forEach((item, idx) => {
+  pageItems.forEach((item, idx) => {
     const sid     = String(item.id);
     const normalizedType = normalizeQuestionType(item.type);
     const tl      = TYPE_LABELS[normalizedType] || normalizedType;
@@ -206,7 +401,9 @@ function renderList() {
     const isOpen  = expandedId === sid;
     const hasOpts = NEEDS_OPTS.includes(item.type);
     const hasGrid = NEEDS_GRID.includes(item.type);
-    const isLast  = idx === items.length - 1 && !addingNew;
+    const imageUrl = getLibraryImage(item);
+    const videoUrl = getLibraryVideo(item);
+    const isLast  = idx === pageItems.length - 1 && !addingNew;
 
     html += `
     <div id="qrow-${sid}" style="border-bottom:${isLast?'none':'1px solid #f1f5f9'};transition:background .12s${isOpen?';background:#f8faff':''}">
@@ -215,15 +412,20 @@ function renderList() {
           <div style="font-size:13.5px;font-weight:600;color:#0f172a;line-height:1.4;margin-bottom:4px">${esc(item.text)}</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;background:${tc}">${tl}</span>
+            <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eef2ff;color:#00008B">${esc(item.category)}</span>
+            ${getLibrarySurvey(item) ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#f8fafc;color:#475569">${esc(getLibrarySurvey(item))}</span>` : ''}
+            <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#ecfeff;color:#0e7490">${esc(normalizeTarget(item.doi_tuong || item.target))}</span>
             ${hasOpts && item.opts.length ? `<span style="font-size:11.5px;color:#94a3b8">${item.opts.length} lựa chọn</span>` : ''}
             ${hasGrid ? `<span style="font-size:11.5px;color:#94a3b8">${(item.rows||[]).length} hàng · ${(item.cols||[]).length} cột</span>` : ''}
+            ${imageUrl ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#1d4ed8">Có ảnh</span>` : ''}
+            ${videoUrl ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#f5f3ff;color:#6d28d9">Có video</span>` : ''}
           </div>
         </div>
         <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
           <div class="lib-row-actions" style="display:flex;gap:2px;opacity:0;transition:opacity .15s">
             <button onclick="event.stopPropagation();libAddImage('${sid}')" title="Thêm hình ảnh"
               style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-              onmouseenter="this.style.color='#0ea5e9';this.style.background='#e0f2fe'"
+              onmouseenter="this.style.color='#00008B';this.style.background='#00008B'"
               onmouseleave="this.style.color='#94a3b8';this.style.background='none'">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             </button>
@@ -250,12 +452,12 @@ function renderList() {
       </div>
 
       ${isOpen ? `
-      <div style="padding:4px 16px 16px;background:#f8faff;border-top:1px solid #e0e7ff" onclick="event.stopPropagation()">
+      <div style="padding:4px 16px 16px;background:#f8faff;border-top:1px solid #00008B" onclick="event.stopPropagation()">
         <div style="margin-bottom:12px">
           <label style="font-size:11.5px;font-weight:700;color:#374151;display:block;margin-bottom:5px">Nội dung câu hỏi</label>
           <input id="edit-text-${sid}" type="text" class="input" value="${esc(item.text)}" style="font-size:13px">
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px">
           <div>
             <label style="font-size:11.5px;font-weight:700;color:#374151;display:block;margin-bottom:5px">Loại câu hỏi</label>
             <select id="edit-type-${sid}" class="input" style="height:36px;font-size:13px" onchange="onEditTypeChange('${sid}')">
@@ -263,14 +465,27 @@ function renderList() {
             </select>
           </div>
           <div>
-            <label style="font-size:11.5px;font-weight:700;color:#374151;display:block;margin-bottom:5px">Bộ môn</label>
-            <select id="edit-bomon-${sid}" class="input" style="height:36px;font-size:13px">
+            <label style="font-size:11.5px;font-weight:700;color:#374151;display:block;margin-bottom:5px">Danh mục</label>
+            <select id="edit-bomon-${sid}" class="input" style="height:36px;font-size:13px" onchange="syncEditSurveyOptions('${sid}')">
               <option value="Ngoại ngữ" ${item.bo_mon==='Ngoại ngữ'?'selected':''}>🌐 Ngoại ngữ</option>
               <option value="Tin học"   ${item.bo_mon==='Tin học'?'selected':''}>💻 Tin học</option>
             </select>
           </div>
+          <div>
+            <label style="font-size:11.5px;font-weight:700;color:#374151;display:block;margin-bottom:5px">Loại khảo sát</label>
+            <select id="edit-survey-${sid}" class="input" style="height:36px;font-size:13px">
+              ${surveyOptionsMarkup(item.bo_mon, getLibrarySurvey(item), false)}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11.5px;font-weight:700;color:#374151;display:block;margin-bottom:5px">Đối tượng</label>
+            <select id="edit-target-${sid}" class="input" style="height:36px;font-size:13px">
+              ${TARGET_OPTIONS.map(target => `<option value="${target}" ${normalizeTarget(item.doi_tuong || item.target) === target ? 'selected' : ''}>${target}</option>`).join('')}
+            </select>
+          </div>
         </div>
         <div id="edit-opts-area-${sid}">${renderEditOpts(item)}</div>
+        ${renderLibraryMedia(item)}
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
           <button onclick="cancelExpand()" class="btn btn-outline btn-sm">Hủy</button>
           <button onclick="saveEdit('${sid}')" class="btn btn-primary btn-sm">
@@ -283,6 +498,83 @@ function renderList() {
   });
 
   list.innerHTML = html;
+  renderLibraryPagination(items.length);
+}
+
+function renderLibraryPagination(totalItems) {
+  const pager = document.getElementById('lib-pagination');
+  if (!pager) return;
+  const totalPages = Math.max(1, Math.ceil(totalItems / LIB_PAGE_SIZE));
+  if (totalItems <= LIB_PAGE_SIZE) {
+    pager.style.display = 'none';
+    pager.innerHTML = '';
+    return;
+  }
+
+  const pageButtons = Array.from({ length: totalPages }, (_, i) => i + 1)
+    .filter(page => page === 1 || page === totalPages || Math.abs(page - libraryPage) <= 1)
+    .reduce((acc, page, index, arr) => {
+      if (index && page - arr[index - 1] > 1) acc.push('gap');
+      acc.push(page);
+      return acc;
+    }, []);
+
+  pager.style.display = 'flex';
+  pager.style.alignItems = 'center';
+  pager.style.justifyContent = 'space-between';
+  pager.style.gap = '12px';
+  pager.style.marginTop = '12px';
+  pager.innerHTML = `
+    <div style="font-size:12.5px;color:#64748b;font-weight:600">Trang ${libraryPage} / ${totalPages}</div>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+      <button onclick="goLibraryPage(${libraryPage - 1})" ${libraryPage === 1 ? 'disabled' : ''}
+        class="btn btn-outline btn-sm" style="min-width:38px;height:34px;padding:0 10px;${libraryPage === 1 ? 'opacity:.45;cursor:not-allowed' : ''}">Trước</button>
+      ${pageButtons.map(page => page === 'gap'
+        ? `<span style="padding:0 4px;color:#94a3b8;font-weight:700">...</span>`
+        : `<button onclick="goLibraryPage(${page})"
+            style="width:34px;height:34px;border-radius:9px;border:1.5px solid ${page === libraryPage ? '#00008B' : '#dbe3ef'};background:${page === libraryPage ? '#00008B' : '#fff'};color:${page === libraryPage ? '#fff' : '#334155'};font-size:12.5px;font-weight:800;cursor:pointer">${page}</button>`
+      ).join('')}
+      <button onclick="goLibraryPage(${libraryPage + 1})" ${libraryPage === totalPages ? 'disabled' : ''}
+        class="btn btn-outline btn-sm" style="min-width:38px;height:34px;padding:0 10px;${libraryPage === totalPages ? 'opacity:.45;cursor:not-allowed' : ''}">Sau</button>
+    </div>`;
+}
+
+function goLibraryPage(page) {
+  const totalItems = getFilteredLibraryItems().length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / LIB_PAGE_SIZE));
+  libraryPage = Math.min(Math.max(1, page), totalPages);
+  expandedId = null;
+  renderList();
+}
+
+function renderLibraryMedia(item) {
+  const sid = String(item.id);
+  const imageUrl = getLibraryImage(item);
+  const videoUrl = getLibraryVideo(item);
+  if (!imageUrl && !videoUrl) return '';
+
+  return `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px">
+      ${imageUrl ? `
+        <div style="border:1.5px solid #dbeafe;border-radius:12px;background:#f8fbff;padding:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+            <span style="font-size:11.5px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.35px">Hình ảnh</span>
+            <button onclick="libRemoveMedia('${sid}','image')" style="border:none;background:transparent;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer">Gỡ</button>
+          </div>
+          <img src="${esc(imageUrl)}" alt="" style="display:block;max-width:100%;max-height:180px;border-radius:10px;object-fit:cover;border:1px solid #bfdbfe;background:#fff">
+        </div>` : ''}
+      ${videoUrl ? `
+        <div style="border:1.5px solid #ede9fe;border-radius:12px;background:#fbfaff;padding:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+            <span style="font-size:11.5px;font-weight:800;color:#6d28d9;text-transform:uppercase;letter-spacing:.35px">Video</span>
+            <button onclick="libRemoveMedia('${sid}','video')" style="border:none;background:transparent;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer">Gỡ</button>
+          </div>
+          <a href="${esc(videoUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;color:#4c1d95;font-size:12.5px;font-weight:700;text-decoration:none;word-break:break-all">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="2" y="2" width="20" height="20" rx="5"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>
+            ${esc(videoUrl)}
+          </a>
+        </div>` : ''}
+    </div>`;
 }
 
 function renderEditOpts(item) {
@@ -312,24 +604,24 @@ function renderEditOpts(item) {
   }
   if (normalizedType === 'scale') {
     const opts = item.opts && item.opts.length >= 2 ? item.opts : ['',''];
-    return `<div style="padding:12px 14px;border:1px solid #c7d2fe;border-radius:12px;background:linear-gradient(180deg,#f8f9ff 0%,#eef2ff 100%)">
-      <div style="font-size:11px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">⟷ Phạm vi tuyến tính (1–5)</div>
+    return `<div style="padding:12px 14px;border:1px solid #00008B;border-radius:12px;background:linear-gradient(180deg,#f8f9ff 0%,#00008B 100%)">
+      <div style="font-size:11px;font-weight:700;color:#00008B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">⟷ Phạm vi tuyến tính (1–5)</div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        ${[1,2,3,4,5].map(n=>`<div style="width:36px;height:36px;border-radius:50%;border:2px solid #a5b4fc;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#4338ca;background:#fff">${n}</div>`).join('')}
+        ${[1,2,3,4,5].map(n=>`<div style="width:36px;height:36px;border-radius:50%;border:2px solid #a5b4fc;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#00008B;background:#fff">${n}</div>`).join('')}
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <div style="flex:1">
           <div style="font-size:11px;color:#6366f1;font-weight:600;margin-bottom:4px">Nhãn đầu (tuỳ chọn)</div>
-          <input type="text" value="${esc(opts[0])}" placeholder="vd: Không hài lòng" data-opt="0"
-            style="width:100%;padding:6px 10px;border:1px solid #c7d2fe;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s"
-            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#c7d2fe'">
+          <input type="text" value="${esc(opts[0])}" placeholder="Ví dụ: Không hài lòng" data-opt="0"
+            style="width:100%;padding:6px 10px;border:1px solid #00008B;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s"
+            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#00008B'">
         </div>
         <div style="font-size:18px;color:#a5b4fc">→</div>
         <div style="flex:1">
           <div style="font-size:11px;color:#6366f1;font-weight:600;margin-bottom:4px">Nhãn cuối (tuỳ chọn)</div>
-          <input type="text" value="${esc(opts[1])}" placeholder="vd: Rất hài lòng" data-opt="1"
-            style="width:100%;padding:6px 10px;border:1px solid #c7d2fe;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s"
-            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#c7d2fe'">
+          <input type="text" value="${esc(opts[1])}" placeholder="Ví dụ: Rất hài lòng" data-opt="1"
+            style="width:100%;padding:6px 10px;border:1px solid #00008B;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s"
+            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#00008B'">
         </div>
       </div>
     </div>`;
@@ -341,7 +633,7 @@ function renderEditOpts(item) {
       <div id="opts-list-${item.id}" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px">
         ${opts.map((o,i) => _optRow(item.id, o, i, opts.length, normalizedType)).join('')}
       </div>
-      <button onclick="addEditOpt('${item.id}')" style="padding:5px 14px;background:transparent;border:1.5px dashed #7dd3fc;border-radius:7px;cursor:pointer;color:#0284c7;font-size:12px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#e0f2fe';this.style.borderColor='#0ea5e9'" onmouseleave="this.style.background='transparent';this.style.borderColor='#7dd3fc'">+ Thêm lựa chọn</button>`;
+      <button onclick="addEditOpt('${item.id}')" style="padding:5px 14px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:12px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#00008B';this.style.borderColor='#fff'" onmouseleave="this.style.background='transparent';this.style.borderColor='#00008B'">+ Thêm lựa chọn</button>`;
   }
   if (NEEDS_GRID.includes(normalizedType)) {
     return `
@@ -354,11 +646,11 @@ function renderEditOpts(item) {
           <button onclick="addGridRow('${item.id}','row')" style="padding:4px 10px;background:transparent;border:1.5px dashed #c4b5fd;border-radius:7px;cursor:pointer;color:#7c3aed;font-size:11.5px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#f5f3ff'" onmouseleave="this.style.background='transparent'">+ Thêm hàng</button>
         </div>
         <div>
-          <div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🔷 Cột (lựa chọn)</div>
+          <div style="font-size:11px;font-weight:700;color:#00008B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🔷 Cột (lựa chọn)</div>
           <div id="cols-list-${item.id}" style="display:flex;flex-direction:column;gap:5px;margin-bottom:6px">
             ${(item.cols||['']).map((c,i) => _gridRow(item.id,'col',c,i,normalizedType)).join('')}
           </div>
-          <button onclick="addGridRow('${item.id}','col')" style="padding:4px 10px;background:transparent;border:1.5px dashed #7dd3fc;border-radius:7px;cursor:pointer;color:#0284c7;font-size:11.5px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#e0f2fe'" onmouseleave="this.style.background='transparent'">+ Thêm cột</button>
+          <button onclick="addGridRow('${item.id}','col')" style="padding:4px 10px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:11.5px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#00008B'" onmouseleave="this.style.background='transparent'">+ Thêm cột</button>
         </div>
       </div>`;
   }
@@ -393,7 +685,7 @@ function _optRow(qid, val, idx, total, type) {
 function _gridRow(qid, kind, val, idx, type) {
   const icon = kind==='row'
     ? `<span style="width:14px;height:14px;border-radius:${type==='grid_radio'?'50%':'3px'};border:1.5px solid #c4b5fd;flex-shrink:0;display:inline-block;background:#fff"></span>`
-    : `<span style="width:14px;height:14px;border-radius:${type==='grid_radio'?'50%':'3px'};border:1.5px solid #7dd3fc;flex-shrink:0;display:inline-block;background:#fff"></span>`;
+    : `<span style="width:14px;height:14px;border-radius:${type==='grid_radio'?'50%':'3px'};border:1.5px solid #00008B;flex-shrink:0;display:inline-block;background:#fff"></span>`;
   return `<div style="display:flex;align-items:center;gap:6px">
     ${icon}
     <input type="text" value="${esc(val)}" data-idx="${idx}" class="input" style="flex:1;height:30px;font-size:12px" placeholder="${kind==='row'?'Hàng':'Cột'} ${idx+1}">
@@ -474,8 +766,11 @@ async function saveEdit(qid) {
   if (!item) return;
   const text   = (document.getElementById('edit-text-'  + qid)?.value || '').trim();
   const bo_mon = document.getElementById('edit-bomon-'  + qid)?.value || item.bo_mon;
+  const loai_khao_sat = document.getElementById('edit-survey-' + qid)?.value || getLibrarySurvey(item);
+  const doi_tuong = document.getElementById('edit-target-' + qid)?.value || normalizeTarget(item.doi_tuong || item.target);
   const type   = document.getElementById('edit-type-'   + qid)?.value || item.type;
   if (!text) { showToast('Vui lòng nhập nội dung câu hỏi', 'error'); return; }
+  if (!loai_khao_sat) { showToast('Vui lòng chọn loại khảo sát', 'error'); return; }
 
   let opts = item.opts || [], rows = item.rows || [], cols = item.cols || [];
   if (NEEDS_OPTS.includes(type))
@@ -489,7 +784,10 @@ async function saveEdit(qid) {
   if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
 
   try {
-    await apiFetch(`/library/${qid}`, { method: 'PUT', body: JSON.stringify({ bo_mon, text, type, opts, rows, cols }) });
+    await apiFetch(`/library/${qid}`, {
+      method: 'PUT',
+      body: JSON.stringify(buildLibraryPayload(item, { bo_mon, loai_khao_sat, survey_type: loai_khao_sat, doi_tuong, target: doi_tuong, text, type, opts, rows, cols }))
+    });
     expandedId = null;
     await loadLibFromAPI();
     showToast('Đã lưu câu hỏi ✅', 'success');
@@ -502,15 +800,32 @@ async function saveEdit(qid) {
 // ── Add new form ──────────────────────────────────────────────────
 
 function renderAddForm() {
+  const defaultCategory = libraryFilters.category !== 'Tất cả'
+    ? libraryFilters.category
+    : (activeTab === 'tinhoc' ? 'Tin học' : 'Ngoại ngữ');
+  const defaultSurvey = libraryFilters.survey !== 'Tất cả' ? libraryFilters.survey : '';
+  const defaultTarget = libraryFilters.target !== 'Tất cả' ? libraryFilters.target : 'Tất cả';
   return `
-  <div id="add-new-form" style="border-bottom:1px solid #e0e7ff;background:#faf5ff;padding:16px">
+  <div id="add-new-form" style="border-bottom:1px solid #00008B;background:#faf5ff;padding:16px">
     <div style="font-size:12px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">✦ Tạo câu hỏi mới</div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:8px;border:1.5px solid ${activeTab==='ngoaingu'?'#2563eb':'#e2e8f0'};background:${activeTab==='ngoaingu'?'#eff6ff':'#fff'};font-size:12.5px;font-weight:600" id="new-lbl-nn">
-        <input type="radio" name="new-tab" value="ngoaingu" ${activeTab==='ngoaingu'?'checked':''} onchange="const v=this.value;['nn','th'].forEach(x=>{const el=document.getElementById('new-lbl-'+x);el.style.borderColor=((x==='nn'&&v==='ngoaingu')||(x==='th'&&v==='tinhoc'))?'#2563eb':'#e2e8f0';el.style.background=((x==='nn'&&v==='ngoaingu')||(x==='th'&&v==='tinhoc'))?'#eff6ff':'#fff';})"> 🌐 Ngoại ngữ
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px">
+      <label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:800;color:#6b21a8;text-transform:uppercase;letter-spacing:.35px">
+        Danh mục
+        <select id="new-q-category" class="input" style="height:36px;font-size:13px;text-transform:none;letter-spacing:0" onchange="syncNewSurveyOptions()">
+          ${CATEGORY_OPTIONS.map(category => `<option value="${category}" ${defaultCategory === category ? 'selected' : ''}>${category}</option>`).join('')}
+        </select>
       </label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:8px;border:1.5px solid ${activeTab==='tinhoc'?'#2563eb':'#e2e8f0'};background:${activeTab==='tinhoc'?'#eff6ff':'#fff'};font-size:12.5px;font-weight:600" id="new-lbl-th">
-        <input type="radio" name="new-tab" value="tinhoc" ${activeTab==='tinhoc'?'checked':''} onchange="const v=this.value;['nn','th'].forEach(x=>{const el=document.getElementById('new-lbl-'+x);el.style.borderColor=((x==='nn'&&v==='ngoaingu')||(x==='th'&&v==='tinhoc'))?'#2563eb':'#e2e8f0';el.style.background=((x==='nn'&&v==='ngoaingu')||(x==='th'&&v==='tinhoc'))?'#eff6ff':'#fff';})"> 💻 Tin học
+      <label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:800;color:#6b21a8;text-transform:uppercase;letter-spacing:.35px">
+        Loại khảo sát
+        <select id="new-q-survey" class="input" style="height:36px;font-size:13px;text-transform:none;letter-spacing:0">
+          ${surveyOptionsMarkup(defaultCategory, defaultSurvey, false)}
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:800;color:#6b21a8;text-transform:uppercase;letter-spacing:.35px">
+        Đối tượng
+        <select id="new-q-target" class="input" style="height:36px;font-size:13px;text-transform:none;letter-spacing:0">
+          ${TARGET_OPTIONS.map(target => `<option value="${target}" ${defaultTarget === target ? 'selected' : ''}>${target}</option>`).join('')}
+        </select>
       </label>
     </div>
     <input id="new-q-text" type="text" class="input" placeholder="Nhập nội dung câu hỏi..." style="margin-bottom:10px;font-size:13px">
@@ -535,6 +850,7 @@ let _newOpts = [''], _newRows = [''], _newCols = [''];
 
 function startAddNew() {
   addingNew  = true; expandedId = null;
+  libraryPage = 1;
   _newOpts = ['']; _newRows = ['']; _newCols = [''];
   renderList();
   setTimeout(() => { renderNewOpts(); document.getElementById('new-q-text')?.focus(); document.getElementById('add-new-form')?.scrollIntoView({behavior:'smooth',block:'nearest'}); }, 30);
@@ -573,27 +889,27 @@ function renderNewOpts() {
     area.innerHTML = `
       <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Các lựa chọn</div>
       <div id="new-opts-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:6px">${_newOpts.map((o,i)=>_newOptRow(o,i,type)).join('')}</div>
-      <button onclick="addNewOpt()" style="padding:5px 14px;background:transparent;border:1.5px dashed #7dd3fc;border-radius:7px;cursor:pointer;color:#0284c7;font-size:12px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#e0f2fe';this.style.borderColor='#0ea5e9'" onmouseleave="this.style.background='transparent';this.style.borderColor='#7dd3fc'">+ Thêm lựa chọn</button>`;
+      <button onclick="addNewOpt()" style="padding:5px 14px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:12px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#00008B';this.style.borderColor='#fff'" onmouseleave="this.style.background='transparent';this.style.borderColor='#00008B'">+ Thêm lựa chọn</button>`;
   } else if (type === 'scale') {
-    area.innerHTML = `<div style="padding:12px 14px;border:1px solid #c7d2fe;border-radius:12px;background:linear-gradient(180deg,#f8f9ff 0%,#eef2ff 100%)">
-      <div style="font-size:11px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">⟷ Phạm vi tuyến tính (1–5)</div>
+    area.innerHTML = `<div style="padding:12px 14px;border:1px solid #00008B;border-radius:12px;background:linear-gradient(180deg,#f8f9ff 0%,#00008B 100%)">
+      <div style="font-size:11px;font-weight:700;color:#00008B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">⟷ Phạm vi tuyến tính (1–5)</div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        ${[1,2,3,4,5].map(n=>`<div style="width:36px;height:36px;border-radius:50%;border:2px solid #a5b4fc;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#4338ca;background:#fff">${n}</div>`).join('')}
+        ${[1,2,3,4,5].map(n=>`<div style="width:36px;height:36px;border-radius:50%;border:2px solid #a5b4fc;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#00008B;background:#fff">${n}</div>`).join('')}
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <div style="flex:1">
           <div style="font-size:11px;color:#6366f1;font-weight:600;margin-bottom:4px">Nhãn đầu (tuỳ chọn)</div>
-          <input type="text" placeholder="vd: Không hài lòng"
-            style="width:100%;padding:6px 10px;border:1px solid #c7d2fe;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s"
-            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#c7d2fe'"
+          <input type="text" placeholder="Ví dụ: Không hài lòng"
+            style="width:100%;padding:6px 10px;border:1px solid #00008B;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s"
+            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#00008B'"
             oninput="_newOpts[0]=this.value">
         </div>
         <div style="font-size:18px;color:#a5b4fc">→</div>
         <div style="flex:1">
           <div style="font-size:11px;color:#6366f1;font-weight:600;margin-bottom:4px">Nhãn cuối (tuỳ chọn)</div>
-          <input type="text" placeholder="vd: Rất hài lòng"
-            style="width:100%;padding:6px 10px;border:1px solid #c7d2fe;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s"
-            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#c7d2fe'"
+          <input type="text" placeholder="Ví dụ: Rất hài lòng"
+            style="width:100%;padding:6px 10px;border:1px solid #00008B;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s"
+            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#00008B'"
             oninput="_newOpts[1]=this.value">
         </div>
       </div>
@@ -608,9 +924,9 @@ function renderNewOpts() {
           <button onclick="addNewGridRow('row')" style="padding:4px 10px;background:transparent;border:1.5px dashed #c4b5fd;border-radius:7px;cursor:pointer;color:#7c3aed;font-size:11.5px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#f5f3ff'" onmouseleave="this.style.background='transparent'">+ Thêm hàng</button>
         </div>
         <div>
-          <div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🔷 Cột (lựa chọn)</div>
+          <div style="font-size:11px;font-weight:700;color:#00008B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🔷 Cột (lựa chọn)</div>
           <div id="new-cols-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:6px">${_newCols.map((c,i)=>_newGridRow('col',c,i,type)).join('')}</div>
-          <button onclick="addNewGridRow('col')" style="padding:4px 10px;background:transparent;border:1.5px dashed #7dd3fc;border-radius:7px;cursor:pointer;color:#0284c7;font-size:11.5px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#e0f2fe'" onmouseleave="this.style.background='transparent'">+ Thêm cột</button>
+          <button onclick="addNewGridRow('col')" style="padding:4px 10px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:11.5px;font-weight:600;transition:all .15s" onmouseenter="this.style.background='#00008B'" onmouseleave="this.style.background='transparent'">+ Thêm cột</button>
         </div>
       </div>`;
   } else { area.innerHTML = renderTextPreview(type); }
@@ -640,7 +956,7 @@ function _newOptRow(val, idx, type) {
 function _newGridRow(kind, val, idx, type) {
   const icon = kind==='row'
     ? `<span style="width:14px;height:14px;border-radius:${type==='grid_radio'?'50%':'3px'};border:1.5px solid #c4b5fd;flex-shrink:0;display:inline-block;background:#fff"></span>`
-    : `<span style="width:14px;height:14px;border-radius:${type==='grid_radio'?'50%':'3px'};border:1.5px solid #7dd3fc;flex-shrink:0;display:inline-block;background:#fff"></span>`;
+    : `<span style="width:14px;height:14px;border-radius:${type==='grid_radio'?'50%':'3px'};border:1.5px solid #00008B;flex-shrink:0;display:inline-block;background:#fff"></span>`;
   return `<div style="display:flex;align-items:center;gap:6px">
     ${icon}
     <input type="text" value="${esc(val)}" class="input" style="flex:1;height:30px;font-size:12px;background:#fff" placeholder="${kind==='row'?'Hàng':'Cột'} ${idx+1}" oninput="${kind==='row'?'_newRows':'_newCols'}[${idx}]=this.value">
@@ -657,9 +973,11 @@ function removeNewGridRow(kind,idx) { const a=kind==='row'?_newRows:_newCols; if
 async function confirmAdd() {
   const text = (document.getElementById('new-q-text')?.value || '').trim();
   if (!text) { showToast('Vui lòng nhập nội dung câu hỏi', 'error'); document.getElementById('new-q-text')?.focus(); return; }
-  const tab    = document.querySelector('input[name="new-tab"]:checked')?.value || activeTab;
+  const bo_mon = document.getElementById('new-q-category')?.value || (activeTab === 'tinhoc' ? 'Tin học' : 'Ngoại ngữ');
+  const loai_khao_sat = document.getElementById('new-q-survey')?.value || '';
+  const doi_tuong = document.getElementById('new-q-target')?.value || 'Tất cả';
+  if (!loai_khao_sat) { showToast('Vui lòng chọn loại khảo sát', 'error'); document.getElementById('new-q-survey')?.focus(); return; }
   const type   = normalizeQuestionType(document.getElementById('new-q-type')?.value || 'choice');
-  const bo_mon = tab === 'ngoaingu' ? 'Ngoại ngữ' : 'Tin học';
 
   document.querySelectorAll('#new-opts-list input').forEach((inp,i) => { _newOpts[i] = inp.value; });
   document.querySelectorAll('#new-rows-list input').forEach((inp,i) => { _newRows[i] = inp.value; });
@@ -679,11 +997,11 @@ async function confirmAdd() {
   if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
 
   try {
-    await apiFetch('/library', { method: 'POST', body: JSON.stringify({ bo_mon, text, type, opts, rows, cols }) });
+    await apiFetch('/library', { method: 'POST', body: JSON.stringify({ bo_mon, loai_khao_sat, survey_type: loai_khao_sat, doi_tuong, target: doi_tuong, text, type, opts, rows, cols }) });
     addingNew = false; _newOpts = ['']; _newRows = ['']; _newCols = [''];
-    activeTab = tab;
+    activeTab = bo_mon === 'Tin học' ? 'tinhoc' : 'ngoaingu';
+    libraryFilters = { category: bo_mon, survey: loai_khao_sat || 'Tất cả', target: doi_tuong || 'Tất cả' };
     await loadLibFromAPI();
-    switchTab(tab);
     showToast('Đã thêm câu hỏi vào thư viện ✅', 'success');
   } catch (e) {
     showToast('Lỗi thêm câu hỏi: ' + e.message, 'error');
@@ -701,15 +1019,12 @@ async function libAddImage(id) {
   try {
     await apiFetch(`/library/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ bo_mon: item.bo_mon, text: item.text, type: item.type, opts: item.opts || [], rows: item.rows || [], cols: item.cols || [], image: url.trim() })
+      body: JSON.stringify(buildLibraryPayload(item, { image: url.trim() }))
     });
     await loadLibFromAPI();
     showToast('Đã thêm hình ảnh ✅', 'success');
   } catch (e) {
-    // Lưu local nếu API chưa hỗ trợ field image
-    item.image = url.trim();
-    renderList();
-    showToast('Đã thêm hình ảnh (local)', 'success');
+    showToast('Lỗi thêm hình ảnh: ' + e.message, 'error');
   }
 }
 
@@ -721,14 +1036,28 @@ async function libAddVideo(id) {
   try {
     await apiFetch(`/library/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ bo_mon: item.bo_mon, text: item.text, type: item.type, opts: item.opts || [], rows: item.rows || [], cols: item.cols || [], video: url.trim() })
+      body: JSON.stringify(buildLibraryPayload(item, { video: url.trim() }))
     });
     await loadLibFromAPI();
     showToast('Đã thêm video ✅', 'success');
   } catch (e) {
-    item.video = url.trim();
-    renderList();
-    showToast('Đã thêm video (local)', 'success');
+    showToast('Lỗi thêm video: ' + e.message, 'error');
+  }
+}
+
+async function libRemoveMedia(id, kind) {
+  const item = _findItem(id);
+  if (!item) return;
+  try {
+    await apiFetch(`/library/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(buildLibraryPayload(item, kind === 'image' ? { image: null, image_url: null, hinh_anh_url: null } : { video: null, video_url: null }))
+    });
+    await loadLibFromAPI();
+    expandedId = String(id);
+    showToast(kind === 'image' ? 'Đã gỡ hình ảnh' : 'Đã gỡ video', 'success');
+  } catch (e) {
+    showToast('Lỗi gỡ media: ' + e.message, 'error');
   }
 }
 
@@ -740,11 +1069,17 @@ async function libDuplicate(id) {
       method: 'POST',
       body: JSON.stringify({
         bo_mon: item.bo_mon,
+        loai_khao_sat: getLibrarySurvey(item),
+        survey_type: getLibrarySurvey(item),
+        doi_tuong: normalizeTarget(item.doi_tuong || item.target),
+        target: normalizeTarget(item.doi_tuong || item.target),
         text: item.text + ' (sao chép)',
         type: item.type,
         opts: item.opts || [],
         rows: item.rows || [],
         cols: item.cols || [],
+        image: getLibraryImage(item) || null,
+        video: getLibraryVideo(item) || null,
       })
     });
     await loadLibFromAPI();
