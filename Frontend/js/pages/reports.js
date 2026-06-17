@@ -5417,5 +5417,4 @@ window.setActivityRange = function(days, btn) {
   
   initGlobalDashboardChart(days);
 };
-
 setTimeout(initGlobalDashboardChart, 100);
