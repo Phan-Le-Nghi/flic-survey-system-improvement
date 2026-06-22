@@ -42,8 +42,11 @@ const upload = multer({
 
 router.get("/overview", authMiddleware, authorize("view_report"), async (req, res) => {
   try {
-    const forms    = await sql.query`SELECT COUNT(*) AS tong_form, SUM(CASE WHEN trang_thai='active' THEN 1 ELSE 0 END) AS form_hoat_dong, SUM(luot_xem) AS tong_luot_xem FROM Form`;
-    const feedback = await sql.query`SELECT COUNT(*) AS tong_phan_hoi, AVG(CAST(danh_gia AS FLOAT)) AS diem_tb FROM PhanHoi`;
+    const phanHoiColumns = await getPhanHoiColumns(sql);
+    const ratingExpr = phanHoiColumns.has("danh_gia") ? "AVG(CAST(danh_gia AS FLOAT))" : "NULL";
+
+    const forms    = await sql.query`SELECT COUNT(*) AS tong_form, SUM(CASE WHEN trang_thai='active' THEN 1 ELSE 0 END) AS form_hoat_dong, SUM(luot_xem) AS tong_luot_xem FROM Form WHERE trang_thai != 'deleted'`;
+    const feedback = await new sql.Request().query(`SELECT COUNT(*) AS tong_phan_hoi, ${ratingExpr} AS diem_tb FROM PhanHoi WHERE trang_thai != 'deleted'`);
     const staff    = await sql.query`SELECT COUNT(*) AS tong_nhan_vien FROM NhanVien WHERE trang_thai='active'`;
     const pending  = await sql.query`SELECT COUNT(*) AS cho_duyet FROM PheDuyet WHERE trang_thai='pending'`;
     const trends   = await sql.query`
@@ -56,9 +59,9 @@ router.get("/overview", authMiddleware, authorize("view_report"), async (req, re
            AND ngay_tao >= DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
            AND ngay_tao <  DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)) AS form_thang_truoc,
         (SELECT COUNT(*) FROM PhanHoi
-         WHERE ngay_gui >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)) AS phan_hoi_thang_nay,
+         WHERE trang_thai != 'deleted' AND ngay_gui >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)) AS phan_hoi_thang_nay,
         (SELECT COUNT(*) FROM PhanHoi
-         WHERE ngay_gui >= DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+         WHERE trang_thai != 'deleted' AND ngay_gui >= DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
            AND ngay_gui <  DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)) AS phan_hoi_thang_truoc
     `;
     res.json({
@@ -81,8 +84,45 @@ router.get("/forms-by-week", authMiddleware, authorize("view_report"), async (re
              COUNT(DISTINCT f.id) AS so_form, COUNT(DISTINCT ph.id) AS so_phan_hoi
       FROM (SELECT DATEADD(DAY,-n,CAST(GETDATE() AS DATE)) AS ngay_tao FROM (VALUES(0),(1),(2),(3),(4),(5),(6)) AS d(n)) AS dates
       LEFT JOIN Form f ON CAST(f.ngay_tao AS DATE)=dates.ngay_tao AND f.trang_thai != 'deleted'
-      LEFT JOIN PhanHoi ph ON CAST(ph.ngay_gui AS DATE)=dates.ngay_tao
+      LEFT JOIN PhanHoi ph ON CAST(ph.ngay_gui AS DATE)=dates.ngay_tao AND ph.trang_thai != 'deleted'
       GROUP BY dates.ngay_tao ORDER BY dates.ngay_tao`;
+    res.json(result.recordset);
+  } catch (err) { err500(res, err); }
+});
+
+router.get("/activity-chart", authMiddleware, authorize("view_report"), async (req, res) => {
+  try {
+    const range = req.query.range || '7';
+    let days = 7;
+    if (range === 'this_month') {
+      const now = new Date();
+      days = now.getDate();
+    } else if (range === '90') {
+      days = 90;
+    } else if (!isNaN(parseInt(range))) {
+      days = parseInt(range);
+    }
+    
+    const query = `
+      WITH DateRange AS (
+        SELECT DATEADD(DAY, -${days - 1}, CAST(GETDATE() AS DATE)) AS ngay_tao
+        UNION ALL
+        SELECT DATEADD(DAY, 1, ngay_tao)
+        FROM DateRange
+        WHERE ngay_tao < CAST(GETDATE() AS DATE)
+      )
+      SELECT FORMAT(dates.ngay_tao,'dd/MM') AS ngay, 
+             DATENAME(WEEKDAY,dates.ngay_tao) AS ten_ngay,
+             COUNT(DISTINCT f.id) AS so_form, 
+             COUNT(DISTINCT ph.id) AS so_phan_hoi
+      FROM DateRange dates
+      LEFT JOIN Form f ON CAST(f.ngay_tao AS DATE)=dates.ngay_tao AND f.trang_thai != 'deleted'
+      LEFT JOIN PhanHoi ph ON CAST(ph.ngay_gui AS DATE)=dates.ngay_tao AND ph.trang_thai != 'deleted'
+      GROUP BY dates.ngay_tao 
+      ORDER BY dates.ngay_tao
+      OPTION (MAXRECURSION 365)
+    `;
+    const result = await sql.query(query);
     res.json(result.recordset);
   } catch (err) { err500(res, err); }
 });
@@ -94,7 +134,7 @@ router.get("/top-forms", authMiddleware, authorize("view_report"), async (req, r
              COUNT(ph.id) AS so_phan_hoi, AVG(CAST(ph.danh_gia AS FLOAT)) AS diem_tb
       FROM Form f
       LEFT JOIN LoaiKhaoSat lk ON lk.id=f.loai_khao_sat_id
-      LEFT JOIN PhanHoi ph ON ph.form_id=f.id
+      LEFT JOIN PhanHoi ph ON ph.form_id=f.id AND ph.trang_thai != 'deleted'
       WHERE f.trang_thai='active'
       GROUP BY f.id,f.ten_form,lk.danh_muc ORDER BY so_phan_hoi DESC`;
     res.json(result.recordset);
@@ -107,7 +147,7 @@ router.get("/feedback-by-month", authMiddleware, authorize("view_report"), async
       SELECT FORMAT(ngay_gui,'MM/yyyy') AS thang, YEAR(ngay_gui) AS nam, MONTH(ngay_gui) AS so_thang,
              COUNT(*) AS so_luong, AVG(CAST(danh_gia AS FLOAT)) AS diem_tb
       FROM PhanHoi
-      WHERE ngay_gui >= DATEADD(MONTH,-5,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1))
+      WHERE trang_thai != 'deleted' AND ngay_gui >= DATEADD(MONTH,-5,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1))
       GROUP BY FORMAT(ngay_gui,'MM/yyyy'),YEAR(ngay_gui),MONTH(ngay_gui)
       ORDER BY YEAR(ngay_gui),MONTH(ngay_gui)`;
     res.json(result.recordset);
@@ -177,7 +217,7 @@ router.get("/forms-with-data", authMiddleware, authorize("view_report"), async (
 
 // ── API MỚI: Lấy toàn bộ dữ liệu phân tích của 1 form ──
 // GET /api/reports/form-analysis/:form_id
-router.get("/form-analysis/:form_id", authMiddleware, authorize("view_report"), async (req, res) => {
+router.get("/form-analysis/:form_id", async (req, res) => {
   const formId = parseInt(req.params.form_id);
   if (isNaN(formId)) return res.status(400).json({ message: "form_id không hợp lệ" });
 
@@ -255,8 +295,11 @@ router.get("/form-analysis/:form_id", authMiddleware, authorize("view_report"), 
     // 4. Câu hỏi + lựa chọn + thống kê câu trả lời
     const questionsRes = await sql.query`
       SELECT ch.id, ch.noi_dung, ch.loai, ch.thu_tu, ch.bat_buoc,
-             ch.mo_ta_cau_hoi, ch.hang_grid, ch.cot_grid
-      FROM CauHoi ch WHERE ch.form_id = ${formId} ORDER BY ch.thu_tu
+             ch.mo_ta_cau_hoi, ch.hang_grid, ch.cot_grid, ch.section_id
+      FROM CauHoi ch 
+      LEFT JOIN FormSection fs ON fs.id = ch.section_id
+      WHERE ch.form_id = ${formId} 
+      ORDER BY ISNULL(fs.thu_tu, 0), ch.thu_tu
     `;
     const questions = questionsRes.recordset;
 
@@ -296,7 +339,7 @@ router.get("/form-analysis/:form_id", authMiddleware, authorize("view_report"), 
              MAX(ctph.diem_danh_gia) AS max_diem
       FROM CauHoi ch
       LEFT JOIN ChiTietPhanHoi ctph ON ctph.cau_hoi_id = ch.id
-      WHERE ch.form_id = ${formId} AND ch.loai IN ('rating', 'scale')
+      WHERE ch.form_id = ${formId} AND ch.loai IN ('rating', 'scale', 'star_rating')
       GROUP BY ch.id
     `;
 
@@ -325,7 +368,7 @@ router.get("/form-analysis/:form_id", authMiddleware, authorize("view_report"), 
         FROM CauHoi ch
         INNER JOIN ChiTietPhanHoi ctph ON ctph.cau_hoi_id = ch.id
         INNER JOIN PhanHoi ph ON ph.id = ctph.phan_hoi_id
-        WHERE ch.form_id = @formId AND ch.loai IN ('short_text', 'long_text', 'text', 'paragraph')
+        WHERE ch.form_id = @formId AND ch.loai IN ('short_text', 'long_text', 'text', 'paragraph', 'grid_radio', 'grid_checkbox')
           AND ${answerExpr} IS NOT NULL
           AND LEN(${answerExpr}) > 2
         ORDER BY ch.id

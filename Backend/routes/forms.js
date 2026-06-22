@@ -285,6 +285,10 @@ async function ensureQuestionMediaColumns() {
     await sql.query`ALTER TABLE CauHoi ADD validation_json NVARCHAR(MAX) NULL`;
     columns.add("validation_json");
   }
+  if (!columns.has("mo_ta_cau_hoi")) {
+    await sql.query`ALTER TABLE CauHoi ADD mo_ta_cau_hoi NVARCHAR(MAX) NULL`;
+    columns.add("mo_ta_cau_hoi");
+  }
   return columns;
 }
 
@@ -432,6 +436,11 @@ async function saveFormItems(formId, items) {
       values.push("@validation_json");
       insertReq.input("validation_json", sql.NVarChar(sql.MAX), item.validation_json || null);
     }
+    if (questionColumns.has("mo_ta_cau_hoi")) {
+      fields.push("mo_ta_cau_hoi");
+      values.push("@mo_ta_cau_hoi");
+      insertReq.input("mo_ta_cau_hoi", sql.NVarChar(sql.MAX), item.mo_ta_cau_hoi || item.desc || item.description || null);
+    }
     const insertQ = await insertReq.query(`
       INSERT INTO CauHoi (${fields.join(", ")})
       OUTPUT INSERTED.id
@@ -556,7 +565,7 @@ router.get("/", authMiddleware, authorize("view_form"), async (req, res) => {
              ${formColumns.has("mau_nen") ? "f.mau_nen" : "NULL"} AS mau_nen,
              ${formColumns.has("font_family") ? "f.font_family" : "NULL"} AS font_family,
              n.ho_ten AS nguoi_tao, n.vai_tro,
-             (SELECT COUNT(*) FROM PhanHoi p WHERE p.form_id = f.id) AS so_phan_hoi,
+             (SELECT COUNT(*) FROM PhanHoi p WHERE p.form_id = f.id AND p.trang_thai != 'deleted') AS so_phan_hoi,
              (SELECT COUNT(*) FROM CauHoi q WHERE q.form_id = f.id) AS so_cau_hoi,
              (SELECT TOP 1 q.noi_dung FROM CauHoi q WHERE q.form_id = f.id ORDER BY q.thu_tu) AS cau_hoi_dau,
              f.luot_xem, f.loi_ket,
@@ -576,14 +585,14 @@ router.get("/", authMiddleware, authorize("view_form"), async (req, res) => {
     const params = {};
 
     if (status) { query += ` AND f.trang_thai = @status`; params.status = status; }
-    if (cat)    { query += ` AND ${categorySelect} = @cat`; params.cat = cat; }
+    if (cat) { query += ` AND ${categorySelect} = @cat`; params.cat = cat; }
     if (search) { query += ` AND f.ten_form LIKE @search`; params.search = `%${search}%`; }
 
     query += ` ORDER BY CASE WHEN f.trang_thai = 'pending' AND pa.do_uu_tien = 'urgent' THEN 0 ELSE 1 END, COALESCE(f.ngay_cap_nhat, f.ngay_tao) DESC, f.id DESC`;
 
     const req2 = new sql.Request();
     if (params.status) req2.input("status", sql.NVarChar, params.status);
-    if (params.cat)    req2.input("cat",    sql.NVarChar, params.cat);
+    if (params.cat) req2.input("cat", sql.NVarChar, params.cat);
     if (params.search) req2.input("search", sql.NVarChar, params.search);
 
     const result = await req2.query(query);
@@ -605,7 +614,7 @@ router.get("/stats", authMiddleware, authorize("view_form"), async (req, res) =>
         SUM(luot_xem) AS tong_luot_xem
       FROM Form
     `;
-    const ph = await sql.query`SELECT COUNT(*) AS tong_phan_hoi FROM PhanHoi`;
+    const ph = await sql.query`SELECT COUNT(*) AS tong_phan_hoi FROM PhanHoi WHERE trang_thai != 'deleted'`;
     res.json({ ...result.recordset[0], tong_phan_hoi: ph.recordset[0].tong_phan_hoi });
   } catch (err) {
     err500(res, err);
@@ -928,7 +937,7 @@ router.delete("/:id", authMiddleware, authorize("delete_form"), async (req, res)
     if (formRes.recordset[0].trang_thai === "active") {
       return res.status(400).json({ message: "Biểu mẫu đang hoạt động, không thể xóa. Vui lòng đóng biểu mẫu trước." });
     }
-    
+
     await sql.query`
       UPDATE Form 
       SET trang_thai = 'deleted', 
@@ -938,12 +947,12 @@ router.delete("/:id", authMiddleware, authorize("delete_form"), async (req, res)
     `;
 
     try {
-      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do' 
-        ? `Xóa biểu mẫu (Lý do: ${ly_do_xoa})` 
+      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do'
+        ? `Xóa biểu mẫu (Lý do: ${ly_do_xoa})`
         : 'Xóa biểu mẫu';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, N'Xóa biểu mẫu', 'form', ${req.params.id}, ${logDetail})
+        VALUES (${nhan_vien_id}, 'delete', 'form', ${req.params.id}, ${logDetail})
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
 
@@ -958,7 +967,7 @@ router.patch("/:id/restore", authMiddleware, authorize("delete_form"), async (re
     const nhan_vien_id = req.user ? req.user.id : null;
     const formRes = await sql.query`SELECT id FROM Form WHERE id = ${req.params.id} AND trang_thai = 'deleted'`;
     if (!formRes.recordset[0]) return res.status(404).json({ message: "Không tìm thấy biểu mẫu trong thùng rác" });
-    
+
     await sql.query`
       UPDATE Form 
       SET trang_thai = 'draft', 
@@ -968,12 +977,12 @@ router.patch("/:id/restore", authMiddleware, authorize("delete_form"), async (re
     `;
 
     try {
-      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do' 
-        ? `Khôi phục biểu mẫu từ thùng rác (Lý do: ${ly_do_xoa})` 
+      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do'
+        ? `Khôi phục biểu mẫu từ thùng rác (Lý do: ${ly_do_xoa})`
         : 'Khôi phục biểu mẫu từ thùng rác';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, N'Khôi phục biểu mẫu', 'form', ${req.params.id}, ${logDetail})
+        VALUES (${nhan_vien_id}, 'restore', 'form', ${req.params.id}, ${logDetail})
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
 
@@ -987,14 +996,14 @@ router.delete("/:id/permanent", authMiddleware, authorize("delete_form"), async 
     const { ly_do_xoa } = req.body || {};
     const nhan_vien_id = req.user ? req.user.id : null;
     await sql.query`DELETE FROM Form WHERE id = ${req.params.id} AND trang_thai = 'deleted'`;
-    
+
     try {
-      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do' 
-        ? `Xóa vĩnh viễn biểu mẫu (Lý do: ${ly_do_xoa})` 
+      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do'
+        ? `Xóa vĩnh viễn biểu mẫu (Lý do: ${ly_do_xoa})`
         : 'Xóa vĩnh viễn biểu mẫu';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, N'Xóa vĩnh viễn biểu mẫu', 'form', ${req.params.id}, ${logDetail})
+        VALUES (${nhan_vien_id}, 'hard_delete', 'form', ${req.params.id}, ${logDetail})
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
 

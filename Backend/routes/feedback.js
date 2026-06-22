@@ -91,13 +91,7 @@ router.post('/', async (req, res) => {
     `);
     const newId = result.recordset[0].id;
 
-    // Ghi nhật ký
-    try {
-      await sql.query`
-        INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (NULL, N'Nộp phản hồi', 'form', ${formId}, N'Người dùng nộp phản hồi mới')
-      `;
-    } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
+
 
     res.status(201).json({ id: newId, message: 'Đã lưu phản hồi' });
   } catch (err) {
@@ -286,10 +280,9 @@ router.delete('/:id', authMiddleware, authorize('delete_feedback'), async (req, 
     `;
 
     try {
-      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do' ? `Xóa 1 phản hồi (Lý do: ${ly_do_xoa})` : 'Xóa 1 phản hồi';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, N'Xóa phản hồi', 'feedback', ${id}, ${logDetail})
+        VALUES (${nhan_vien_id}, N'Xóa phản hồi', 'feedback', ${id}, N'Đưa phản hồi vào thùng rác')
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
 
@@ -302,15 +295,16 @@ router.delete('/:id', authMiddleware, authorize('delete_feedback'), async (req, 
 // ── GET /api/feedback/trash/list ─────────────────────────────────
 router.get('/trash/list', authMiddleware, authorize('view_feedback'), async (req, res) => {
   try {
+    const columns = await getPhanHoiColumns(sql);
+    const select = buildFeedbackSelect(columns);
     const result = await sql.query`
-      SELECT f.id AS form_id, f.ten_form,
-             COUNT(ph.id) AS so_phan_hoi_xoa,
-             MAX(ph.ngay_xoa) AS ngay_xoa_gannhat
+      SELECT ${select},
+             nx.ho_ten AS nguoi_xoa_ten
       FROM PhanHoi ph
       JOIN Form f ON f.id = ph.form_id
+      LEFT JOIN NhanVien nx ON ph.nguoi_xoa_id = nx.id
       WHERE ph.trang_thai = 'deleted'
-      GROUP BY f.id, f.ten_form
-      ORDER BY MAX(ph.ngay_xoa) DESC
+      ORDER BY ph.ngay_xoa DESC
     `;
     res.json(result.recordset);
   } catch (err) {
@@ -322,7 +316,6 @@ router.get('/trash/list', authMiddleware, authorize('view_feedback'), async (req
 router.patch('/:id/restore', authMiddleware, authorize('delete_feedback'), async (req, res) => {
   const id = Number(req.params.id);
   const nhan_vien_id = req.user ? req.user.id : null;
-  const { ly_do_xoa } = req.body || {};
   if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
     await sql.query`
@@ -331,12 +324,9 @@ router.patch('/:id/restore', authMiddleware, authorize('delete_feedback'), async
       WHERE id=${id} AND trang_thai='deleted'
     `;
     try {
-      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do' 
-        ? `Khôi phục phản hồi từ thùng rác (Lý do: ${ly_do_xoa})` 
-        : N'Khôi phục phản hồi từ thùng rác';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, N'Khôi phục phản hồi', 'feedback', ${id}, ${logDetail})
+        VALUES (${nhan_vien_id}, N'Khôi phục phản hồi', 'feedback', ${id}, N'Khôi phục phản hồi từ thùng rác')
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
     res.json({ message: 'Đã khôi phục phản hồi' });
@@ -349,104 +339,16 @@ router.patch('/:id/restore', authMiddleware, authorize('delete_feedback'), async
 router.delete('/:id/permanent', authMiddleware, authorize('delete_feedback'), async (req, res) => {
   const id = Number(req.params.id);
   const nhan_vien_id = req.user ? req.user.id : null;
-  const { ly_do_xoa } = req.body || {};
   if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
     await sql.query`DELETE FROM PhanHoi WHERE id=${id} AND trang_thai='deleted'`;
     try {
-      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do' 
-        ? `Xóa vĩnh viễn 1 phản hồi (Lý do: ${ly_do_xoa})` 
-        : N'Xóa vĩnh viễn 1 phản hồi';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, N'Xóa vĩnh viễn phản hồi', 'feedback', ${id}, ${logDetail})
+        VALUES (${nhan_vien_id}, N'Xóa vĩnh viễn phản hồi', 'feedback', ${id}, N'Xóa vĩnh viễn phản hồi khỏi hệ thống')
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
     res.json({ message: 'Đã xóa vĩnh viễn phản hồi' });
-  } catch (err) {
-    err500(res, err);
-  }
-});
-
-// ── PATCH /api/feedback/form/:formId/restore ───────────────────
-router.patch('/form/:formId/restore', authMiddleware, authorize('delete_feedback'), async (req, res) => {
-  const formId = Number(req.params.formId);
-  const nhan_vien_id = req.user ? req.user.id : null;
-  const { ly_do_xoa } = req.body || {};
-  if (!validId(formId)) return res.status(400).json({ message: 'ID không hợp lệ' });
-  try {
-    const result = await sql.query`
-      UPDATE PhanHoi 
-      SET trang_thai='active', ngay_xoa=NULL, nguoi_xoa_id=NULL, ly_do_xoa=NULL 
-      WHERE form_id=${formId} AND trang_thai='deleted'
-    `;
-    if (result.rowsAffected[0] > 0) {
-      try {
-        const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do' 
-          ? `Khôi phục tất cả phản hồi của biểu mẫu (Lý do: ${ly_do_xoa})` 
-          : N'Khôi phục tất cả phản hồi của biểu mẫu';
-        await sql.query`
-          INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-          VALUES (${nhan_vien_id}, N'Khôi phục phản hồi', 'form', ${formId}, ${logDetail})
-        `;
-      } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
-    }
-    res.json({ message: 'Đã khôi phục các phản hồi của biểu mẫu' });
-  } catch (err) {
-    err500(res, err);
-  }
-});
-
-// ── DELETE /api/feedback/form/:formId/permanent ────────────────
-router.delete('/form/:formId/permanent', authMiddleware, authorize('delete_feedback'), async (req, res) => {
-  const formId = Number(req.params.formId);
-  const nhan_vien_id = req.user ? req.user.id : null;
-  const { ly_do_xoa } = req.body || {};
-  if (!validId(formId)) return res.status(400).json({ message: 'ID không hợp lệ' });
-  try {
-    const result = await sql.query`DELETE FROM PhanHoi WHERE form_id=${formId} AND trang_thai='deleted'`;
-    if (result.rowsAffected[0] > 0) {
-      try {
-        const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do' 
-          ? `Xóa tất cả các phản hồi (Lý do: ${ly_do_xoa})` 
-          : N'Xóa tất cả các phản hồi';
-        await sql.query`
-          INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-          VALUES (${nhan_vien_id}, N'Xóa vĩnh viễn phản hồi', 'form', ${formId}, ${logDetail})
-        `;
-      } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
-    }
-    res.json({ message: 'Đã xóa vĩnh viễn các phản hồi của biểu mẫu' });
-  } catch (err) {
-    err500(res, err);
-  }
-});
-
-// ── DELETE /api/feedback/form/:formId ──────────────────────────
-router.delete('/form/:formId', authMiddleware, authorize('delete_feedback'), async (req, res) => {
-  const formId = Number(req.params.formId);
-  const nhan_vien_id = req.user ? req.user.id : null;
-  const { ly_do_xoa } = req.body || {};
-  if (!validId(formId)) return res.status(400).json({ message: 'ID không hợp lệ' });
-  try {
-    const result = await sql.query`
-      UPDATE PhanHoi 
-      SET trang_thai='deleted', 
-          ngay_xoa=GETDATE(), 
-          nguoi_xoa_id=${nhan_vien_id}, 
-          ly_do_xoa=${ly_do_xoa || 'Không có lý do'} 
-      WHERE form_id=${formId} AND trang_thai='active'
-    `;
-    if (result.rowsAffected[0] > 0) {
-      try {
-        const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do' ? `Xóa tất cả các phản hồi của biểu mẫu (Lý do: ${ly_do_xoa})` : 'Xóa tất cả các phản hồi của biểu mẫu';
-        await sql.query`
-          INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-          VALUES (${nhan_vien_id}, N'Xóa phản hồi', 'form', ${formId}, ${logDetail})
-        `;
-      } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
-    }
-    res.json({ message: 'Đã xóa các phản hồi của biểu mẫu' });
   } catch (err) {
     err500(res, err);
   }
