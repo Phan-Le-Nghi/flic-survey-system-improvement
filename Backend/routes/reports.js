@@ -195,7 +195,7 @@ router.get("/forms-with-data", authMiddleware, authorize("view_report"), async (
     const ratingExpr = phanHoiColumns.has("danh_gia") ? "ph.danh_gia" : "NULL";
     const result = await new sql.Request().query(`
       SELECT f.id, f.ten_form, lk.danh_muc, lk.ten_loai AS loai_khao_sat,
-             f.doi_tuong, f.mo_ta, f.trang_thai, f.ngay_tao, f.ngay_dong,
+             f.mo_ta, f.trang_thai, f.ngay_tao, f.ngay_dong,
              nv.ho_ten AS nguoi_tao,
              COUNT(ph.id)                        AS so_phan_hoi,
              AVG(CAST(${ratingExpr} AS FLOAT))   AS diem_tb,
@@ -206,7 +206,7 @@ router.get("/forms-with-data", authMiddleware, authorize("view_report"), async (
       LEFT JOIN NhanVien nv ON nv.id = f.nhan_vien_id
       INNER JOIN PhanHoi ph ON ph.form_id = f.id
       WHERE f.trang_thai != 'deleted'
-      GROUP BY f.id, f.ten_form, lk.danh_muc, lk.ten_loai, f.doi_tuong, f.mo_ta,
+      GROUP BY f.id, f.ten_form, lk.danh_muc, lk.ten_loai, f.mo_ta,
                f.trang_thai, f.ngay_tao, f.ngay_dong, nv.ho_ten
       HAVING COUNT(ph.id) > 0
       ORDER BY so_phan_hoi DESC
@@ -247,7 +247,7 @@ router.get("/form-analysis/:form_id", async (req, res) => {
       .input("formId", sql.Int, formId)
       .query(`
       SELECT f.id, f.ten_form, lk.danh_muc, lk.ten_loai AS loai_khao_sat,
-             f.doi_tuong, f.mo_ta, f.trang_thai, f.luot_xem,
+             f.mo_ta, f.trang_thai, f.luot_xem,
              f.ngay_tao, f.ngay_dong, nv.ho_ten AS nguoi_tao,
              COUNT(ph.id)                    AS so_phan_hoi,
              AVG(CAST(${ratingExpr} AS FLOAT)) AS diem_tb,
@@ -261,7 +261,7 @@ router.get("/form-analysis/:form_id", async (req, res) => {
       LEFT JOIN NhanVien nv ON nv.id = f.nhan_vien_id
       LEFT JOIN PhanHoi ph ON ph.form_id = f.id
       WHERE f.id = @formId
-      GROUP BY f.id,f.ten_form,lk.danh_muc,lk.ten_loai,f.doi_tuong,f.mo_ta,
+      GROUP BY f.id,f.ten_form,lk.danh_muc,lk.ten_loai,f.mo_ta,
                f.trang_thai,f.luot_xem,f.ngay_tao,f.ngay_dong,nv.ho_ten
     `);
     if (!formRes.recordset[0]) return res.status(404).json({ message: "Không tìm thấy biểu mẫu" });
