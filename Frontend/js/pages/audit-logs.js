@@ -35,14 +35,14 @@ document.getElementById("page-content").innerHTML = `
 
   <div class="card">
     <div class="table-wrap">
-      <table>
+      <table style="width:100%;text-align:center;border-collapse:collapse;table-layout:fixed; min-width: 900px;">
         <thead>
           <tr>
-            <th style="width: 15%">Thời gian</th>
-            <th style="width: 20%">Người thực hiện</th>
-            <th style="width: 15%">Hành động</th>
-            <th style="width: 25%">Biểu mẫu tác động</th>
-            <th style="width: 25%">Chi tiết</th>
+            <th class="sticky-col-left" style="width: 12%; text-align:center;">Thời gian</th>
+            <th style="width: 18%; text-align:center;">Người thực hiện</th>
+            <th style="width: 12%; text-align:center;">Hành động</th>
+            <th style="width: 28%; text-align:center;">Biểu mẫu tác động</th>
+            <th class="sticky-col-right" style="width: 30%; text-align:center;">Chi tiết</th>
           </tr>
         </thead>
         <tbody id="log-table-body">
@@ -118,41 +118,42 @@ document.getElementById('filter-end-date').addEventListener('change', handleFilt
 function getActionBadge(type) {
   let bgColor = '#e5e7eb';
   let color = '#374151';
+  let borderColor = '#d1d5db';
   let label = type || 'Không xác định';
 
   const t = (type || '').toLowerCase();
 
   if (t === 'create' || t.includes('tạo')) {
-    bgColor = '#e0e7ff'; color = '#00008B'; label = '+ Tạo mới';
+    bgColor = '#e0e7ff'; color = '#00008B'; borderColor = '#a5b4fc'; label = '+ Tạo mới';
   } else if (t === 'edit' || t === 'update' || t.includes('sửa') || t.includes('trả lời')) {
-    bgColor = '#ffedd5'; color = '#c2410c';
+    bgColor = '#ffedd5'; color = '#c2410c'; borderColor = '#fdba74';
     if (t === 'edit' || t === 'update') label = '✎ Chỉnh sửa';
   } else if (t === 'delete' || t === 'hard_delete' || t.includes('xóa')) {
-    bgColor = '#fee2e2'; color = '#b91c1c';
+    bgColor = '#fee2e2'; color = '#b91c1c'; borderColor = '#fca5a5';
     label = '🗑 Xóa';
   } else if (t === 'restore' || t.includes('khôi phục')) {
-    bgColor = '#eff6ff'; color = '#1e40af';
-    if (t === 'restore') label = '↺ Khôi phục';
-  } else if (t === 'approve' || t.includes('duyệt')) {
-    bgColor = '#dcfce7'; color = '#166534';
-    if (t === 'approve') label = '✓ Phê duyệt';
-  } else if (t === 'reject' || t.includes('từ chối')) {
-    bgColor = '#fee2e2'; color = '#991b1b';
-    if (t === 'reject') label = '× Từ chối';
+    bgColor = '#eff6ff'; color = '#1e40af'; borderColor = '#93c5fd';
+    label = '↺ Khôi phục';
+  } else if (t.includes('duyệt')) {
+    bgColor = '#dcfce7'; color = '#166534'; borderColor = '#86efac';
+    label = '✓ Phê duyệt';
+  } else if (t.includes('từ chối')) {
+    bgColor = '#fef08a'; color = '#854d0e'; borderColor = '#fde047';
+    label = '✗ Từ chối';
   } else if (t === 'login' || t.includes('đăng nhập')) {
-    bgColor = '#e0f2fe'; color = '#0369a1';
+    bgColor = '#e0f2fe'; color = '#0369a1'; borderColor = '#7dd3fc';
     label = 'Đăng nhập';
   } else if (t === 'export' || t.includes('xuất')) {
-    bgColor = '#fef08a'; color = '#854d0e';
+    bgColor = '#fef08a'; color = '#854d0e'; borderColor = '#fde047';
     label = '⬇ Xuất dữ liệu';
   } else if (t === 'close' || t.includes('đóng')) {
-    bgColor = '#f1f5f9'; color = '#475569';
+    bgColor = '#f1f5f9'; color = '#475569'; borderColor = '#cbd5e1';
     if (t === 'close') label = 'Đóng biểu mẫu';
   } else if (t.includes('lưu trữ')) {
-    bgColor = '#f3e8ff'; color = '#7e22ce';
+    bgColor = '#f3e8ff'; color = '#7e22ce'; borderColor = '#d8b4fe';
   }
 
-  return `<span style="display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:4px 12px; border-radius:999px; background-color:${bgColor}; color:${color}; font-size:12.5px; font-weight:600; white-space:nowrap; width:115px; overflow:hidden; text-overflow:ellipsis;" title="${label.replace(/"/g, '&quot;')}">${label}</span>`;
+  return `<span style="display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:3px 11px; border-radius:999px; background-color:${bgColor}; color:${color}; border:1px solid ${borderColor}; font-size:12.5px; font-weight:600; white-space:nowrap; width:115px; overflow:hidden; text-overflow:ellipsis;" title="${label.replace(/"/g, '&quot;')}">${label}</span>`;
 }
 
 // Global click listener for view log form links to avoid inline onclick syntax errors
@@ -275,10 +276,10 @@ function renderLogs(data) {
           <td style="padding:16px;">
             ${getActionBadge(log.actionType)}
           </td>
-          <td style="padding:16px;">
+          <td style="padding: 16px 16px 16px 70px; text-align:left;">
             ${formLinkHtml}
           </td>
-          <td style="padding:16px; color:var(--gray-600); line-height:1.5;">
+          <td style="padding: 16px 16px 16px 110px; text-align:left; color:var(--gray-600); line-height:1.5;">
             ${displayDetail}
           </td>
         </tr>

@@ -58,6 +58,17 @@ function switchTrashTab(tab) {
   trashCurrentPage = 1;
   trashSelectedIds.clear();
   isDeleteMode = false;
+
+  const tabForms = document.getElementById('tab-forms');
+  const tabFeedbacks = document.getElementById('tab-feedbacks');
+  if (tabForms) tabForms.classList.toggle('active', tab === 'forms');
+  if (tabFeedbacks) tabFeedbacks.classList.toggle('active', tab === 'feedbacks');
+
+  const filtersCard = document.getElementById('trash-filters');
+  if (filtersCard) {
+    filtersCard.style.display = 'block';
+  }
+
   loadTrashData();
 }
 
@@ -84,13 +95,13 @@ function initTrashPage() {
     </div>
 
     <!-- Tabs -->
-    <div style="display:flex; gap:24px; margin-bottom:20px; border-bottom:1px solid var(--gray-200);">
-      <div onclick="switchTrashTab('forms')" id="tab-forms" style="padding:12px 0; cursor:pointer; font-weight:700; color:${trashTab === 'forms' ? 'var(--primary)' : 'var(--gray-500)'}; border-bottom:3px solid ${trashTab === 'forms' ? 'var(--primary)' : 'transparent'};">Biểu mẫu</div>
-      <div onclick="switchTrashTab('feedbacks')" id="tab-feedbacks" style="padding:12px 0; cursor:pointer; font-weight:700; color:${trashTab === 'feedbacks' ? 'var(--primary)' : 'var(--gray-500)'}; border-bottom:3px solid ${trashTab === 'feedbacks' ? 'var(--primary)' : 'transparent'};">Phản hồi</div>
+    <div class="tabs" style="margin-bottom:20px;">
+      <button id="tab-forms" class="tab-btn ${trashTab === 'forms' ? 'active' : ''}" onclick="switchTrashTab('forms')">Biểu mẫu</button>
+      <button id="tab-feedbacks" class="tab-btn ${trashTab === 'feedbacks' ? 'active' : ''}" onclick="switchTrashTab('feedbacks')">Phản hồi</button>
     </div>
 
     <!-- Filters -->
-    <div class="card" style="margin-bottom:20px;border:1px solid var(--gray-200);${trashTab === 'feedbacks' ? 'display:none;' : ''}">
+    <div id="trash-filters" class="card" style="margin-bottom:20px;border:1px solid var(--gray-200);">
       <div class="card-body" style="padding:14px 20px">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <div class="input-wrap" style="flex:1;min-width:220px">
@@ -178,13 +189,21 @@ async function loadTrashData() {
           deleteReason: f.ly_do_xoa || 'Không có lý do'
         }));
       } else {
-        trashItems = dbItems.map(f => ({
-          id: String(f.form_id),
-          name: f.ten_form || 'Biểu mẫu đã xóa',
-          deletedCount: f.so_phan_hoi_xoa,
-          deletedAt: new Date(f.ngay_xoa_gannhat || Date.now()).getTime(),
-          deleteReason: 'Không có lý do' // Phản hồi không lưu lý do theo từng bản ghi trong thùng rác chung
-        }));
+        trashItems = dbItems.map(f => {
+          const dt = new Date(f.ngay_xoa_gannhat || Date.now());
+          const dateKey = dt.toISOString().split('T')[0];
+          return {
+            id: String(f.form_id) + '_' + dateKey,
+            formId: String(f.form_id),
+            dateKey: dateKey,
+            name: f.ten_form || 'Biểu mẫu đã xóa',
+            cat: f.danh_muc || '',
+            deletedCount: f.so_phan_hoi_xoa,
+            deletedBy: f.nguoi_xoa_ten || f.nguoi_tao || 'Hệ thống',
+            deletedAt: dt.getTime(),
+            deleteReason: 'Không có lý do'
+          };
+        });
       }
     } else {
       trashItems = [];
@@ -218,7 +237,7 @@ function toggleTrashItem(id, checked) {
 function updateTrashActionButtons() {
   const container = document.getElementById('trash-action-buttons');
   if (!container) return;
-  
+
   if (isDeleteMode) {
     const hasSelected = trashSelectedIds.size > 0;
     container.innerHTML = `
@@ -276,12 +295,17 @@ function renderTrash() {
 
 function renderTrashTableOnly() {
   let valid = trashItems.filter(f => daysLeft(f.deletedAt) > 0);
-  
+
   if (trashCategoryFilter) {
     valid = valid.filter(f => {
       const catStr = (f.cat || 'Chưa phân loại').toLowerCase();
       return catStr.includes(trashCategoryFilter);
     });
+  }
+
+  if (trashSearchQuery) {
+    const q = trashSearchQuery.toLowerCase();
+    valid = valid.filter(f => (f.name || '').toLowerCase().includes(q) || (f.deletedBy || '').toLowerCase().includes(q));
   }
 
   const countEl = document.getElementById('trash-count');
@@ -297,23 +321,23 @@ function renderTrashTableOnly() {
   const allSelectedOnPage = pageData.length > 0 && pageData.every(f => trashSelectedIds.has(String(f.id)));
 
   listEl.innerHTML = `
-    <div class="table-responsive" style="background:#fff;">
-      <table class="table" style="width:100%;text-align:left;border-collapse:collapse;">
+    <div class="table-responsive" style="background:#fff; overflow-x: auto;">
+      <table class="table" style="width:100%;text-align:center;border-collapse:collapse;table-layout:fixed; min-width: 900px;">
         <thead>
           <tr style="border-bottom:2px solid #eef2ff;background:#f8fafc;">
-            ${isDeleteMode ? `<th style="padding:16px 20px;width:40px"><input type="checkbox" style="width:16px;height:16px;accent-color:#00008B;cursor:pointer" onchange="toggleSelectAllTrash(event)" ${allSelectedOnPage ? 'checked' : ''}></th>` : ''}
-            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;">TÊN BIỂU MẪU</th>
+            ${isDeleteMode ? `<th style="padding:16px 20px;width:40px;text-align:center;"><input type="checkbox" style="width:16px;height:16px;accent-color:#00008B;cursor:pointer" onchange="toggleSelectAllTrash(event)" ${allSelectedOnPage ? 'checked' : ''}></th>` : ''}
+            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;width:22%;">TÊN BIỂU MẪU</th>
+            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">NGƯỜI XÓA</th>
             ${trashTab === 'forms' ? `
-            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;">NGƯỜI XÓA</th>
-            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;">THỜI GIAN XÓA</th>
-            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;">THỜI HẠN</th>
-            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;">LÝ DO XÓA</th>
+            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">THỜI GIAN XÓA</th>
+            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">THỜI HẠN</th>
+            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">LÝ DO XÓA</th>
             ` : `
-            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center">SỐ PHẢN HỒI XÓA</th>
-            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;">THỜI GIAN XÓA GẦN NHẤT</th>
-            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;">THỜI HẠN</th>
+            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">SỐ PHẢN HỒI XÓA</th>
+            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">THỜI GIAN XÓA</th>
+            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">THỜI HẠN</th>
             `}
-            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center">THAO TÁC</th>
+            <th class="sticky-col-right" style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;width:15%;">THAO TÁC</th>
           </tr>
         </thead>
         <tbody>
@@ -325,37 +349,40 @@ function renderTrashTableOnly() {
     const isChecked = trashSelectedIds.has(safeId);
     const badgeColor = isUrgent ? '#ef4444' : '#0ea5e9';
     const badgeBg = isUrgent ? '#fef2f2' : '#f0f9ff';
-    
+
     const categoryStr = (f.cat || 'Chưa phân loại').toLowerCase();
     let catBg = '#f1f5f9';
     let catColor = '#64748b';
+    let catBorder = '#cbd5e1';
     if (categoryStr.includes('ngoại ngữ')) {
       catBg = '#ffedd5';
       catColor = '#ea580c';
+      catBorder = '#fdba74';
     } else if (categoryStr.includes('tin học')) {
       catBg = '#e0f2fe';
       catColor = '#0284c7';
+      catBorder = '#7dd3fc';
     }
-    
+
     return `
               <tr style="border-bottom:1px solid #f1f5f9;transition:all 0.2s;${isChecked ? 'background:#eff6ff' : ''}" onmouseenter="if(!${isChecked})this.style.background='#f8fafc'" onmouseleave="if(!${isChecked})this.style.background='transparent'">
-                ${isDeleteMode ? `<td style="padding:16px 20px;"><input type="checkbox" style="width:16px;height:16px;accent-color:#00008B;cursor:pointer" onchange="toggleTrashItem('${safeId}', this.checked)" ${isChecked ? 'checked' : ''}></td>` : ''}
-                <td style="padding:16px 20px;">
-                  <div style="font-weight:700;color:${isChecked ? '#00008B' : '#0f172a'};font-size:14.5px;margin-bottom:4px;">${f.name}</div>
-                  ${trashTab === 'forms' ? `<div style="display:inline-block;padding:2px 8px;border-radius:6px;background:${catBg};color:${catColor};font-size:11.5px;font-weight:600;">${f.cat || 'Chưa phân loại'}</div>` : ''}
+                ${isDeleteMode ? `<td style="padding:16px 20px;text-align:center;"><input type="checkbox" style="width:16px;height:16px;accent-color:#00008B;cursor:pointer" onchange="toggleTrashItem('${safeId}', this.checked)" ${isChecked ? 'checked' : ''}></td>` : ''}
+                <td style="padding: 16px 20px 16px 40px; text-align:left;">
+                  <div style="font-weight:700;color:${isChecked ? '#00008B' : '#0f172a'};font-size:14.5px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</div>
+                  <div style="display:inline-block;padding:3px 11px;border-radius:999px;background:${catBg};color:${catColor};border:1px solid ${catBorder};font-size:11.5px;font-weight:600;">${f.cat || 'Chưa phân loại'}</div>
                 </td>
-                ${trashTab === 'forms' ? `
-                <td style="padding:16px 20px;">
+                <td style="padding:16px 20px;text-align:center;">
                   <span style="font-weight:600;color:#475569;font-size:13.5px;">${f.deletedBy}</span>
                 </td>
-                <td style="padding:16px 20px;color:#64748b;font-size:13.5px;font-weight:500;">
+                ${trashTab === 'forms' ? `
+                <td style="padding:16px 20px;color:#64748b;font-size:13.5px;font-weight:500;text-align:center;">
                   ${new Date(f.deletedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                 </td>
-                <td style="padding:16px 20px;color:${isUrgent ? '#ef4444' : '#64748b'};font-size:13.5px;font-weight:500;">
+                <td style="padding:16px 20px;color:${isUrgent ? '#ef4444' : '#64748b'};font-size:13.5px;font-weight:500;text-align:center;">
                   ${days === 0 ? 'Hôm nay' : 'Còn ' + days + ' ngày'}
                 </td>
-                <td style="padding:16px 20px;">
-                  <div style="font-size:13px;color:#64748b;font-style:italic;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${f.deleteReason}">
+                <td style="padding:16px 20px;text-align:center;">
+                  <div style="font-size:13px;color:#64748b;font-style:italic;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 auto;" title="${f.deleteReason}">
                     ${f.deleteReason}
                   </div>
                 </td>
@@ -363,14 +390,14 @@ function renderTrashTableOnly() {
                 <td style="padding:16px 20px;text-align:center;font-weight:700;color:var(--gray-800)">
                   ${f.deletedCount}
                 </td>
-                <td style="padding:16px 20px;color:#64748b;font-size:13.5px;font-weight:500;">
+                <td style="padding:16px 20px;color:#64748b;font-size:13.5px;font-weight:500;text-align:center;">
                   ${new Date(f.deletedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                 </td>
-                <td style="padding:16px 20px;color:${isUrgent ? '#ef4444' : '#64748b'};font-size:13.5px;font-weight:500;">
+                <td style="padding:16px 20px;color:${isUrgent ? '#ef4444' : '#64748b'};font-size:13.5px;font-weight:500;text-align:center;">
                   ${days === 0 ? 'Hôm nay' : 'Còn ' + days + ' ngày'}
                 </td>
                 `}
-                <td style="padding:16px 20px;text-align:center;">
+                <td class="sticky-col-right" style="padding:16px 20px;text-align:center;">
                   <div style="display:flex;gap:8px;justify-content:center;">
                     <button style="background:transparent; color:#00008B; border:1px solid #bfdbfe; padding:6px 12px; border-radius:8px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px; cursor:pointer; transition:all 0.2s;" onmouseenter="this.style.background='#eff6ff'" onmouseleave="this.style.background='transparent'" title="Khôi phục" onclick="openTrashRestoreModal('${safeId}','${safeName}')">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg> Khôi phục
@@ -444,7 +471,7 @@ function openTrashRestoreModal(id, name) {
     document.body.appendChild(modal);
     modal.offsetHeight; // reflow
   }
-  
+
   document.getElementById('trash-restore-msg').innerHTML = `Bạn có chắc chắn muốn khôi phục biểu mẫu <strong>${name}</strong> không?`;
   const reasonInput = document.getElementById('trash-restore-reason');
   if (reasonInput) reasonInput.value = '';
@@ -462,16 +489,25 @@ async function confirmTrashRestore() {
   if (!trashRestoreTarget) return;
   const target = trashRestoreTarget;
   closeTrashRestoreModal();
-  
+
   try {
     const reasonInput = document.getElementById('trash-restore-reason');
     const reason = reasonInput ? reasonInput.value.trim() : '';
-    
-    const endpoint = trashTab === 'forms' ? `/forms/${target.id}/restore` : `/feedback/form/${target.id}/restore`;
-    await fetch(`${API_BASE}${endpoint}`, { 
-      method: 'PATCH', 
+
+    let endpoint, bodyData;
+    if (trashTab === 'forms') {
+      endpoint = `/forms/${target.id}/restore`;
+      bodyData = { ly_do_xoa: reason || 'Không có lý do' };
+    } else {
+      const parts = String(target.id).split('_');
+      endpoint = `/feedback/form/${parts[0]}/restore`;
+      bodyData = { ly_do_xoa: reason || 'Không có lý do', dateKey: parts[1] };
+    }
+
+    await fetch(`${API_BASE}${endpoint}`, {
+      method: 'PATCH',
       headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ly_do_xoa: reason || 'Không có lý do' })
+      body: JSON.stringify(bodyData)
     });
     await loadTrashData();
     trashSelectedIds.delete(String(target.id));
@@ -525,14 +561,14 @@ function openTrashDeleteModal(target) {
     document.body.appendChild(modal);
     modal.offsetHeight; // reflow
   }
-  
+
   const msgEl = document.getElementById('trash-delete-msg');
   if (target.type === 'single') {
     msgEl.innerHTML = `Bạn có chắc chắn muốn xóa vĩnh viễn biểu mẫu <strong>${target.name}</strong> không? Hành động này không thể hoàn tác.`;
   } else {
     msgEl.innerHTML = `Bạn có chắc chắn muốn xóa vĩnh viễn <strong>${trashSelectedIds.size} biểu mẫu đã chọn</strong> không? Hành động này không thể hoàn tác.`;
   }
-  
+
   const reasonInput = document.getElementById('trash-delete-reason');
   if (reasonInput) reasonInput.value = '';
   modal.classList.add('open');
@@ -549,17 +585,26 @@ async function confirmTrashDelete() {
   if (!trashDeleteTarget) return;
   const target = trashDeleteTarget;
   closeTrashDeleteModal();
-  
+
   if (target.type === 'single') {
     try {
       const reasonInput = document.getElementById('trash-delete-reason');
       const reason = reasonInput ? reasonInput.value.trim() : '';
-      
-      const endpoint = trashTab === 'forms' ? `/forms/${target.id}/permanent` : `/feedback/form/${target.id}/permanent`;
-      await fetch(`${API_BASE}${endpoint}`, { 
-        method: 'DELETE', 
+
+      let endpoint, bodyData;
+      if (trashTab === 'forms') {
+        endpoint = `/forms/${target.id}/permanent`;
+        bodyData = { ly_do_xoa: reason || 'Không có lý do' };
+      } else {
+        const parts = String(target.id).split('_');
+        endpoint = `/feedback/form/${parts[0]}/permanent`;
+        bodyData = { ly_do_xoa: reason || 'Không có lý do', dateKey: parts[1] };
+      }
+
+      await fetch(`${API_BASE}${endpoint}`, {
+        method: 'DELETE',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ly_do_xoa: reason || 'Không có lý do' })
+        body: JSON.stringify(bodyData)
       });
       removeApprovalsByForm(target.id);
       await loadTrashData();
@@ -583,14 +628,22 @@ async function confirmTrashDelete() {
     try {
       const reasonInput = document.getElementById('trash-delete-reason');
       const reason = reasonInput ? reasonInput.value.trim() : '';
-      
+
       const isForms = trashTab === 'forms';
       await Promise.all(ids.map(id => {
-        const endpoint = isForms ? `/forms/${id}/permanent` : `/feedback/form/${id}/permanent`;
-        return fetch(`${API_BASE}${endpoint}`, { 
-          method: 'DELETE', 
+        let endpoint, bodyData;
+        if (isForms) {
+          endpoint = `/forms/${id}/permanent`;
+          bodyData = { ly_do_xoa: reason || 'Không có lý do' };
+        } else {
+          const parts = String(id).split('_');
+          endpoint = `/feedback/form/${parts[0]}/permanent`;
+          bodyData = { ly_do_xoa: reason || 'Không có lý do', dateKey: parts[1] };
+        }
+        return fetch(`${API_BASE}${endpoint}`, {
+          method: 'DELETE',
           headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ly_do_xoa: reason || 'Không có lý do' })
+          body: JSON.stringify(bodyData)
         });
       }));
       ids.forEach(id => removeApprovalsByForm(id));
@@ -618,17 +671,25 @@ async function restoreSelected() {
   if (!trashSelectedIds.size) return;
   const reason = prompt(`Khôi phục ${trashSelectedIds.size} biểu mẫu đã chọn?\n\nNhập lý do khôi phục (nếu có):`);
   if (reason === null) return;
-  
+
   const ids = Array.from(trashSelectedIds);
   const restoredNames = ids.map(id => trashItems.find(x => String(x.id) === String(id))?.name).filter(Boolean).join(', ');
   try {
     const isForms = trashTab === 'forms';
     await Promise.all(ids.map(id => {
-      const endpoint = isForms ? `/forms/${id}/restore` : `/feedback/form/${id}/restore`;
-      return fetch(`${API_BASE}${endpoint}`, { 
-        method: 'PATCH', 
+      let endpoint, bodyData;
+      if (isForms) {
+        endpoint = `/forms/${id}/restore`;
+        bodyData = { ly_do_xoa: reason.trim() || 'Không có lý do' };
+      } else {
+        const parts = String(id).split('_');
+        endpoint = `/feedback/form/${parts[0]}/restore`;
+        bodyData = { ly_do_xoa: reason.trim() || 'Không có lý do', dateKey: parts[1] };
+      }
+      return fetch(`${API_BASE}${endpoint}`, {
+        method: 'PATCH',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ly_do_xoa: reason.trim() || 'Không có lý do' })
+        body: JSON.stringify(bodyData)
       });
     }));
     await loadTrashData();
