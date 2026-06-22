@@ -557,7 +557,7 @@ router.get("/", authMiddleware, authorize("view_form"), async (req, res) => {
     const approvalColumns = await getTableColumns("PheDuyet");
     const approvalDeadlineSelect = approvalColumns.has("han_chot_duyet") ? "a.han_chot_duyet" : "NULL";
     let query = `
-      SELECT f.id, f.ten_form, ${categorySelect} AS danh_muc, f.doi_tuong, f.trang_thai,
+      SELECT f.id, f.ten_form, ${categorySelect} AS danh_muc, f.trang_thai,
              ${surveyTypeSelect} AS loai_khao_sat,
              f.ngay_tao, f.ngay_cap_nhat, f.ngay_dong,
              ${formColumns.has("mo_ta") ? "f.mo_ta" : "NULL"} AS mo_ta,

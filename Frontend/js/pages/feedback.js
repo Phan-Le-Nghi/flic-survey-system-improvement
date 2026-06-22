@@ -73,9 +73,8 @@ document.getElementById('page-content').innerHTML = `
         <table style="width:100%; border-collapse:collapse; text-align:center; table-layout:fixed; min-width: 1000px;">
           <thead style="position: sticky; top: 0; z-index: 10; background: #f8fafc; box-shadow: 0 1px 0 #e2e8f0;">
             <tr>
-              <th class="sticky-col-left" style="padding:16px 20px; font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.5px; width: 24%; text-align:center;">TÊN BIỂU MẪU</th>
+              <th class="sticky-col-left" style="padding:16px 20px; font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.5px; width: 36%; text-align:center;">TÊN BIỂU MẪU</th>
               <th style="padding:16px 20px; font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.5px; width: 12%; text-align:center;">DANH MỤC</th>
-              <th style="padding:16px 20px; font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.5px; width: 12%; text-align:center;">ĐỐI TƯỢNG</th>
               <th style="padding:16px 20px; font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.5px; width: 8%; text-align:center;">PHẢN HỒI</th>
               <th style="padding:16px 20px; font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.5px; width: 14%; text-align:center;">TRẠNG THÁI</th>
               <th style="padding:16px 20px; font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.5px; width: 10%; text-align:center;">NGÀY TẠO</th>
@@ -228,7 +227,6 @@ function renderTable(data) {
           ${f.ten_form || ''}
         </td>
         <td style="padding:16px 20px;color:var(--gray-600);font-weight:500; text-align:center;">${f.danh_muc || ''}</td>
-        <td style="padding:16px 20px;color:var(--gray-600); text-align:center;">${f.doi_tuong || 'Tất cả'}</td>
         <td style="padding:16px 20px;font-weight:700;color:var(--gray-800);text-align:center; text-align:center;">${f.so_phan_hoi || 0}</td>
         <td style="padding:16px 20px; text-align:center;">${statusHtml}</td>
         <td style="padding:16px 20px;color:var(--gray-600);font-size:13.5px; text-align:center;">${formatDate(f.ngay_tao)}</td>
