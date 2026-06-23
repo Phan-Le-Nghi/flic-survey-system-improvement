@@ -266,6 +266,7 @@ router.patch('/:id', authMiddleware, authorize('view_feedback'), async (req, res
 router.delete('/:id', authMiddleware, authorize('delete_feedback'), async (req, res) => {
   const id = Number(req.params.id);
   const nhan_vien_id = req.user ? req.user.id : null;
+  console.log('DELETE FEEDBACK PARAMS:', req.params, 'BODY:', req.body);
   const { ly_do_xoa } = req.body || {};
   if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
@@ -280,9 +281,12 @@ router.delete('/:id', authMiddleware, authorize('delete_feedback'), async (req, 
     `;
 
     try {
+      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do'
+        ? `Đưa phản hồi vào thùng rác (Lý do: ${ly_do_xoa})`
+        : 'Đưa phản hồi vào thùng rác';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, 'delete', 'feedback', ${id}, N'Đưa phản hồi vào thùng rác')
+        VALUES (${nhan_vien_id}, 'delete', 'feedback', ${id}, ${logDetail})
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
 
@@ -302,13 +306,14 @@ router.get('/trash/list', authMiddleware, authorize('view_feedback'), async (req
              COUNT(ph.id) AS so_phan_hoi_xoa,
              MAX(ph.ngay_xoa) AS ngay_xoa_gannhat,
              MAX(nx.ho_ten) AS nguoi_xoa_ten,
-             CONVERT(varchar(16), ph.ngay_xoa, 120) AS dateKey
+             MAX(ph.ly_do_xoa) AS ly_do_xoa,
+             CONVERT(varchar(19), ph.ngay_xoa, 120) AS dateKey
       FROM PhanHoi ph
       JOIN Form f ON f.id = ph.form_id
       LEFT JOIN LoaiKhaoSat lks ON f.loai_khao_sat_id = lks.id
       LEFT JOIN NhanVien nx ON ph.nguoi_xoa_id = nx.id
       WHERE ph.trang_thai = 'deleted'
-      GROUP BY f.id, f.ten_form, lks.danh_muc, CONVERT(varchar(16), ph.ngay_xoa, 120)
+      GROUP BY f.id, f.ten_form, lks.danh_muc, CONVERT(varchar(19), ph.ngay_xoa, 120)
       ORDER BY MAX(ph.ngay_xoa) DESC
     `;
     res.json(result.recordset);
@@ -321,6 +326,7 @@ router.get('/trash/list', authMiddleware, authorize('view_feedback'), async (req
 router.patch('/:id/restore', authMiddleware, authorize('delete_feedback'), async (req, res) => {
   const id = Number(req.params.id);
   const nhan_vien_id = req.user ? req.user.id : null;
+  const { ly_do_xoa } = req.body || {};
   if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
     await sql.query`
@@ -329,9 +335,12 @@ router.patch('/:id/restore', authMiddleware, authorize('delete_feedback'), async
       WHERE id=${id} AND trang_thai='deleted'
     `;
     try {
+      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do'
+        ? `Khôi phục phản hồi từ thùng rác (Lý do: ${ly_do_xoa})`
+        : 'Khôi phục phản hồi từ thùng rác';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, 'restore', 'feedback', ${id}, N'Khôi phục phản hồi từ thùng rác')
+        VALUES (${nhan_vien_id}, 'restore', 'feedback', ${id}, ${logDetail})
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
     res.json({ message: 'Đã khôi phục phản hồi' });
@@ -344,13 +353,17 @@ router.patch('/:id/restore', authMiddleware, authorize('delete_feedback'), async
 router.delete('/:id/permanent', authMiddleware, authorize('delete_feedback'), async (req, res) => {
   const id = Number(req.params.id);
   const nhan_vien_id = req.user ? req.user.id : null;
+  const { ly_do_xoa } = req.body || {};
   if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
     await sql.query`DELETE FROM PhanHoi WHERE id=${id} AND trang_thai='deleted'`;
     try {
+      const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do'
+        ? `Xóa vĩnh viễn phản hồi khỏi hệ thống (Lý do: ${ly_do_xoa})`
+        : 'Xóa vĩnh viễn phản hồi khỏi hệ thống';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, 'hard_delete', 'feedback', ${id}, N'Xóa vĩnh viễn phản hồi khỏi hệ thống')
+        VALUES (${nhan_vien_id}, 'hard_delete', 'feedback', ${id}, ${logDetail})
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
     res.json({ message: 'Đã xóa vĩnh viễn phản hồi' });
@@ -363,7 +376,7 @@ router.delete('/:id/permanent', authMiddleware, authorize('delete_feedback'), as
 router.patch('/form/:form_id/restore', authMiddleware, authorize('delete_feedback'), async (req, res) => {
   const form_id = Number(req.params.form_id);
   const nhan_vien_id = req.user ? req.user.id : null;
-  const { dateKey } = req.body || {};
+  const { dateKey, ly_do_xoa } = req.body || {};
   if (!validId(form_id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
     const request = new sql.Request();
@@ -371,7 +384,7 @@ router.patch('/form/:form_id/restore', authMiddleware, authorize('delete_feedbac
     let whereSql = `form_id = @form_id AND trang_thai = 'deleted'`;
     if (dateKey) {
       request.input('dateKey', sql.VarChar, dateKey);
-      whereSql += ` AND CONVERT(varchar(16), ngay_xoa, 120) = @dateKey`;
+      whereSql += ` AND CONVERT(varchar(19), ngay_xoa, 120) = @dateKey`;
     }
 
     const result = await request.query(`
@@ -382,9 +395,12 @@ router.patch('/form/:form_id/restore', authMiddleware, authorize('delete_feedbac
     const count = result.rowsAffected[0] || 0;
     try {
       if (count > 0) {
+        const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do'
+          ? `Khôi phục ${count} phản hồi của biểu mẫu (Lý do: ${ly_do_xoa})`
+          : `Khôi phục ${count} phản hồi của biểu mẫu`;
         await sql.query`
           INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-          VALUES (${nhan_vien_id}, 'restore', 'feedback', ${form_id}, N'Khôi phục ' + CAST(${count} AS VARCHAR) + N' phản hồi của biểu mẫu')
+          VALUES (${nhan_vien_id}, 'restore', 'feedback', ${form_id}, ${logDetail})
         `;
       }
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
@@ -398,7 +414,7 @@ router.patch('/form/:form_id/restore', authMiddleware, authorize('delete_feedbac
 router.delete('/form/:form_id/permanent', authMiddleware, authorize('delete_feedback'), async (req, res) => {
   const form_id = Number(req.params.form_id);
   const nhan_vien_id = req.user ? req.user.id : null;
-  const { dateKey } = req.body || {};
+  const { dateKey, ly_do_xoa } = req.body || {};
   if (!validId(form_id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
     const request = new sql.Request();
@@ -406,16 +422,19 @@ router.delete('/form/:form_id/permanent', authMiddleware, authorize('delete_feed
     let whereSql = `form_id = @form_id AND trang_thai = 'deleted'`;
     if (dateKey) {
       request.input('dateKey', sql.VarChar, dateKey);
-      whereSql += ` AND CONVERT(varchar(16), ngay_xoa, 120) = @dateKey`;
+      whereSql += ` AND CONVERT(varchar(19), ngay_xoa, 120) = @dateKey`;
     }
 
     const result = await request.query(`DELETE FROM PhanHoi WHERE ${whereSql}`);
     const count = result.rowsAffected[0] || 0;
     try {
       if (count > 0) {
+        const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do'
+          ? `Xóa vĩnh viễn ${count} phản hồi của biểu mẫu khỏi hệ thống (Lý do: ${ly_do_xoa})`
+          : `Xóa vĩnh viễn ${count} phản hồi của biểu mẫu khỏi hệ thống`;
         await sql.query`
           INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-          VALUES (${nhan_vien_id}, 'hard_delete', 'feedback', ${form_id}, N'Xóa vĩnh viễn ' + CAST(${count} AS VARCHAR) + N' phản hồi của biểu mẫu khỏi hệ thống')
+          VALUES (${nhan_vien_id}, 'hard_delete', 'feedback', ${form_id}, ${logDetail})
         `;
       }
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }

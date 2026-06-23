@@ -124,11 +124,14 @@ async function loadFeedbackData() {
     catSelect.innerHTML = '<option value="all">Danh mục (Tất cả)</option>' + categories.map(c => `<option value="${c}">${c}</option>`).join('');
   }
 
-  // Calculate stats
-  const totalFeedback = allFeedbacks.length;
+  // Calculate stats based only on feedbacks for forms that are not deleted/draft/pending/rejected
+  const validFormIds = new Set(allForms.map(f => f.id));
+  const validFeedbacks = allFeedbacks.filter(fb => validFormIds.has(fb.form_id));
+
+  const totalFeedback = validFeedbacks.length;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const newToday = allFeedbacks.filter(f => {
+  const newToday = validFeedbacks.filter(f => {
     if (!f.ngay_gui) return false;
     const d = new Date(f.ngay_gui.replace('Z', ''));
     d.setHours(0, 0, 0, 0);
@@ -223,7 +226,7 @@ function renderTable(data) {
 
     return `
       <tr style="border-bottom:${borderB}; transition:background 0.2s" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='none'">
-        <td class="sticky-col-left" style="padding:16px 20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; color:var(--gray-900); cursor:pointer; text-align:center;" onmouseover="this.style.color='#00008B'" onmouseout="this.style.color='var(--gray-900)'" onclick="viewFormFeedbacks(${f.id}, '${(f.ten_form || '').replace(/'/g, "\\'")}')">
+        <td class="sticky-col-left" style="padding: 16px 20px 16px 40px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; color:var(--gray-900); cursor:pointer; text-align:left;" onmouseover="this.style.color='#00008B'" onmouseout="this.style.color='var(--gray-900)'" onclick="viewFormFeedbacks(${f.id}, '${(f.ten_form || '').replace(/'/g, "\\'")}')">
           ${f.ten_form || ''}
         </td>
         <td style="padding:16px 20px;color:var(--gray-600);font-weight:500; text-align:center;">${f.danh_muc || ''}</td>
