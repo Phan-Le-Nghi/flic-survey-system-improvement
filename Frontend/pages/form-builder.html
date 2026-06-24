@@ -13,7 +13,7 @@
       font-family: "Be Vietnam Pro", sans-serif;
       color: #0f172a;
       background:
-        radial-gradient(circle at top left, rgba(0,0,139,.12), transparent 28%),
+        radial-gradient(circle at top left, rgba(2,80,173,.12), transparent 28%),
         linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%);
     }
     .public-shell {
@@ -35,7 +35,7 @@
       overflow: hidden;
       border-radius: 30px;
       background: linear-gradient(135deg,#eef5ff 0%,#ffffff 70%);
-      border-top: 8px solid #00008B;
+      border-top: 8px solid #0250AD;
       box-shadow: 0 24px 48px rgba(15,23,42,.12);
       display: flex;
       flex-direction: column;
@@ -67,30 +67,34 @@
     .form-badge {
       padding: 6px 12px;
       border-radius: 999px;
-      background: rgba(255,255,255,.72);
-      color: #334155;
+      background: #ffffff;
+      border: 1px solid #bfdbfe;
+      color: #0250AD;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
     }
     .form-title {
       margin: 0;
-      font-size: 42px;
-      font-weight: 800;
-      line-height: 1.08;
-      color: #00008B;
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      color: #0250AD;
     }
     .form-sub {
       margin: 12px 0 0;
-      color: #00008B;
+      color: #334155;
       font-size: 16px;
+      font-weight: 600;
+      line-height: 1.55;
     }
     .form-created {
       padding: 8px 8px 14px;
-      color: #00008B;
+      color: #0250AD;
       font-size: 14px;
     }
     .form-created strong {
-      color: #c2410c;
+      color: #FA7413;
     }
     .prefill-grid {
       display: none;
@@ -125,7 +129,7 @@
     .field-block input:focus,
     .field-block select:focus,
     .field-block textarea:focus {
-      border-color: #00008B;
+      border-color: #0250AD;
       box-shadow: 0 0 0 4px rgba(56,189,248,.12);
     }
     .question-list {
@@ -135,11 +139,11 @@
       margin-top: 0;
     }
     .question-card {
-      border: 1px solid #00008B;
-      border-radius: 22px;
+      border: 1px solid #bfdbfe;
+      border-radius: 20px;
       padding: 20px 20px 22px;
-      background: linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,247,237,.95) 100%);
-      box-shadow: 0 12px 26px rgba(0,0,139,.08);
+      background: linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+      box-shadow: 0 12px 26px rgba(30,64,175,.08);
     }
     .question-head {
       display: flex;
@@ -159,30 +163,33 @@
       width: 36px;
       height: 36px;
       border-radius: 50%;
-      margin-bottom: 10px;
-      background: #00008B;
-      color: #00008B;
+      margin-top: 2px;
+      margin-bottom: 0;
+      background: #0250AD;
+      color: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 800;
+      box-shadow: 0 8px 18px rgba(2,80,173,.18);
     }
     .question-text {
       margin: 0;
-      font-size: 21px;
-      line-height: 1.45;
-      font-weight: 800;
+      font-size: 16px;
+      line-height: 1.5;
+      font-weight: 600;
       color: #0f172a;
     }
     .question-chip {
       flex-shrink: 0;
       padding: 6px 12px;
       border-radius: 999px;
-      background: #00008B;
-      color: #00008B;
+      background: #0250AD;
+      color: #fff;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
       white-space: nowrap;
     }
     .option-list {
@@ -202,12 +209,25 @@
       background: rgba(255,255,255,.92);
       cursor: pointer;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 400;
       color: #334155;
     }
     .option-item input {
       margin: 0;
-      accent-color: #00008B;
+      accent-color: #0250AD;
+    }
+    .option-item .other-answer {
+      flex: 1;
+      min-width: 160px;
+      border: 0;
+      border-bottom: 1px solid #cbd5e1;
+      background: transparent;
+      padding: 6px 0;
+      font: inherit;
+      outline: none;
+    }
+    .option-item .other-answer:focus {
+      border-bottom-color: #0250AD;
     }
     .text-answer,
     .select-answer {
@@ -245,7 +265,7 @@
     }
     .rating-pill input {
       margin: 0;
-      accent-color: #00008B;
+      accent-color: #0250AD;
     }
     .star-wrap {
       display: flex;
@@ -283,7 +303,7 @@
       transform: scale(1.08);
     }
     .star-item.active .star-icon {
-      color: #f59e0b;
+      color: #FA7413;
     }
     .helper-text {
       margin-top: 18px;
@@ -349,7 +369,7 @@
         padding: 24px 22px;
       }
       .form-title {
-        font-size: 34px;
+        font-size: 26px;
       }
       .prefill-grid,
       .prefill-grid.three {
@@ -379,7 +399,6 @@
         <p class="form-sub" id="public-form-sub" style="display:none"></p>
       </div>
 
-      <div class="form-created">Ng&agrave;y t&#7841;o: <strong id="public-form-created">--</strong></div>
 
       <div id="public-question-list" class="question-list">
         <div class="question-card" style="text-align:center;color:#64748b">Đang tải câu hỏi...</div>
@@ -403,6 +422,42 @@
   <script>
     // API_BASE đã được khai báo trong main.js
     let currentForm = null;
+    let currentPublicPageIndex = 0;
+    let publicFormPages = [];
+    let publicQuestionsRaw = [];
+
+    function isSectionItem(item) {
+      return !!item?._isSection || String(item?.type || item?.loai || "").toLowerCase() === "section";
+    }
+
+    function countRealQuestions(items) {
+      return (items || []).filter(item => !isSectionItem(item)).length;
+    }
+
+    function getQuestionNumberInSection(items, index) {
+      const sliced = (items || []).slice(0, index + 1);
+      return countRealQuestions(sliced);
+    }
+
+    function buildFormPages(items) {
+      const questions = items || [];
+      const hasSection = questions.some(isSectionItem);
+      if (!hasSection) {
+        return [{ section: null, sectionIndex: -1, items: questions.map((item, i) => ({ item, originalIndex: i })) }];
+      }
+      const pages = [];
+      let current = { section: null, sectionIndex: -1, items: [] };
+      questions.forEach((item, index) => {
+        if (isSectionItem(item)) {
+          if (current.section || current.items.length) pages.push(current);
+          current = { section: item, sectionIndex: index, items: [] };
+          return;
+        }
+        current.items.push({ item, originalIndex: index });
+      });
+      if (current.section || current.items.length) pages.push(current);
+      return pages;
+    }
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -414,7 +469,7 @@
     }
 
     const DEFAULT_PUBLIC_THEME = {
-      color: "#00008B",
+      color: "#0250AD",
       background: "#eef5ff",
       headerImage: "",
       fontFamily: "Be Vietnam Pro"
@@ -425,7 +480,7 @@
       const image = String(data.anh_bia || "").trim();
       const bg = String(data.mau_nen || "").trim().toLowerCase();
       const font = String(data.font_family || "").trim();
-      return !!image || (!!bg && !LEGACY_DEFAULT_BACKGROUNDS.has(bg)) || (!!font && font !== "Roboto");
+      return !!image || (!!bg && !LEGACY_DEFAULT_BACKGROUNDS.has(bg)) || (!!font && font !== "Be Vietnam Pro");
     }
 
     function applyPublicTheme(data = {}) {
@@ -437,7 +492,7 @@
       document.body.style.fontFamily = `"${font}", "Be Vietnam Pro", sans-serif`;
       document.body.style.background = custom && data.mau_nen
         ? data.mau_nen
-        : "radial-gradient(circle at top left, rgba(0,0,139,.12), transparent 28%), linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%)";
+        : "radial-gradient(circle at top left, rgba(2,80,173,.12), transparent 28%), linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%)";
 
       const head = document.querySelector(".form-head");
       if (head) {
@@ -448,12 +503,23 @@
       }
     }
 
-    function formatRichText(value) {
-      return escapeHtml(value)
+    function formatRichText(value, isRequired = false) {
+      if (!value) return isRequired ? ' <span style="color:#ef4444;margin-left:2px">*</span>' : '';
+      let text = String(value);
+      if (isRequired) {
+        const lines = text.split('\n');
+        lines[0] = lines[0] + '__REQ_STAR__';
+        text = lines.join('\n');
+      }
+      let html = escapeHtml(text)
         .replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/g, "<u>$1</u>")
         .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
         .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
         .replace(/\n/g, "<br>");
+      if (isRequired) {
+        html = html.replace('__REQ_STAR__', ' <span style="color:#ef4444;margin-left:2px">*</span>');
+      }
+      return html;
     }
 
     function getYoutubeEmbedUrl(url) {
@@ -497,15 +563,50 @@
       return params.get("form_id") || "";
     }
 
+    function updatePublicFooter() {
+      const footer = document.querySelector('.public-footer');
+      if (!footer || !publicFormPages.length) return;
+      
+      const hasMultiplePages = publicFormPages.length > 1;
+      const isLastPage = currentPublicPageIndex === publicFormPages.length - 1;
+      
+      const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
+      
+      let html = '';
+      if (hasMultiplePages && currentPublicPageIndex > 0) {
+        html += `<button class="btn btn-outline" style="min-width:118px;height:48px;border-radius:14px;background:#fff;color:#0250AD;font-weight:800;border:1px solid #cbd5e1;cursor:pointer;box-shadow:0 8px 18px rgba(15,23,42,.08)" type="button" onclick="setPublicPage(${currentPublicPageIndex - 1})">Quay lại</button>`;
+      }
+      
+      if (hasMultiplePages && !isLastPage) {
+        html += `<button class="btn" style="min-width:118px;height:48px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-weight:800;cursor:pointer;box-shadow:0 12px 28px rgba(29,155,240,.24)" type="button" onclick="goNextPublicPage()">Tiếp</button>`;
+      } else {
+        if (isPreview) {
+          html += `<button class="submit-btn" id="public-submit-btn" style="min-width:210px;height:48px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-weight:800;cursor:not-allowed;opacity:.72" type="button" title="Đây là chế độ xem trước, bạn không thể gửi phản hồi." onclick="if(typeof showToast === 'function') { showToast('Bạn đang xem biểu mẫu dưới dạng xem trước, không thể gửi phản hồi.', 'info'); } else { alert('Bạn đang xem biểu mẫu dưới dạng xem trước, không thể gửi phản hồi.'); }">Gửi phản hồi</button>`;
+        } else {
+          html += `<button class="submit-btn" id="public-submit-btn" style="min-width:210px;height:48px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-weight:800;cursor:pointer;" type="button" onclick="submitPublicForm()">Gửi phản hồi</button>`;
+        }
+      }
+      
+      if (hasMultiplePages) {
+        html += `<span style="font-size:13px;font-weight:800;color:#64748b;display:flex;align-items:center;">Phần ${currentPublicPageIndex + 1}/${publicFormPages.length}</span>`;
+      }
+      footer.innerHTML = html;
+    }
+
     function getQuestionTypeLabel(type) {
       const normalized = String(type || "choice").toLowerCase();
       if (normalized === "rating") return "Đánh giá";
       if (normalized === "star_rating") return "Đánh giá sao";
+      if (normalized === "scale") return "Thang đo";
       if (normalized === "checkbox") return "Hộp kiểm";
       if (normalized === "dropdown") return "Thả xuống";
       if (normalized === "grid_radio") return "Lưới trắc nghiệm";
       if (normalized === "grid_checkbox") return "Lưới hộp kiểm";
-      if (normalized === "text" || normalized === "paragraph") return "Tự luận";
+      if (normalized === "short_text" || normalized === "text") return "Tự luận";
+      if (normalized === "paragraph") return "Tự luận dài";
+      if (normalized === "upload") return "Tải tệp";
+      if (normalized === "date") return "Ngày";
+      if (normalized === "time") return "Giờ";
       return "Lựa chọn";
     }
 
@@ -516,6 +617,72 @@
     function getOptionId(option, fallbackIndex) {
       if (typeof option === "string") return "";
       return option?.id || `opt_${fallbackIndex}`;
+    }
+
+    function parseJsonObject(value) {
+      if (value && typeof value === "object" && !Array.isArray(value)) return value;
+      try {
+        const parsed = value ? JSON.parse(value) : {};
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function questionAllowsOther(question) {
+      const type = String(question?.loai || question?.type || "choice").toLowerCase();
+      if (type !== "choice" && type !== "checkbox") return false;
+      const validation = parseJsonObject(question.validation_json || question.validation || question.logic_json);
+      return !!(
+        question.allowOther ||
+        question.allow_other ||
+        question.hasOtherOption ||
+        question.has_other_option ||
+        validation.allow_other ||
+        validation.allowOther ||
+        validation.has_other_option
+      );
+    }
+
+    function getQuestionConfig(question) {
+      return parseJsonObject(question?.validation_json || question?.validation || question?.logic_json);
+    }
+
+    function getDisplayOptions(question) {
+      const options = Array.isArray(question.lua_chon) ? question.lua_chon.map((option, index) => ({ option, originalIndex: index })) : [];
+      const config = getQuestionConfig(question);
+      if (!config.shuffle_options || options.length < 2) return options;
+      const seed = String(question.id || "") + "|" + options.map(({ option }) => getOptionLabel(option)).join("|");
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+      return [...options].sort((a, b) => {
+        const av = Math.sin((hash || 1) + a.originalIndex * 999);
+        const bv = Math.sin((hash || 1) + b.originalIndex * 999);
+        return av - bv;
+      });
+    }
+
+    function getDisplayRows(question) {
+      const rows = getGridRows(question).map((row, index) => ({ row, originalIndex: index }));
+      const config = getQuestionConfig(question);
+      if (!config.shuffle_rows || rows.length < 2) return rows;
+      const seed = String(question.id || "") + "|" + rows.map(({ row }) => row).join("|");
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+      return [...rows].sort((a, b) => {
+        const av = Math.sin((hash || 1) + a.originalIndex * 997);
+        const bv = Math.sin((hash || 1) + b.originalIndex * 997);
+        return av - bv;
+      });
+    }
+
+    function enforceGridColumnLimit(input) {
+      if (!input?.checked) return;
+      const questionId = input.dataset.questionId;
+      const colIndex = input.dataset.colIndex;
+      document.querySelectorAll(`input[data-question-id="${questionId}"][data-col-index="${colIndex}"]:checked`).forEach((item) => {
+        if (item !== input) item.checked = false;
+      });
     }
 
     function getCleanTextArray(values) {
@@ -533,23 +700,49 @@
     }
 
     function renderChoiceOptions(question, type) {
-      const options = Array.isArray(question.lua_chon) ? question.lua_chon : [];
+      const options = getDisplayOptions(question);
+      const otherId = `other_${question.id}`;
+      const hasOther = questionAllowsOther(question);
       return `
         <div class="option-list">
-          ${options.map((option, optionIndex) => `
+          ${options.map(({ option, originalIndex }) => `
             <label class="option-item">
               <input
                 type="${type === "checkbox" ? "checkbox" : "radio"}"
                 ${type === "checkbox" ? "" : `name="question_${question.id}"`}
-                value="${escapeHtml(getOptionId(option, optionIndex))}"
+                value="${escapeHtml(getOptionId(option, originalIndex))}"
                 data-question-id="${question.id}"
                 data-question-type="${type}"
-                data-option-id="${escapeHtml(getOptionId(option, optionIndex))}"
+                data-option-id="${escapeHtml(getOptionId(option, originalIndex))}"
+                data-option-index="${originalIndex}"
                 data-option-label="${escapeHtml(getOptionLabel(option))}"
               >
               <span>${escapeHtml(getOptionLabel(option))}</span>
             </label>
           `).join("")}
+          ${hasOther ? `
+            <label class="option-item">
+              <input
+                type="${type === "checkbox" ? "checkbox" : "radio"}"
+                ${type === "checkbox" ? "" : `name="question_${question.id}"`}
+                id="${otherId}"
+                value="__other__"
+                data-question-id="${question.id}"
+                data-question-type="${type}"
+                data-option-id=""
+                data-option-label="Khác"
+                data-other-option="1"
+              >
+              <span>Khác:</span>
+              <input
+                class="other-answer"
+                data-question-other-id="${question.id}"
+                placeholder="Câu trả lời khác"
+                onfocus="const el=document.getElementById('${otherId}');if(el)el.checked=true"
+                id="${otherId}_text"
+              >
+            </label>
+          ` : ""}
         </div>
       `;
     }
@@ -620,25 +813,86 @@
       `;
     }
 
-    function renderGridAnswer(question, type) {
-      const rows = getGridRows(question);
-      const cols = getGridCols(question);
-      if (!rows.length || !cols.length) {
-        return `<div style="padding:12px 14px;border:1px dashed #f59e0b;border-radius:12px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:700">Câu hỏi lưới chưa có dữ liệu hàng/cột.</div>`;
-      }
+    function getScaleConfig(question) {
+      let cfg = {};
+      try { cfg = JSON.parse(question.validation_json || '{}'); } catch(e) {}
+      const sc = cfg.scale_config || cfg.scale || {};
+      const opts = Array.isArray(question.lua_chon) ? question.lua_chon : [];
+      const legacyLabels = opts.length === 2 ? { labelMin: opts[0]?.noi_dung || opts[0] || '', labelMax: opts[1]?.noi_dung || opts[1] || '' } : {};
+      const rawStart = Number(sc.start ?? sc.min ?? 1);
+      const start = rawStart === 0 ? 0 : 1;
+      const rawEnd = Number(sc.end ?? sc.max ?? 5);
+      const end = Math.min(10, Math.max(2, isNaN(rawEnd) ? 5 : rawEnd));
+      return {
+        start, end,
+        labelMin: String(sc.labelMin ?? sc.label_min ?? legacyLabels.labelMin ?? '').trim(),
+        labelMax: String(sc.labelMax ?? sc.label_max ?? legacyLabels.labelMax ?? '').trim(),
+      };
+    }
 
-      const inputType = type === "grid_checkbox" ? "checkbox" : "radio";
+    function renderLinearScale(question) {
+      const scale = getScaleConfig(question);
+      const values = Array.from({ length: scale.end - scale.start + 1 }, (_, i) => scale.start + i);
+      const hasLabels = !!(scale.labelMin || scale.labelMax);
+      const minW = Math.max(values.length * 56, 200);
       return `
-        <div style="overflow-x:auto;margin-top:12px">
-          <table style="width:100%;min-width:520px;border-collapse:separate;border-spacing:0 8px">
+        <div style="width:100%;overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;min-width:${minW}px">
             <thead>
               <tr>
-                <th style="text-align:left;padding:0 12px 6px;color:#64748b;font-size:12px;font-weight:800"></th>
-                ${cols.map((col) => `<th style="text-align:center;padding:0 12px 6px;color:#00008B;font-size:12px;font-weight:800">${escapeHtml(col)}</th>`).join("")}
+                ${hasLabels ? `<td style="width:1%"></td>` : ''}
+                ${values.map(n => `<td style="padding:0 0 6px;text-align:center;font-size:13px;font-weight:700;color:#1e293b">${n}</td>`).join('')}
+                ${hasLabels ? `<td style="width:1%"></td>` : ''}
               </tr>
             </thead>
             <tbody>
-              ${rows.map((row, rowIndex) => `
+              <tr>
+                ${hasLabels ? `<td style="padding:0 10px 0 0;white-space:nowrap;font-size:12.5px;font-weight:700;color:#64748b;text-align:left;width:1%">${escapeHtml(scale.labelMin)}</td>` : ''}
+                ${values.map(n => `
+                  <td style="padding:4px 0;text-align:center">
+                    <label style="display:flex;flex-direction:column;align-items:center;cursor:pointer">
+                      <input
+                        type="radio"
+                        name="question_${question.id}"
+                        value="${n}"
+                        data-question-id="${question.id}"
+                        data-question-type="scale"
+                        data-option-id=""
+                        data-option-label="${n}"
+                        style="width:20px;height:20px;accent-color:#0250AD;cursor:pointer;margin:0"
+                      >
+                    </label>
+                  </td>`).join('')}
+                ${hasLabels ? `<td style="padding:0 0 0 10px;white-space:nowrap;font-size:12.5px;font-weight:700;color:#64748b;text-align:right;width:1%">${escapeHtml(scale.labelMax)}</td>` : ''}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderGridAnswer(question, type) {
+      const displayRows = getDisplayRows(question);
+      const rows = displayRows.map(({ row }) => row);
+      const cols = getGridCols(question);
+      if (!rows.length || !cols.length) {
+        return `<div style="padding:12px 14px;border:1px dashed #FA7413;border-radius:12px;background:#FA7413;color:#fff;font-size:13px;font-weight:700">C?u h?i l??i ch?a c? d? li?u h?ng/c?t.</div>`;
+      }
+
+      const inputType = type === "grid_checkbox" ? "checkbox" : "radio";
+      const config = getQuestionConfig(question);
+      const limitCol = !!config.limit_one_per_column;
+      return `
+        <div style="overflow-x:auto;margin-top:12px">
+          <table style="width:100%;min-width:520px;table-layout:fixed;border-collapse:separate;border-spacing:0 8px">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:0 12px 6px;color:#64748b;font-size:12px;font-weight:800"></th>
+                ${cols.map((col) => `<th style="text-align:center;padding:0 12px 6px;color:#0250AD;font-size:12px;font-weight:800">${escapeHtml(col)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${displayRows.map(({ row, originalIndex: rowIndex }) => `
                 <tr>
                   <td style="padding:13px 12px;background:#fff;border:1px solid #dbe4f0;border-right:none;border-radius:12px 0 0 12px;font-size:14px;font-weight:700;color:#334155">${escapeHtml(row)}</td>
                   ${cols.map((col, colIndex) => `
@@ -652,7 +906,8 @@
                         data-col-index="${colIndex}"
                         data-row-label="${escapeHtml(row)}"
                         data-col-label="${escapeHtml(col)}"
-                        style="width:18px;height:18px;accent-color:${inputType === "radio" ? "#00008B" : "#f59e0b"};cursor:pointer"
+                        ${limitCol ? `onchange="enforceGridColumnLimit(this)"` : ""}
+                        style="width:18px;height:18px;accent-color:${inputType === "radio" ? "#0250AD" : "#FA7413"};cursor:pointer"
                       >
                     </td>
                   `).join("")}
@@ -668,20 +923,21 @@
     function renderQuestion(question, index) {
       const options = Array.isArray(question.lua_chon) ? question.lua_chon : [];
       const type = String(question.loai || "choice").toLowerCase();
-      const requiredMark = question.bat_buoc ? '<span style="color:#dc2626"> *</span>' : "";
 
       let answerHtml = "";
-      if (type === "text" || type === "paragraph") {
-        answerHtml = type === "paragraph"
-          ? `<textarea class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn"></textarea>`
-          : `<input class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn">`;
+      if (type === "text" || type === "short_text") {
+        answerHtml = `<input class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn">`;
+      } else if (type === "paragraph") {
+        answerHtml = `<textarea class="text-answer" data-question-id="${question.id}" data-question-type="${type}" placeholder="Nhập câu trả lời của bạn"></textarea>`;
       } else if (type === "dropdown") {
+        const displayOptions = getDisplayOptions(question);
         answerHtml = `
           <select class="select-answer" data-question-id="${question.id}" data-question-type="${type}">
-            <option value="">-- Chọn đáp án --</option>
-            ${options.map((option, optionIndex) => `
+            <option value="">-- Ch?n ??p ?n --</option>
+            ${displayOptions.map(({ option, originalIndex }) => `
               <option
-                value="${escapeHtml(getOptionId(option, optionIndex))}"
+                value="${escapeHtml(getOptionId(option, originalIndex))}"
+                data-option-index="${originalIndex}"
                 data-option-label="${escapeHtml(getOptionLabel(option))}">
                 ${escapeHtml(getOptionLabel(option))}
               </option>
@@ -690,12 +946,31 @@
         `;
       } else if (type === "checkbox") {
         answerHtml = renderChoiceOptions(question, "checkbox");
+      } else if (type === "scale") {
+        answerHtml = renderLinearScale(question);
       } else if (type === "rating") {
         answerHtml = renderAgreementScale(question, options);
       } else if (type === "star_rating") {
         answerHtml = renderStarScale(question);
       } else if (type === "grid_radio" || type === "grid_checkbox") {
         answerHtml = renderGridAnswer(question, type);
+      } else if (type === "date") {
+        const config = getQuestionConfig(question);
+        const inputType = config.include_time ? "datetime-local" : (config.include_year === false ? "text" : "date");
+        const placeholder = config.include_year === false ? "mm/dd" : "";
+        answerHtml = `<input class="text-answer" type="${inputType}" data-question-id="${question.id}" data-question-type="${type}" placeholder="${placeholder}" style="width:220px;max-width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #bbf7d0;border-radius:12px;background:#f8fffb;color:#334155;font:inherit;outline:none">`;
+      } else if (type === "time") {
+        const config = getQuestionConfig(question);
+        if (config.time_type === "duration") {
+          answerHtml = `
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <input class="duration-answer" type="number" min="0" data-question-id="${question.id}" data-duration-part="hours" placeholder="Giờ" style="width:84px;padding:12px 10px;border:1.5px solid #bbf7d0;border-radius:12px;background:#f8fffb;color:#334155;font:inherit;outline:none">
+              <input class="duration-answer" type="number" min="0" max="59" data-question-id="${question.id}" data-duration-part="minutes" placeholder="Phút" style="width:84px;padding:12px 10px;border:1.5px solid #bbf7d0;border-radius:12px;background:#f8fffb;color:#334155;font:inherit;outline:none">
+              <input class="duration-answer" type="number" min="0" max="59" data-question-id="${question.id}" data-duration-part="seconds" placeholder="Giây" style="width:84px;padding:12px 10px;border:1.5px solid #bbf7d0;border-radius:12px;background:#f8fffb;color:#334155;font:inherit;outline:none">
+            </div>`;
+        } else {
+          answerHtml = `<input class="text-answer" type="time" data-question-id="${question.id}" data-question-type="${type}" style="width:220px;max-width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #bbf7d0;border-radius:12px;background:#f8fffb;color:#334155;font:inherit;outline:none">`;
+        }
       } else if (options.length) {
         answerHtml = renderChoiceOptions(question, "choice");
       } else {
@@ -707,11 +982,13 @@
           <div class="question-head">
             <div class="question-left">
               <div class="question-no">${index + 1}</div>
-              <p class="question-text">${formatRichText(question.noi_dung || "Câu hỏi")}${requiredMark}</p>
+              <div>
+                <p class="question-text">${formatRichText(question.noi_dung || "Câu hỏi", question.bat_buoc)}</p>
+                ${(question.mo_ta_cau_hoi || question.desc) ? `<div style="font-size:13.5px;color:#475569;margin-top:6px;line-height:1.55">${formatRichText(question.mo_ta_cau_hoi || question.desc)}</div>` : ''}
+              </div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
               <div class="question-chip">${getQuestionTypeLabel(type)}</div>
-              <div class="question-chip">${question.bat_buoc ? "Bắt buộc" : "Không bắt buộc"}</div>
             </div>
           </div>
           ${renderQuestionMedia(question)}
@@ -722,10 +999,150 @@
     }
 
     function renderQuestions(questions) {
+      publicQuestionsRaw = questions;
+      publicFormPages = buildFormPages(questions);
+      currentPublicPageIndex = 0;
+      
       const target = document.getElementById("public-question-list");
-      target.innerHTML = questions.length
-        ? questions.map(renderQuestion).join("")
-        : `<div class="question-card" style="text-align:center;color:#64748b">Biểu mẫu này chưa có câu hỏi.</div>`;
+      if (!publicFormPages.length || (publicFormPages.length === 1 && !publicFormPages[0].items.length)) {
+        target.innerHTML = `<div class="question-card" style="text-align:center;color:#64748b">Biểu mẫu này chưa có câu hỏi.</div>`;
+        updatePublicFooter();
+        return;
+      }
+      
+      target.innerHTML = publicFormPages.map((page, pageIndex) => {
+        let html = `<div class="form-page" id="form-page-${pageIndex}" style="display:${pageIndex === 0 ? 'block' : 'none'};">`;
+        
+        if (page.section) {
+          html += `
+            <div style="border:1px solid #e2e8f0;border-left:6px solid #0250AD;border-radius:20px;padding:20px 22px;background:#fff;box-shadow:0 8px 16px rgba(0,0,0,.03);margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:900;color:#0250AD;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Phần ${pageIndex + 1} / ${publicFormPages.length}</div>
+              <div style="font-size:24px;font-weight:900;color:#0f172a;line-height:1.3">${formatRichText(page.section.noi_dung || page.section.text || `Phần ${pageIndex + 1}`)}</div>
+              ${page.section.mo_ta || page.section.desc ? `<div style="font-size:14px;color:#475569;line-height:1.55;margin-top:8px">${formatRichText(page.section.mo_ta || page.section.desc)}</div>` : ''}
+            </div>
+          `;
+        } else if (publicFormPages.length > 1) {
+          html += `
+            <div style="border:1px solid #e2e8f0;border-left:6px solid #0250AD;border-radius:20px;padding:14px 18px;background:#fff;box-shadow:0 8px 16px rgba(0,0,0,.03);margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:900;color:#0250AD;text-transform:uppercase;letter-spacing:.6px">Phần ${pageIndex + 1} / ${publicFormPages.length}</div>
+            </div>
+          `;
+        }
+        
+        html += page.items.map(({ item, originalIndex }) => renderQuestion(item, getQuestionNumberInSection(questions, originalIndex) - 1)).join("");
+        html += `</div>`;
+        return html;
+      }).join("");
+      
+      updatePublicFooter();
+    }
+
+    function setPublicPage(index) {
+      if (index < 0 || index >= publicFormPages.length) return;
+      if (index > currentPublicPageIndex) {
+        if (!validateCurrentPage()) return;
+      }
+      document.getElementById(`form-page-${currentPublicPageIndex}`).style.display = 'none';
+      currentPublicPageIndex = index;
+      document.getElementById(`form-page-${currentPublicPageIndex}`).style.display = 'block';
+      updatePublicFooter();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function getCurrentPageJumpAction() {
+      const page = publicFormPages[currentPublicPageIndex];
+      if (!page) return "continue";
+      for (const { item: question } of page.items) {
+        const type = String(question.loai || question.type || "choice").toLowerCase();
+        if (type !== "choice" && type !== "dropdown") continue;
+        const config = getQuestionConfig(question);
+        const jump = config.section_jump || {};
+        if (!jump.enabled || !jump.optionActions) continue;
+        let selectedIndex = "";
+        if (type === "dropdown") {
+          const select = document.querySelector(`[data-question-id="${question.id}"][data-question-type="${type}"]`);
+          selectedIndex = select?.selectedOptions?.[0]?.dataset?.optionIndex || "";
+        } else {
+          const selected = document.querySelector(`input[data-question-id="${question.id}"][data-question-type="choice"]:checked`);
+          selectedIndex = selected?.dataset?.optionIndex || "";
+        }
+        if (selectedIndex === "") continue;
+        const action = jump.optionActions[String(selectedIndex)] || "continue";
+        if (action && action !== "continue") return action;
+      }
+      return "continue";
+    }
+
+    function goNextPublicPage() {
+      if (!validateCurrentPage()) return;
+      const action = getCurrentPageJumpAction();
+      if (action === "submit") {
+        submitPublicForm();
+        return;
+      }
+      if (String(action).startsWith("page:")) {
+        const targetIndex = Number(String(action).slice(5));
+        if (Number.isInteger(targetIndex) && targetIndex >= 0 && targetIndex < publicFormPages.length) {
+          setPublicPage(targetIndex);
+          return;
+        }
+      }
+      setPublicPage(currentPublicPageIndex + 1);
+    }
+
+    function validateCurrentPage() {
+      clearValidationErrors();
+      let hasError = false;
+      const currentPageItems = publicFormPages[currentPublicPageIndex].items;
+      currentPageItems.forEach(({ item: question }) => {
+        const answer = collectQuestionAnswer(question);
+        if (!answer.valid) {
+          hasError = true;
+          document.getElementById(`error-question-${question.id}`)?.classList.add('open');
+        }
+      });
+      if (hasError) {
+        if (typeof showToast === 'function') showToast("Vui lòng điền đủ các câu bắt buộc", "error");
+        else alert("Vui lòng điền đủ các câu bắt buộc");
+        return false;
+      }
+      return true;
+    }
+
+    function updatePublicFooter() {
+      const footer = document.querySelector('.public-footer');
+      if (!footer || !publicFormPages.length) return;
+      
+      const hasMultiplePages = publicFormPages.length > 1;
+      const isLastPage = currentPublicPageIndex === publicFormPages.length - 1;
+      
+      const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
+      
+      let html = '';
+      if (hasMultiplePages && currentPublicPageIndex > 0) {
+        html += `<button class="btn btn-outline" style="min-width:118px;height:48px;border-radius:14px;background:#fff;color:#0250AD;font-weight:800;border:1px solid #cbd5e1;cursor:pointer;box-shadow:0 8px 18px rgba(15,23,42,.08)" type="button" onclick="setPublicPage(${currentPublicPageIndex - 1})">Quay lại</button>`;
+      }
+      
+      if (hasMultiplePages && !isLastPage) {
+        html += `<button class="btn" style="min-width:118px;height:48px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-weight:800;cursor:pointer;box-shadow:0 12px 28px rgba(29,155,240,.24)" type="button" onclick="goNextPublicPage()">Tiếp</button>`;
+      } else {
+        if (isPreview) {
+          html += `<button class="submit-btn" id="public-submit-btn" style="min-width:210px;height:48px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-weight:800;cursor:not-allowed;opacity:.72" type="button" title="Đây là chế độ xem trước, bạn không thể gửi phản hồi." onclick="if(typeof showToast === 'function') { showToast('Bạn đang xem biểu mẫu dưới dạng xem trước, không thể gửi phản hồi.', 'info'); } else { alert('Bạn đang xem biểu mẫu dưới dạng xem trước, không thể gửi phản hồi.'); }">Gửi phản hồi</button>`;
+        } else {
+          html += `<button class="submit-btn" id="public-submit-btn" style="min-width:210px;height:48px;border:none;border-radius:14px;background:linear-gradient(135deg,#22c1f1,#1d9bf0);color:#fff;font-weight:800;cursor:pointer;" type="button" onclick="submitPublicForm()">Gửi phản hồi</button>`;
+        }
+      }
+      
+      if (hasMultiplePages) {
+        html += `<span style="font-size:13px;font-weight:800;color:#64748b;display:flex;align-items:center;">Phần ${currentPublicPageIndex + 1}/${publicFormPages.length}</span>`;
+      }
+      
+      footer.innerHTML = html;
+      footer.style.display = 'flex';
+      footer.style.justifyContent = 'center';
+      footer.style.alignItems = 'center';
+      footer.style.gap = '10px';
+      footer.style.flexWrap = 'wrap';
     }
 
     function updateStarVisual(questionId, selectedValue) {
@@ -738,34 +1155,135 @@
     function collectQuestionAnswer(question) {
       const type = String(question.loai || "choice").toLowerCase();
       const questionId = question.id;
+      let valConfig = {};
+      try { valConfig = JSON.parse(question.validation_json || question.validation || question.logic_json || '{}'); } catch(e){}
 
-      if (type === "text" || type === "paragraph") {
+      function checkValidationRule(value, rule, count) {
+        if (!rule || !rule.type || !value) return { valid: true };
+        const v1 = rule.value || '';
+        const v2 = rule.value2 || '';
+        if (rule.type === 'length') {
+          const len = String(value).length;
+          const limit = Number(v1);
+          if (isNaN(limit)) return { valid: true };
+          if (rule.condition === 'max' && len > limit) return { valid: false, error: rule.customError || `Tối đa ${limit} ký tự` };
+          if (rule.condition === 'min' && len < limit) return { valid: false, error: rule.customError || `Tối thiểu ${limit} ký tự` };
+        }
+        if (rule.type === 'number') {
+          const num = Number(value);
+          const n1 = Number(v1);
+          const n2 = Number(v2);
+          if (isNaN(num)) return { valid: false, error: rule.customError || 'Phải là một số' };
+          if (rule.condition === 'gt' && !(num > n1)) return { valid: false, error: rule.customError || `Phải lớn hơn ${n1}` };
+          if (rule.condition === 'gte' && !(num >= n1)) return { valid: false, error: rule.customError || `Phải lớn hơn hoặc bằng ${n1}` };
+          if (rule.condition === 'lt' && !(num < n1)) return { valid: false, error: rule.customError || `Phải nhỏ hơn ${n1}` };
+          if (rule.condition === 'lte' && !(num <= n1)) return { valid: false, error: rule.customError || `Phải nhỏ hơn hoặc bằng ${n1}` };
+          if (rule.condition === 'eq' && !(num === n1)) return { valid: false, error: rule.customError || `Phải bằng ${n1}` };
+          if (rule.condition === 'neq' && !(num !== n1)) return { valid: false, error: rule.customError || `Phải khác ${n1}` };
+          if (rule.condition === 'between' && !(num >= n1 && num <= n2)) return { valid: false, error: rule.customError || `Phải từ ${n1} đến ${n2}` };
+          if (rule.condition === 'not_between' && (num >= n1 && num <= n2)) return { valid: false, error: rule.customError || `Không được nằm từ ${n1} đến ${n2}` };
+          if (rule.condition === 'is_number' && isNaN(num)) return { valid: false, error: rule.customError || 'Phải là một số' };
+        }
+        if (rule.type === 'text') {
+          const text = String(value).toLowerCase();
+          const t1 = String(v1).toLowerCase();
+          if (rule.condition === 'contains' && !text.includes(t1)) return { valid: false, error: rule.customError || `Phải chứa "${v1}"` };
+          if (rule.condition === 'not_contains' && text.includes(t1)) return { valid: false, error: rule.customError || `Không được chứa "${v1}"` };
+          if (rule.condition === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return { valid: false, error: rule.customError || 'Phải là địa chỉ email hợp lệ' };
+          if (rule.condition === 'url' && !/^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(text)) return { valid: false, error: rule.customError || 'Phải là URL hợp lệ' };
+        }
+        if (rule.type === 'regex') {
+          try {
+            const re = new RegExp(v1);
+            const isMatch = re.test(String(value));
+            if (rule.condition === 'contains' && !isMatch) return { valid: false, error: rule.customError || 'Không khớp với mẫu' };
+            if (rule.condition === 'not_contains' && isMatch) return { valid: false, error: rule.customError || 'Khớp với mẫu bị cấm' };
+            if (rule.condition === 'matches' && !re.test(String(value))) return { valid: false, error: rule.customError || 'Không khớp chính xác với mẫu' };
+            if (rule.condition === 'not_matches' && re.test(String(value))) return { valid: false, error: rule.customError || 'Khớp với mẫu bị cấm' };
+          } catch(e) {}
+        }
+        if (rule.type === 'select') {
+          const num = Number(v1);
+          if (isNaN(num)) return { valid: true };
+          if (rule.condition === 'min_select' && count < num) return { valid: false, error: rule.customError || `Vui lòng chọn ít nhất ${num} tùy chọn` };
+          if (rule.condition === 'max_select' && count > num) return { valid: false, error: rule.customError || `Vui lòng chọn tối đa ${num} tùy chọn` };
+          if (rule.condition === 'exact_select' && count !== num) return { valid: false, error: rule.customError || `Vui lòng chọn chính xác ${num} tùy chọn` };
+        }
+        return { valid: true };
+      }
+
+      function setErrorText(err) {
+        const errEl = document.getElementById(`error-question-${questionId}`);
+        if (errEl) errEl.textContent = err;
+      }
+
+      if (type === "text" || type === "short_text" || type === "paragraph") {
         const input = document.querySelector(`[data-question-id="${questionId}"][data-question-type="${type}"]`);
         const value = input?.value?.trim() || "";
-        return { valid: !question.bat_buoc || Boolean(value), summary: value, details: value ? [{ cau_hoi_id: questionId, noi_dung: value }] : [] };
+        const baseValid = !question.bat_buoc || Boolean(value);
+        if (!baseValid) {
+          setErrorText("Câu hỏi này là bắt buộc.");
+          return { valid: false };
+        }
+        if (value) {
+          const ruleCheck = checkValidationRule(value, valConfig, 0);
+          if (!ruleCheck.valid) {
+            setErrorText(ruleCheck.error);
+            return { valid: false };
+          }
+        }
+        return { valid: true, summary: value, details: value ? [{ cau_hoi_id: questionId, noi_dung: value }] : [] };
       }
 
       if (type === "dropdown") {
         const select = document.querySelector(`[data-question-id="${questionId}"][data-question-type="${type}"]`);
         const optionId = select?.value || "";
         const optionLabel = select?.selectedOptions?.[0]?.dataset?.optionLabel || "";
-        return { valid: !question.bat_buoc || Boolean(optionId), summary: optionLabel, details: optionId ? [{ cau_hoi_id: questionId, lua_chon_id: optionId }] : [] };
+        const valid = !question.bat_buoc || Boolean(optionId);
+        if (!valid) setErrorText("Câu hỏi này là bắt buộc.");
+        return { valid, summary: optionLabel, details: optionId ? [{ cau_hoi_id: questionId, lua_chon_id: optionId }] : [] };
       }
 
       if (type === "checkbox") {
         const checked = Array.from(document.querySelectorAll(`input[data-question-id="${questionId}"][data-question-type="${type}"]:checked`));
+        const otherInput = document.querySelector(`[data-question-other-id="${questionId}"]`);
+        const regularChecked = checked.filter((item) => item.dataset.otherOption !== "1");
+        const otherChecked = checked.some((item) => item.dataset.otherOption === "1");
+        const otherValue = otherChecked ? (otherInput?.value?.trim() || "") : "";
+        const summaryParts = regularChecked.map((item) => item.dataset.optionLabel || "").filter(Boolean);
+        if (otherValue) summaryParts.push(otherValue);
+        const details = regularChecked.map((item) => ({ cau_hoi_id: questionId, lua_chon_id: item.dataset.optionId || null }));
+        if (otherValue) details.push({ cau_hoi_id: questionId, noi_dung: otherValue });
+        
+        const count = regularChecked.length + (otherValue ? 1 : 0);
+        const baseValid = !question.bat_buoc || count > 0;
+        if (!baseValid) {
+          setErrorText("Câu hỏi này là bắt buộc.");
+          return { valid: false };
+        }
+        
+        if (count > 0 && valConfig.type === 'select') {
+          const ruleCheck = checkValidationRule("fake", valConfig, count);
+          if (!ruleCheck.valid) {
+            setErrorText(ruleCheck.error);
+            return { valid: false };
+          }
+        }
+
         return {
-          valid: !question.bat_buoc || checked.length > 0,
-          summary: checked.map((item) => item.dataset.optionLabel || "").join(", "),
-          details: checked.map((item) => ({ cau_hoi_id: questionId, lua_chon_id: item.dataset.optionId || null })),
+          valid: true,
+          summary: summaryParts.join(", "),
+          details,
         };
       }
 
       if (type === "rating" || type === "star_rating") {
         const selected = document.querySelector(`input[data-question-id="${questionId}"][data-question-type="${type}"]:checked`);
         const score = selected ? parseInt(selected.value, 10) : null;
+        const valid = !question.bat_buoc || Boolean(score);
+        if (!valid) setErrorText("Câu hỏi này là bắt buộc.");
         return {
-          valid: !question.bat_buoc || Boolean(score),
+          valid,
           summary: score ? `${score} sao` : "",
           details: score ? [{ cau_hoi_id: questionId, lua_chon_id: selected.dataset.optionId || null, diem_danh_gia: score }] : [],
           rating: score,
@@ -784,6 +1302,7 @@
 
         const answeredRows = new Set(selected.map((item) => Number(item.dataset.rowIndex)));
         const valid = !question.bat_buoc || (rows.length > 0 && rows.every((_, index) => answeredRows.has(index)));
+        if (!valid) setErrorText("Câu hỏi này yêu cầu một phản hồi cho mỗi hàng.");
         const summaryParts = rows
           .map((row, index) => {
             const cols = grouped.get(index) || [];
@@ -805,19 +1324,52 @@
         };
       }
 
+      if (type === "date") {
+        const input = document.querySelector(`[data-question-id="${questionId}"][data-question-type="${type}"]`);
+        const value = input?.value?.trim() || "";
+        const valid = !question.bat_buoc || Boolean(value);
+        if (!valid) setErrorText("Câu hỏi này là bắt buộc.");
+        return { valid, summary: value, details: value ? [{ cau_hoi_id: questionId, noi_dung: value }] : [] };
+      }
+
+      if (type === "time") {
+        const config = getQuestionConfig(question);
+        if (config.time_type === "duration") {
+          const parts = Array.from(document.querySelectorAll(`.duration-answer[data-question-id="${questionId}"]`));
+          const values = Object.fromEntries(parts.map((input) => [input.dataset.durationPart, input.value.trim()]));
+          const hasValue = Object.values(values).some(Boolean);
+          const summary = hasValue ? `${values.hours || 0} giờ ${values.minutes || 0} phút ${values.seconds || 0} giây` : "";
+          const valid = !question.bat_buoc || hasValue;
+          if (!valid) setErrorText("Câu hỏi này là bắt buộc.");
+          return { valid, summary, details: summary ? [{ cau_hoi_id: questionId, noi_dung: summary }] : [] };
+        }
+        const input = document.querySelector(`[data-question-id="${questionId}"][data-question-type="${type}"]`);
+        const value = input?.value?.trim() || "";
+        const valid = !question.bat_buoc || Boolean(value);
+        if (!valid) setErrorText("Câu hỏi này là bắt buộc.");
+        return { valid, summary: value, details: value ? [{ cau_hoi_id: questionId, noi_dung: value }] : [] };
+      }
+
       const fallbackInput = document.querySelector(`[data-question-id="${questionId}"][data-question-type="fallback-text"]`);
       if (fallbackInput) {
         const value = fallbackInput.value.trim();
-        return { valid: !question.bat_buoc || Boolean(value), summary: value, details: value ? [{ cau_hoi_id: questionId, noi_dung: value }] : [] };
+        const valid = !question.bat_buoc || Boolean(value);
+        if (!valid) setErrorText("Câu hỏi này là bắt buộc.");
+        return { valid, summary: value, details: value ? [{ cau_hoi_id: questionId, noi_dung: value }] : [] };
       }
 
       const selected = document.querySelector(`input[data-question-id="${questionId}"][data-question-type="choice"]:checked`);
+      const isOther = selected?.dataset?.otherOption === "1";
+      const otherValue = isOther ? (document.querySelector(`[data-question-other-id="${questionId}"]`)?.value?.trim() || "") : "";
+      const valid = !question.bat_buoc || (Boolean(selected) && (!isOther || Boolean(otherValue)));
+      if (!valid) setErrorText("Câu hỏi này là bắt buộc.");
       return {
-        valid: !question.bat_buoc || Boolean(selected),
-        summary: selected?.dataset?.optionLabel || "",
-        details: selected ? [{ cau_hoi_id: questionId, lua_chon_id: selected.dataset.optionId || null }] : [],
+        valid,
+        summary: isOther ? otherValue : (selected?.dataset?.optionLabel || ""),
+        details: selected ? (isOther ? (otherValue ? [{ cau_hoi_id: questionId, noi_dung: otherValue }] : []) : [{ cau_hoi_id: questionId, lua_chon_id: selected.dataset.optionId || null }]) : [],
       };
     }
+
 
     function clearValidationErrors() {
       document.querySelectorAll(".error-text.open").forEach((item) => item.classList.remove("open"));
@@ -856,7 +1408,7 @@
         ? Math.round(ratingAnswers.reduce((sum, value) => sum + value, 0) / ratingAnswers.length)
         : null;
 
-      const sentiment = averageRating >= 4 ? "positive" : averageRating && averageRating <= 2 ? "negative" : "neutral";
+      const sentiment = averageRating >= 4 ? "Tích cực" : (averageRating !== null && averageRating <= 2 ? "Tiêu cực" : (averageRating === 3 ? "Trung lập" : "Không rõ"));
       const textSummaries = answers.map((item) => String(item.summary || "").trim()).filter(Boolean);
       const primarySummary = textSummaries.find((item) => item.length > 12) || `Đã gửi phản hồi cho biểu mẫu "${currentForm.ten_form || "FLIC"}"`;
 
@@ -875,7 +1427,7 @@
       const card = document.querySelector(".form-card-public");
       if (!card) return;
       card.innerHTML = `
-        <div style="border-top:8px solid #00008B;border-radius:22px;background:#fff;padding:34px 30px;text-align:left;box-shadow:0 16px 40px rgba(0,0,139,.12)">
+        <div style="border-top:8px solid #0250AD;border-radius:22px;background:#fff;padding:34px 30px;text-align:left;box-shadow:0 16px 40px rgba(2,80,173,.12)">
           <div style="font-size:24px;font-weight:900;color:#0f172a;margin-bottom:14px">Gửi thành công!</div>
           <div style="font-size:16px;line-height:1.7;color:#334155;font-weight:600">${formatRichText(message)}</div>
         </div>
@@ -886,33 +1438,33 @@
     async function submitPublicForm() {
       if (!currentForm) return;
 
-      clearValidationErrors();
+      const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
+      if (isPreview) {
+        if (typeof showToast === 'function') showToast("Bạn đang xem biểu mẫu dưới dạng xem trước, không thể gửi phản hồi.", "info");
+        else alert("Bạn đang xem biểu mẫu dưới dạng xem trước, không thể gửi phản hồi.");
+        return;
+      }
+
+      if (!validateCurrentPage()) return;
+
       const submitBtn = document.getElementById("public-submit-btn");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Đang gửi...";
+      }
+
       const successBox = document.getElementById("submit-success-box");
       successBox.classList.remove("open");
 
       const answers = [];
-      let hasError = false;
-
-      currentForm.cau_hoi.forEach((question) => {
-        const answer = collectQuestionAnswer(question);
-        answers.push(answer);
-        if (!answer.valid) {
-          hasError = true;
-          document.getElementById(`error-question-${question.id}`)?.classList.add("open");
-        }
+      publicFormPages.forEach(page => {
+        page.items.forEach(({ item: question }) => {
+          answers.push(collectQuestionAnswer(question));
+        });
       });
-
-      if (hasError) {
-        showToast("Vui lòng điền đủ các câu bắt buộc", "error");
-        return;
-      }
 
       const feedbackBody = buildFeedbackBody(answers);
       const detailRows = answers.flatMap((item) => item.details);
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Đang lưu...";
 
       try {
         const feedbackRes = await fetch(`${API_BASE}/feedback`, {
@@ -971,11 +1523,11 @@
           publicFormSub.innerHTML = "";
           publicFormSub.style.display = "none";
         }
-        const publicQuestions = Array.isArray(data.cau_hoi) ? data.cau_hoi : [];
+        const publicQuestions = Array.isArray(data.form_items) ? data.form_items : (Array.isArray(data.cau_hoi) ? data.cau_hoi : []);
         renderQuestions(publicQuestions);
         document.getElementById("public-form-cat").textContent = data.danh_muc || "Khác";
-        document.getElementById("public-form-count").textContent = `Tổng ${publicQuestions.length} câu hỏi`;
-        document.getElementById("public-form-created").textContent = data.ngay_tao || data.created || new Date().toLocaleDateString("vi-VN");
+        document.getElementById("public-form-count").textContent = `Tổng ${countRealQuestions(publicQuestions)} câu hỏi`;
+
       } catch (error) {
         document.getElementById("public-form-title").textContent = "Không tải được biểu mẫu";
         const sub = document.getElementById("public-form-sub");

@@ -33,7 +33,7 @@ document.getElementById('page-content').innerHTML = `
     </div>
 
     <!-- Stat bar -->
-    <div id="fb-stat-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:24px"></div>
+    <div id="fb-stat-bar" style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:24px"></div>
 
     <!-- Filter bar -->
     <div class="card card-body" style="margin-bottom:20px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:20px">
@@ -112,6 +112,10 @@ async function loadFeedbackData() {
     } else {
       allFeedbacks = [];
     }
+
+    allForms.forEach(f => {
+      f.so_phan_hoi = allFeedbacks.filter(fb => fb.form_id === f.id).length;
+    });
   } catch (err) {
     console.error('Failed to load feedback data:', err);
     allForms = [];
@@ -124,36 +128,19 @@ async function loadFeedbackData() {
     catSelect.innerHTML = '<option value="all">Danh mục (Tất cả)</option>' + categories.map(c => `<option value="${c}">${c}</option>`).join('');
   }
 
-  // Calculate stats based only on feedbacks for forms that are not deleted/draft/pending/rejected
-  const validFormIds = new Set(allForms.map(f => f.id));
-  const validFeedbacks = allFeedbacks.filter(fb => validFormIds.has(fb.form_id));
-
-  const totalFeedback = validFeedbacks.length;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const newToday = validFeedbacks.filter(f => {
-    if (!f.ngay_gui) return false;
-    const d = new Date(f.ngay_gui.replace('Z', ''));
-    d.setHours(0, 0, 0, 0);
-    return d.getTime() === today.getTime();
-  }).length;
-  const activeForms = allForms.filter(f => f.trang_thai === 'active').length;
-
-  renderStatCards(totalFeedback, newToday, activeForms);
   filterData();
 }
 
-function renderStatCards(totalFb, newToday, activeForms) {
+function renderStatCards(totalFb, newToday) {
   const container = document.getElementById('fb-stat-bar');
   if (!container) return;
   const stats = [
-    { label: 'Tổng số phản hồi', value: totalFb.toLocaleString('en-US'), bg: '#e0e7ff', color: '#00008B', icon: '<path d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"/>' },
-    { label: 'Phản hồi mới hôm nay', value: newToday.toLocaleString('en-US'), bg: '#dbeafe', color: '#2563eb', icon: '<path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />' },
-    { label: 'Biểu mẫu đang hoạt động', value: activeForms.toLocaleString('en-US'), bg: '#e0f2fe', color: '#0284c7', icon: '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />' }
+    { label: 'Tổng số phản hồi', value: totalFb.toLocaleString('en-US'), bg: '#e0e7ff', color: '#0250AD', icon: '<path d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"/>' },
+    { label: 'Phản hồi mới hôm nay', value: newToday.toLocaleString('en-US'), bg: '#dbeafe', color: '#2563eb', icon: '<path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />' }
   ];
 
   container.innerHTML = stats.map(s => `
-    <div style="background:#fff; border-radius:12px; padding:24px; display:flex; align-items:center; gap:16px; border:1px solid var(--gray-200); box-shadow:var(--shadow-sm); border-left: 4px solid ${s.color};">
+    <div style="background:#fff; border-radius:12px; padding:24px; display:flex; align-items:center; gap:16px; border:1px solid var(--gray-200); box-shadow:var(--shadow-sm); border-left: 4px solid ${s.color}; flex: 1;">
       <div style="width:52px;height:52px;border-radius:12px;background:${s.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
         <svg viewBox="0 0 24 24" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">${s.icon}</svg>
       </div>
@@ -195,6 +182,21 @@ function filterData() {
     return true;
   });
 
+  const validFormIds = new Set(currentFilteredData.map(f => f.id));
+  const validFeedbacks = allFeedbacks.filter(fb => validFormIds.has(fb.form_id));
+
+  const totalFeedback = currentFilteredData.reduce((sum, f) => sum + parseInt(f.so_phan_hoi || 0), 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const newToday = validFeedbacks.filter(f => {
+    if (!f.ngay_gui) return false;
+    const d = new Date(f.ngay_gui.replace('Z', ''));
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() === today.getTime();
+  }).length;
+
+  renderStatCards(totalFeedback, newToday);
+
   currentFormPage = 1;
   renderTablePage();
 }
@@ -226,7 +228,7 @@ function renderTable(data) {
 
     return `
       <tr style="border-bottom:${borderB}; transition:background 0.2s" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='none'">
-        <td class="sticky-col-left" style="padding: 16px 20px 16px 40px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; color:var(--gray-900); cursor:pointer; text-align:left;" onmouseover="this.style.color='#00008B'" onmouseout="this.style.color='var(--gray-900)'" onclick="viewFormFeedbacks(${f.id}, '${(f.ten_form || '').replace(/'/g, "\\'")}')">
+        <td class="sticky-col-left" style="padding: 16px 20px 16px 40px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; color:var(--gray-900); cursor:pointer; text-align:left;" onmouseover="this.style.color='#0250AD'" onmouseout="this.style.color='var(--gray-900)'" onclick="viewFormFeedbacks(${f.id}, '${(f.ten_form || '').replace(/'/g, "\\'")}')">
           ${f.ten_form || ''}
         </td>
         <td style="padding:16px 20px;color:var(--gray-600);font-weight:500; text-align:center;">${f.danh_muc || ''}</td>
@@ -236,7 +238,7 @@ function renderTable(data) {
         <td style="padding:16px 20px;color:var(--gray-600);font-size:13.5px; text-align:center;">${formatDate(f.ngay_dong)}</td>
         <td class="sticky-col-right" style="padding:16px 20px; text-align:center;">
           <div style="display:flex;gap:12px;align-items:center;justify-content:center">
-            <button onclick="viewFormFeedbacks(${f.id}, '${(f.ten_form || '').replace(/'/g, "\\'")}')" style="background:none;border:none;cursor:pointer;color:var(--gray-500)" title="Xem phản hồi" onmouseover="this.style.color='var(--gray-800)'" onmouseout="this.style.color='var(--gray-500)'">
+            <button onclick="window.open('form-builder.html?form_id=${f.id}&preview=1', '_blank')" style="background:none;border:none;cursor:pointer;color:var(--gray-500)" title="Xem trước biểu mẫu" onmouseover="this.style.color='var(--gray-800)'" onmouseout="this.style.color='var(--gray-500)'">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
             <button onclick="deleteFormFeedback(${f.id}, '${(f.ten_form || '').replace(/'/g, "\\'")}')" style="background:none;border:none;cursor:pointer;color:var(--gray-500)" title="Xóa biểu mẫu" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='var(--gray-500)'">
@@ -324,8 +326,9 @@ window.openDeleteFeedbackModal = function (formId, formName) {
         <div style="padding:24px;">
           <p style="font-size:14px;color:var(--gray-700);margin:0 0 16px 0;line-height:1.5">Bạn có chắc chắn muốn xóa biểu mẫu <strong id="fb-del-name" style="color:var(--gray-900)"></strong>? Biểu mẫu sẽ tự động xóa vĩnh viễn sau 30 ngày.</p>
           <div style="display:flex;flex-direction:column;gap:8px;">
-            <label style="font-size:13px;font-weight:700;color:var(--gray-700)">Lý do xóa</label>
-            <input type="text" id="fb-del-reason" placeholder="Vui lòng nhập lý do xóa..." style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#94a3b8'" onblur="this.style.borderColor='#cbd5e1'">
+            <label style="font-size:13px;font-weight:700;color:var(--gray-700)">Lý do xóa <span style="color:#ef4444">*</span></label>
+            <input type="text" id="fb-del-reason" placeholder="Vui lòng nhập lý do xóa..." style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#94a3b8'; document.getElementById('fb-del-reason-error').style.display='none'" onblur="if(!this.value.trim()) this.style.borderColor='#ef4444'; else this.style.borderColor='#cbd5e1'">
+            <div id="fb-del-reason-error" style="color:#ef4444; font-size:13px; display:none; margin-top:-4px;">Vui lòng nhập lý do xóa để tiếp tục.</div>
           </div>
         </div>
         <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;gap:12px;">
@@ -364,7 +367,9 @@ window.closeDeleteFeedbackModal = function () {
 window.executeDeleteFeedback = function (formId) {
   let reason = document.getElementById('fb-del-reason').value.trim();
   if (!reason) {
-    reason = 'Không có lý do';
+    document.getElementById('fb-del-reason').style.borderColor = '#ef4444';
+    document.getElementById('fb-del-reason-error').style.display = 'block';
+    return;
   }
 
   closeDeleteFeedbackModal();

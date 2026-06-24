@@ -61,8 +61,30 @@ function switchTrashTab(tab) {
 
   const tabForms = document.getElementById('tab-forms');
   const tabFeedbacks = document.getElementById('tab-feedbacks');
-  if (tabForms) tabForms.classList.toggle('active', tab === 'forms');
-  if (tabFeedbacks) tabFeedbacks.classList.toggle('active', tab === 'feedbacks');
+  
+  if (tabForms) {
+    if (tab === 'forms') {
+      tabForms.classList.add('active');
+      tabForms.style.background = '#0250AD';
+      tabForms.style.color = '#fff';
+    } else {
+      tabForms.classList.remove('active');
+      tabForms.style.background = '';
+      tabForms.style.color = '';
+    }
+  }
+  
+  if (tabFeedbacks) {
+    if (tab === 'feedbacks') {
+      tabFeedbacks.classList.add('active');
+      tabFeedbacks.style.background = '#FA7413';
+      tabFeedbacks.style.color = '#fff';
+    } else {
+      tabFeedbacks.classList.remove('active');
+      tabFeedbacks.style.background = '';
+      tabFeedbacks.style.color = '';
+    }
+  }
 
   const filtersCard = document.getElementById('trash-filters');
   if (filtersCard) {
@@ -87,7 +109,7 @@ function initTrashPage() {
         <p class="page-sub">Các biểu mẫu đã xóa sẽ tự động xóa vĩnh viễn sau 30 ngày</p>
       </div>
       <div style="display:flex;gap:12px;" id="trash-action-buttons">
-        <button id="btn-delete-all" class="btn" style="background:linear-gradient(135deg, #fee2e2, #fecaca); color:#991b1b; border:1px solid #fecaca; font-weight:600; padding:8px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s;" onmouseenter="this.style.boxShadow='0 4px 12px rgba(220,38,38,0.15)'" onmouseleave="this.style.boxShadow='none'" onclick="toggleDeleteMode()">
+        <button id="btn-delete-all" class="btn" style="background:#ffffff; color:#dc2626; border:1px solid #fca5a5; font-weight:700; padding:8px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s;" onmouseenter="this.style.background='#fef2f2'; this.style.borderColor='#ef4444'" onmouseleave="this.style.background='#ffffff'; this.style.borderColor='#fca5a5'" onclick="toggleDeleteMode()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
           Xóa tất cả
         </button>
@@ -96,8 +118,8 @@ function initTrashPage() {
 
     <!-- Tabs -->
     <div class="tabs" style="margin-bottom:20px;">
-      <button id="tab-forms" class="tab-btn ${trashTab === 'forms' ? 'active' : ''}" onclick="switchTrashTab('forms')">Biểu mẫu</button>
-      <button id="tab-feedbacks" class="tab-btn ${trashTab === 'feedbacks' ? 'active' : ''}" onclick="switchTrashTab('feedbacks')">Phản hồi</button>
+      <button id="tab-forms" class="tab-btn ${trashTab === 'forms' ? 'active' : ''}" style="${trashTab === 'forms' ? 'background:#0250AD;color:#fff;' : ''}" onclick="switchTrashTab('forms')">Biểu mẫu</button>
+      <button id="tab-feedbacks" class="tab-btn ${trashTab === 'feedbacks' ? 'active' : ''}" style="${trashTab === 'feedbacks' ? 'background:#FA7413;color:#fff;' : ''}" onclick="switchTrashTab('feedbacks')">Phản hồi</button>
     </div>
 
     <!-- Filters -->
@@ -122,10 +144,10 @@ function initTrashPage() {
     <!-- Table content -->
     <div style="margin-top:24px; padding:0 4px;">
       <div id="trash-count" style="font-size:14px;font-weight:600;color:var(--gray-500);margin-bottom:16px;padding-left:4px;"></div>
-      <div id="trash-list-container" class="card" style="overflow:hidden; border-radius:20px; box-shadow: 0 10px 30px rgba(0,0,139,0.04); border:1px solid rgba(0,0,139,0.06);">
+      <div id="trash-list-container" class="card" style="overflow:hidden; border-radius:20px; box-shadow: 0 10px 30px rgba(2,80,173,0.04); border:1px solid rgba(2,80,173,0.06);">
         <div style="text-align:center;padding:80px;color:var(--gray-400)">Đang tải...</div>
       </div>
-      <div id="trash-pagination" style="background:#fff;border:1px solid rgba(0,0,139,0.08);border-radius:16px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;margin-top:20px;box-shadow:0 8px 24px rgba(0,0,139,0.03);gap:12px;flex-wrap:wrap"></div>
+      <div id="trash-pagination" style="background:#fff;border:1px solid rgba(2,80,173,0.08);border-radius:16px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;margin-top:20px;box-shadow:0 8px 24px rgba(2,80,173,0.03);gap:12px;flex-wrap:wrap"></div>
     </div>
   `;
 }
@@ -251,7 +273,7 @@ function updateTrashActionButtons() {
     `;
   } else {
     container.innerHTML = `
-      <button id="btn-delete-all" class="btn" style="background:linear-gradient(135deg, #fee2e2, #fecaca); color:#991b1b; border:1px solid #fecaca; font-weight:600; padding:8px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s;" onmouseenter="this.style.boxShadow='0 4px 12px rgba(220,38,38,0.15)'" onmouseleave="this.style.boxShadow='none'" onclick="toggleDeleteMode()">
+      <button id="btn-delete-all" class="btn" style="background:#ffffff; color:#dc2626; border:1px solid #fca5a5; font-weight:700; padding:8px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s;" onmouseenter="this.style.background='#fef2f2'; this.style.borderColor='#ef4444'" onmouseleave="this.style.background='#ffffff'; this.style.borderColor='#fca5a5'" onclick="toggleDeleteMode()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         Xóa tất cả
       </button>
@@ -309,7 +331,7 @@ function renderTrashTableOnly() {
   }
 
   const countEl = document.getElementById('trash-count');
-  countEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;padding:4px 10px;border-radius:20px;font-size:13px;color:#475569;font-weight:600;"><span style="width:6px;height:6px;border-radius:50%;background:#00008B;"></span>Tìm thấy ${valid.length} biểu mẫu trong thùng rác</span>`;
+  countEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;padding:4px 10px;border-radius:20px;font-size:13px;color:#475569;font-weight:600;"><span style="width:6px;height:6px;border-radius:50%;background:#0250AD;"></span>Tìm thấy ${valid.length} biểu mẫu trong thùng rác</span>`;
 
   // Pagination
   const totalPages = Math.ceil(valid.length / trashItemsPerPage) || 1;
@@ -325,7 +347,7 @@ function renderTrashTableOnly() {
       <table class="table" style="width:100%;text-align:center;border-collapse:collapse;table-layout:fixed; min-width: 900px;">
         <thead>
           <tr style="border-bottom:2px solid #eef2ff;background:#f8fafc;">
-            ${isDeleteMode ? `<th style="padding:16px 20px;width:40px;text-align:center;"><input type="checkbox" style="width:16px;height:16px;accent-color:#00008B;cursor:pointer" onchange="toggleSelectAllTrash(event)" ${allSelectedOnPage ? 'checked' : ''}></th>` : ''}
+            ${isDeleteMode ? `<th style="padding:16px 20px;width:40px;text-align:center;"><input type="checkbox" style="width:16px;height:16px;accent-color:#0250AD;cursor:pointer" onchange="toggleSelectAllTrash(event)" ${allSelectedOnPage ? 'checked' : ''}></th>` : ''}
             <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;width:22%;">TÊN BIỂU MẪU</th>
             <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">NGƯỜI XÓA</th>
             ${trashTab === 'forms' ? `
@@ -355,9 +377,9 @@ function renderTrashTableOnly() {
     let catColor = '#64748b';
     let catBorder = '#cbd5e1';
     if (categoryStr.includes('ngoại ngữ')) {
-      catBg = '#ffedd5';
-      catColor = '#ea580c';
-      catBorder = '#fdba74';
+      catBg = '#fff7ed';
+      catColor = '#FA7413';
+      catBorder = '#fed7aa';
     } else if (categoryStr.includes('tin học')) {
       catBg = '#e0f2fe';
       catColor = '#0284c7';
@@ -366,9 +388,9 @@ function renderTrashTableOnly() {
 
     return `
               <tr style="border-bottom:1px solid #f1f5f9;transition:all 0.2s;${isChecked ? 'background:#eff6ff' : ''}" onmouseenter="if(!${isChecked})this.style.background='#f8fafc'" onmouseleave="if(!${isChecked})this.style.background='transparent'">
-                ${isDeleteMode ? `<td style="padding:16px 20px;text-align:center;"><input type="checkbox" style="width:16px;height:16px;accent-color:#00008B;cursor:pointer" onchange="toggleTrashItem('${safeId}', this.checked)" ${isChecked ? 'checked' : ''}></td>` : ''}
+                ${isDeleteMode ? `<td style="padding:16px 20px;text-align:center;"><input type="checkbox" style="width:16px;height:16px;accent-color:#0250AD;cursor:pointer" onchange="toggleTrashItem('${safeId}', this.checked)" ${isChecked ? 'checked' : ''}></td>` : ''}
                 <td style="padding: 16px 20px 16px 40px; text-align:left;">
-                  <div style="font-weight:700;color:${isChecked ? '#00008B' : '#0f172a'};font-size:14.5px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</div>
+                  <div style="font-weight:700;color:${isChecked ? '#0250AD' : '#0f172a'};font-size:14.5px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</div>
                   <div style="display:inline-block;padding:3px 11px;border-radius:999px;background:${catBg};color:${catColor};border:1px solid ${catBorder};font-size:11.5px;font-weight:600;">${f.cat || 'Chưa phân loại'}</div>
                 </td>
                 <td style="padding:16px 20px;text-align:center;">
@@ -399,7 +421,7 @@ function renderTrashTableOnly() {
                 `}
                 <td class="sticky-col-right" style="padding:16px 20px;text-align:center;">
                   <div style="display:flex;gap:8px;justify-content:center;">
-                    <button style="background:transparent; color:#00008B; border:1px solid #bfdbfe; padding:6px 12px; border-radius:8px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px; cursor:pointer; transition:all 0.2s;" onmouseenter="this.style.background='#eff6ff'" onmouseleave="this.style.background='transparent'" title="Khôi phục" onclick="openTrashRestoreModal('${safeId}','${safeName}')">
+                    <button style="background:transparent; color:#0250AD; border:1px solid #bfdbfe; padding:6px 12px; border-radius:8px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px; cursor:pointer; transition:all 0.2s;" onmouseenter="this.style.background='#eff6ff'" onmouseleave="this.style.background='transparent'" title="Khôi phục" onclick="openTrashRestoreModal('${safeId}','${safeName}')">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg> Khôi phục
                     </button>
                     <button style="background:#fef2f2; color:#ef4444; border:1px solid #fecaca; border-radius:8px; padding:6px 10px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;" onmouseenter="this.style.background='#fee2e2'" onmouseleave="this.style.background='#fef2f2'" title="Xóa vĩnh viễn" onclick="permanentDelete('${safeId}','${safeName}')">
@@ -448,7 +470,7 @@ function openTrashRestoreModal(id, name) {
     modal.innerHTML = `
       <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;border-radius:14px">
         <div class="modal-header">
-          <div><div class="modal-title" style="color:#00008B">Khôi phục biểu mẫu</div>
+          <div><div class="modal-title" style="color:#0250AD">Khôi phục biểu mẫu</div>
           <div style="font-size:12.5px;color:var(--gray-400);margin-top:2px">Xác nhận hành động</div></div>
           <button class="icon-btn close-btn" onclick="closeTrashRestoreModal()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
