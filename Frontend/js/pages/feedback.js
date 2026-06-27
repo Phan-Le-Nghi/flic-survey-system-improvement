@@ -112,15 +112,16 @@ async function loadFeedbackData() {
     } else {
       allFeedbacks = [];
     }
-
-    allForms.forEach(f => {
-      f.so_phan_hoi = allFeedbacks.filter(fb => fb.form_id === f.id).length;
-    });
   } catch (err) {
     console.error('Failed to load feedback data:', err);
     allForms = [];
     allFeedbacks = [];
   }
+
+  // Tính toán lại chính xác số lượng phản hồi cho từng form dựa trên mảng allFeedbacks
+  allForms.forEach(form => {
+    form.so_phan_hoi = allFeedbacks.filter(fb => fb.form_id === form.id).length;
+  });
 
   const categories = [...new Set(allForms.map(f => f.danh_muc).filter(Boolean))];
   const catSelect = document.getElementById('filter-category');
@@ -131,16 +132,24 @@ async function loadFeedbackData() {
   filterData();
 }
 
+function formatNumberCount(num) {
+  if (num == null) return '00';
+  const n = parseInt(num, 10);
+  if (isNaN(n)) return '00';
+  if (n < 10) return String(n).padStart(2, '0');
+  return n.toLocaleString('en-US');
+}
+
 function renderStatCards(totalFb, newToday) {
   const container = document.getElementById('fb-stat-bar');
   if (!container) return;
   const stats = [
-    { label: 'Tổng số phản hồi', value: totalFb.toLocaleString('en-US'), bg: '#e0e7ff', color: '#0250AD', icon: '<path d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"/>' },
-    { label: 'Phản hồi mới hôm nay', value: newToday.toLocaleString('en-US'), bg: '#dbeafe', color: '#2563eb', icon: '<path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />' }
+    { label: 'Tổng số phản hồi', value: formatNumberCount(totalFb), bg: '#e0e7ff', color: '#0250AD', icon: '<path d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"/>' },
+    { label: 'Phản hồi mới hôm nay', value: formatNumberCount(newToday), bg: '#dbeafe', color: '#2563eb', icon: '<path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />' }
   ];
 
   container.innerHTML = stats.map(s => `
-    <div style="background:#fff; border-radius:12px; padding:24px; display:flex; align-items:center; gap:16px; border:1px solid var(--gray-200); box-shadow:var(--shadow-sm); border-left: 4px solid ${s.color}; flex: 1;">
+    <div style="background:#fff; border-radius:12px; padding:24px; display:flex; align-items:center; gap:16px; border:1px solid var(--gray-200); box-shadow:var(--shadow-sm); border-left: 4px solid ${s.color};">
       <div style="width:52px;height:52px;border-radius:12px;background:${s.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
         <svg viewBox="0 0 24 24" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">${s.icon}</svg>
       </div>
@@ -182,10 +191,11 @@ function filterData() {
     return true;
   });
 
+  // Calculate dynamic stats based on currently filtered forms
   const validFormIds = new Set(currentFilteredData.map(f => f.id));
   const validFeedbacks = allFeedbacks.filter(fb => validFormIds.has(fb.form_id));
 
-  const totalFeedback = currentFilteredData.reduce((sum, f) => sum + parseInt(f.so_phan_hoi || 0), 0);
+  const totalFeedback = validFeedbacks.length;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const newToday = validFeedbacks.filter(f => {
@@ -232,13 +242,13 @@ function renderTable(data) {
           ${f.ten_form || ''}
         </td>
         <td style="padding:16px 20px;color:var(--gray-600);font-weight:500; text-align:center;">${f.danh_muc || ''}</td>
-        <td style="padding:16px 20px;font-weight:700;color:var(--gray-800);text-align:center; text-align:center;">${f.so_phan_hoi || 0}</td>
+        <td style="padding:16px 20px;font-weight:700;color:var(--gray-800);text-align:center;">${formatNumberCount(f.so_phan_hoi)}</td>
         <td style="padding:16px 20px; text-align:center;">${statusHtml}</td>
         <td style="padding:16px 20px;color:var(--gray-600);font-size:13.5px; text-align:center;">${formatDate(f.ngay_tao)}</td>
         <td style="padding:16px 20px;color:var(--gray-600);font-size:13.5px; text-align:center;">${formatDate(f.ngay_dong)}</td>
         <td class="sticky-col-right" style="padding:16px 20px; text-align:center;">
           <div style="display:flex;gap:12px;align-items:center;justify-content:center">
-            <button onclick="window.open('form-builder.html?form_id=${f.id}&preview=1', '_blank')" style="background:none;border:none;cursor:pointer;color:var(--gray-500)" title="Xem trước biểu mẫu" onmouseover="this.style.color='var(--gray-800)'" onmouseout="this.style.color='var(--gray-500)'">
+            <button onclick="previewForm(${f.id})" style="background:none;border:none;cursor:pointer;color:var(--gray-500)" title="Xem trước biểu mẫu" onmouseover="this.style.color='var(--gray-800)'" onmouseout="this.style.color='var(--gray-500)'">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
             <button onclick="deleteFormFeedback(${f.id}, '${(f.ten_form || '').replace(/'/g, "\\'")}')" style="background:none;border:none;cursor:pointer;color:var(--gray-500)" title="Xóa biểu mẫu" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='var(--gray-500)'">
@@ -297,6 +307,23 @@ function viewFormFeedbacks(formId, formName) {
   window.location.href = 'feedback-detail.html';
 }
 
+function previewForm(formId) {
+  if (typeof buildPublicFormLink === 'function') {
+    window.open(buildPublicFormLink(formId), '_blank');
+  } else {
+    // Fallback if buildPublicFormLink is not loaded
+    const baseUrl = window.location.origin;
+    const isLocalHtml = window.location.protocol === 'file:';
+    if (isLocalHtml) {
+      const parts = window.location.pathname.split('/');
+      parts[parts.length - 1] = 'public-form.html';
+      window.open(window.location.protocol + '//' + parts.join('/') + '?id=' + formId, '_blank');
+    } else {
+      window.open('/pages/public-form.html?id=' + formId, '_blank');
+    }
+  }
+}
+
 function deleteFormFeedback(formId, formName) {
   window.openDeleteFeedbackModal(formId, formName);
 }
@@ -327,8 +354,8 @@ window.openDeleteFeedbackModal = function (formId, formName) {
           <p style="font-size:14px;color:var(--gray-700);margin:0 0 16px 0;line-height:1.5">Bạn có chắc chắn muốn xóa biểu mẫu <strong id="fb-del-name" style="color:var(--gray-900)"></strong>? Biểu mẫu sẽ tự động xóa vĩnh viễn sau 30 ngày.</p>
           <div style="display:flex;flex-direction:column;gap:8px;">
             <label style="font-size:13px;font-weight:700;color:var(--gray-700)">Lý do xóa <span style="color:#ef4444">*</span></label>
-            <input type="text" id="fb-del-reason" placeholder="Vui lòng nhập lý do xóa..." style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#94a3b8'; document.getElementById('fb-del-reason-error').style.display='none'" onblur="if(!this.value.trim()) this.style.borderColor='#ef4444'; else this.style.borderColor='#cbd5e1'">
-            <div id="fb-del-reason-error" style="color:#ef4444; font-size:13px; display:none; margin-top:-4px;">Vui lòng nhập lý do xóa để tiếp tục.</div>
+            <input type="text" id="fb-del-reason" placeholder="Vui lòng nhập lý do xóa..." style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#94a3b8'; document.getElementById('fb-del-error').style.display='none';" onblur="this.style.borderColor='#cbd5e1'">
+            <div id="fb-del-error" style="color:#ef4444; font-size:12px; display:none;">Vui lòng nhập lý do xóa</div>
           </div>
         </div>
         <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;gap:12px;">
@@ -344,6 +371,12 @@ window.openDeleteFeedbackModal = function (formId, formName) {
   document.getElementById('fb-del-reason').value = '';
   document.getElementById('fb-del-reason').style.borderColor = '#cbd5e1';
   document.getElementById('fb-confirm-del-btn').onclick = function () {
+    const reason = document.getElementById('fb-del-reason').value.trim();
+    if (!reason) {
+      document.getElementById('fb-del-error').style.display = 'block';
+      document.getElementById('fb-del-reason').style.borderColor = '#ef4444';
+      return;
+    }
     executeDeleteFeedback(formId);
   };
 
@@ -366,11 +399,6 @@ window.closeDeleteFeedbackModal = function () {
 
 window.executeDeleteFeedback = function (formId) {
   let reason = document.getElementById('fb-del-reason').value.trim();
-  if (!reason) {
-    document.getElementById('fb-del-reason').style.borderColor = '#ef4444';
-    document.getElementById('fb-del-reason-error').style.display = 'block';
-    return;
-  }
 
   closeDeleteFeedbackModal();
 

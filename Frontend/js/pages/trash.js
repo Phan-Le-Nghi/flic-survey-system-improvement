@@ -61,30 +61,8 @@ function switchTrashTab(tab) {
 
   const tabForms = document.getElementById('tab-forms');
   const tabFeedbacks = document.getElementById('tab-feedbacks');
-  
-  if (tabForms) {
-    if (tab === 'forms') {
-      tabForms.classList.add('active');
-      tabForms.style.background = '#0250AD';
-      tabForms.style.color = '#fff';
-    } else {
-      tabForms.classList.remove('active');
-      tabForms.style.background = '';
-      tabForms.style.color = '';
-    }
-  }
-  
-  if (tabFeedbacks) {
-    if (tab === 'feedbacks') {
-      tabFeedbacks.classList.add('active');
-      tabFeedbacks.style.background = '#FA7413';
-      tabFeedbacks.style.color = '#fff';
-    } else {
-      tabFeedbacks.classList.remove('active');
-      tabFeedbacks.style.background = '';
-      tabFeedbacks.style.color = '';
-    }
-  }
+  if (tabForms) tabForms.classList.toggle('active', tab === 'forms');
+  if (tabFeedbacks) tabFeedbacks.classList.toggle('active', tab === 'feedbacks');
 
   const filtersCard = document.getElementById('trash-filters');
   if (filtersCard) {
@@ -103,13 +81,17 @@ function handleTrashCategoryChange(val) {
 // ── Render page layout ───────────────────────────────────────────
 function initTrashPage() {
   document.getElementById('page-content').innerHTML = `
+    <style>
+      #tab-forms.active { background-color: #0250AD !important; color: #fff !important; border-color: #0250AD !important; }
+      #tab-feedbacks.active { background-color: #FA7413 !important; color: #fff !important; border-color: #FA7413 !important; }
+    </style>
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
         <h2 class="page-title">Thùng rác</h2>
         <p class="page-sub">Các biểu mẫu đã xóa sẽ tự động xóa vĩnh viễn sau 30 ngày</p>
       </div>
       <div style="display:flex;gap:12px;" id="trash-action-buttons">
-        <button id="btn-delete-all" class="btn" style="background:#ffffff; color:#dc2626; border:1px solid #fca5a5; font-weight:700; padding:8px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s;" onmouseenter="this.style.background='#fef2f2'; this.style.borderColor='#ef4444'" onmouseleave="this.style.background='#ffffff'; this.style.borderColor='#fca5a5'" onclick="toggleDeleteMode()">
+        <button id="btn-delete-all" class="btn" style="background:#fff; color:#dc2626; border:1px solid #fecaca; font-weight:700; padding:10px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s;" onmouseenter="this.style.boxShadow='0 4px 12px rgba(220,38,38,0.15)'" onmouseleave="this.style.boxShadow='none'" onclick="toggleDeleteMode()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
           Xóa tất cả
         </button>
@@ -118,8 +100,8 @@ function initTrashPage() {
 
     <!-- Tabs -->
     <div class="tabs" style="margin-bottom:20px;">
-      <button id="tab-forms" class="tab-btn ${trashTab === 'forms' ? 'active' : ''}" style="${trashTab === 'forms' ? 'background:#0250AD;color:#fff;' : ''}" onclick="switchTrashTab('forms')">Biểu mẫu</button>
-      <button id="tab-feedbacks" class="tab-btn ${trashTab === 'feedbacks' ? 'active' : ''}" style="${trashTab === 'feedbacks' ? 'background:#FA7413;color:#fff;' : ''}" onclick="switchTrashTab('feedbacks')">Phản hồi</button>
+      <button id="tab-forms" class="tab-btn ${trashTab === 'forms' ? 'active' : ''}" onclick="switchTrashTab('forms')">Biểu mẫu</button>
+      <button id="tab-feedbacks" class="tab-btn ${trashTab === 'feedbacks' ? 'active' : ''}" onclick="switchTrashTab('feedbacks')">Phản hồi</button>
     </div>
 
     <!-- Filters -->
@@ -213,7 +195,7 @@ async function loadTrashData() {
       } else {
         trashItems = dbItems.map(f => {
           const dt = new Date(f.ngay_xoa_gannhat || Date.now());
-          const dateKey = dt.toISOString().split('T')[0];
+          const dateKey = f.dateKey || dt.toISOString().split('T')[0];
           return {
             id: String(f.form_id) + '_' + dateKey,
             formId: String(f.form_id),
@@ -223,7 +205,7 @@ async function loadTrashData() {
             deletedCount: f.so_phan_hoi_xoa,
             deletedBy: f.nguoi_xoa_ten || f.nguoi_tao || 'Hệ thống',
             deletedAt: dt.getTime(),
-            deleteReason: 'Không có lý do'
+            deleteReason: f.ly_do_xoa || 'Không có lý do'
           };
         });
       }
@@ -263,17 +245,17 @@ function updateTrashActionButtons() {
   if (isDeleteMode) {
     const hasSelected = trashSelectedIds.size > 0;
     container.innerHTML = `
-      <button class="btn" style="background:#f8fafc; color:#475569; border:1px solid #e2e8f0; font-weight:600; padding:8px 16px; border-radius:12px; transition:all 0.2s;" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='#f8fafc'" onclick="cancelDeleteMode()">
+      <button class="btn" style="background:#f8fafc; color:#475569; border:1px solid #e2e8f0; font-weight:600; padding:10px 16px; border-radius:12px; transition:all 0.2s;" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='#f8fafc'" onclick="cancelDeleteMode()">
         Hủy
       </button>
-      <button id="btn-confirm-delete" class="btn" style="background:linear-gradient(135deg, #fee2e2, #fecaca); color:#991b1b; border:1px solid #fecaca; font-weight:600; padding:8px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s; opacity:${hasSelected ? '1' : '0.5'}; cursor:${hasSelected ? 'pointer' : 'not-allowed'};" ${hasSelected ? '' : 'disabled'} onmouseenter="if(!this.disabled) this.style.boxShadow='0 4px 12px rgba(220,38,38,0.15)'" onmouseleave="this.style.boxShadow='none'" onclick="deleteSelected()">
+      <button id="btn-confirm-delete" class="btn" style="background:#fff; color:#dc2626; border:1px solid #fecaca; font-weight:700; padding:10px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s; opacity:${hasSelected ? '1' : '0.5'}; cursor:${hasSelected ? 'pointer' : 'not-allowed'};" ${hasSelected ? '' : 'disabled'} onmouseenter="if(!this.disabled) this.style.boxShadow='0 4px 12px rgba(220,38,38,0.15)'" onmouseleave="this.style.boxShadow='none'" onclick="deleteSelected()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         Xác nhận xóa
       </button>
     `;
   } else {
     container.innerHTML = `
-      <button id="btn-delete-all" class="btn" style="background:#ffffff; color:#dc2626; border:1px solid #fca5a5; font-weight:700; padding:8px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s;" onmouseenter="this.style.background='#fef2f2'; this.style.borderColor='#ef4444'" onmouseleave="this.style.background='#ffffff'; this.style.borderColor='#fca5a5'" onclick="toggleDeleteMode()">
+      <button id="btn-delete-all" class="btn" style="background:#fff; color:#dc2626; border:1px solid #fecaca; font-weight:700; padding:10px 16px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s;" onmouseenter="this.style.boxShadow='0 4px 12px rgba(220,38,38,0.15)'" onmouseleave="this.style.boxShadow='none'" onclick="toggleDeleteMode()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         Xóa tất cả
       </button>
@@ -358,6 +340,7 @@ function renderTrashTableOnly() {
             <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">SỐ PHẢN HỒI XÓA</th>
             <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">THỜI GIAN XÓA</th>
             <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">THỜI HẠN</th>
+            <th style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;">LÝ DO XÓA</th>
             `}
             <th class="sticky-col-right" style="padding:16px 20px;font-weight:700;color:#334155;font-size:13.5px;letter-spacing:0.3px;text-align:center;width:15%;">THAO TÁC</th>
           </tr>
@@ -394,7 +377,7 @@ function renderTrashTableOnly() {
                   <div style="display:inline-block;padding:3px 11px;border-radius:999px;background:${catBg};color:${catColor};border:1px solid ${catBorder};font-size:11.5px;font-weight:600;">${f.cat || 'Chưa phân loại'}</div>
                 </td>
                 <td style="padding:16px 20px;text-align:center;">
-                  <span style="font-weight:600;color:#475569;font-size:13.5px;">${f.deletedBy}</span>
+                  <span style="font-weight:600;color:#475569;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:150px;" title="${f.deletedBy}">${f.deletedBy}</span>
                 </td>
                 ${trashTab === 'forms' ? `
                 <td style="padding:16px 20px;color:#64748b;font-size:13.5px;font-weight:500;text-align:center;">
@@ -403,8 +386,8 @@ function renderTrashTableOnly() {
                 <td style="padding:16px 20px;color:${isUrgent ? '#ef4444' : '#64748b'};font-size:13.5px;font-weight:500;text-align:center;">
                   ${days === 0 ? 'Hôm nay' : 'Còn ' + days + ' ngày'}
                 </td>
-                <td style="padding:16px 20px;text-align:center;">
-                  <div style="font-size:13px;color:#64748b;font-style:italic;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 auto;" title="${f.deleteReason}">
+                <td style="padding:16px 20px;text-align:center;vertical-align:middle;">
+                  <div style="font-size:13px;color:#64748b;font-style:italic;max-width:280px;white-space:normal;word-break:break-word;margin:0 auto;line-height:1.5;">
                     ${f.deleteReason}
                   </div>
                 </td>
@@ -412,11 +395,16 @@ function renderTrashTableOnly() {
                 <td style="padding:16px 20px;text-align:center;font-weight:700;color:var(--gray-800)">
                   ${f.deletedCount}
                 </td>
-                <td style="padding:16px 20px;color:#64748b;font-size:13.5px;font-weight:500;text-align:center;">
+                <td style="padding:16px 20px;color:#64748b;font-size:13.5px;font-weight:500;text-align:center;white-space:nowrap;">
                   ${new Date(f.deletedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                 </td>
-                <td style="padding:16px 20px;color:${isUrgent ? '#ef4444' : '#64748b'};font-size:13.5px;font-weight:500;text-align:center;">
+                <td style="padding:16px 20px;color:${isUrgent ? '#ef4444' : '#64748b'};font-size:13.5px;font-weight:500;text-align:center;white-space:nowrap;">
                   ${days === 0 ? 'Hôm nay' : 'Còn ' + days + ' ngày'}
+                </td>
+                <td style="padding:16px 20px;text-align:center;vertical-align:middle;">
+                  <div style="font-size:13px;color:#64748b;font-style:italic;max-width:280px;white-space:normal;word-break:break-word;margin:0 auto;line-height:1.5;">
+                    ${f.deleteReason}
+                  </div>
                 </td>
                 `}
                 <td class="sticky-col-right" style="padding:16px 20px;text-align:center;">
@@ -673,10 +661,7 @@ async function confirmTrashDelete() {
       isDeleteMode = false;
       trashSelectedIds.clear();
       updateTrashActionButtons();
-
-      if (typeof window.logActivity === 'function') {
-        window.logActivity('hard_delete', null, `${ids.length} biểu mẫu`, `Xóa vĩnh viễn các biểu mẫu: ${deletedNames}`);
-      }
+      // Backend handles logging
 
       showToast('Đã xóa vĩnh viễn các biểu mẫu được chọn', 'error');
     } catch (e) {
@@ -718,10 +703,7 @@ async function restoreSelected() {
     isDeleteMode = false;
     trashSelectedIds.clear();
     updateTrashActionButtons();
-
-    if (typeof window.logActivity === 'function') {
-      window.logActivity('restore', null, `${ids.length} biểu mẫu`, `Khôi phục các biểu mẫu: ${restoredNames}`);
-    }
+    // Backend handles logging
 
     showToast('Đã khôi phục các biểu mẫu được chọn', 'success');
   } catch (e) {

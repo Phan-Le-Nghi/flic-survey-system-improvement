@@ -6,6 +6,135 @@ const LS_TRASH = 'flic_trash_forms'; // alias cho TRASH_LS_KEY
 const NEW_FORM_LOI_KET_DRAFT_KEY = 'flic_new_form_loi_ket_draft';
 const FORM_QUESTION_MEDIA_CACHE_KEY = 'flic_form_question_media_cache';
 const FORM_ITEMS_CACHE_KEY = 'flic_form_items_cache';
+const DEFAULT_FORM_SETTINGS = Object.freeze({
+  collect_email: false,
+  limit_one_response: false,
+  allow_edit_after_submit: false,
+  show_submit_another_link: true,
+  show_progress_bar: false,
+  shuffle_questions: false,
+});
+
+function normalizeFormSettings(source = {}) {
+  const merged = source?.settings && typeof source.settings === 'object'
+    ? { ...source, ...source.settings }
+    : { ...source };
+  const limitOne = !!(merged.limit_one_response ?? merged.limitOneResponse);
+  const collectEmail = !!(merged.collect_email ?? merged.collectEmail ?? merged.require_login ?? merged.requireLogin ?? limitOne);
+  const hasSubmitAnother = Object.prototype.hasOwnProperty.call(merged, 'show_submit_another_link')
+    || Object.prototype.hasOwnProperty.call(merged, 'showSubmitAnotherLink');
+  return {
+    collect_email: collectEmail,
+    limit_one_response: limitOne,
+    allow_edit_after_submit: !!(merged.allow_edit_after_submit ?? merged.allowEditAfterSubmit),
+    show_submit_another_link: limitOne ? false : (hasSubmitAnother ? !!(merged.show_submit_another_link ?? merged.showSubmitAnotherLink) : true),
+    show_progress_bar: !!(merged.show_progress_bar ?? merged.showProgressBar),
+    shuffle_questions: !!(merged.shuffle_questions ?? merged.shuffleQuestions),
+  };
+}
+
+function getFormSettingsFromControls(prefix = 'new') {
+  const byId = (suffix) => document.getElementById(`${prefix}-setting-${suffix}`);
+  return normalizeFormSettings({
+    collect_email: !!byId('collect-email')?.checked,
+    limit_one_response: !!byId('limit-one-response')?.checked,
+    allow_edit_after_submit: !!byId('allow-edit-after-submit')?.checked,
+    show_submit_another_link: !!byId('show-submit-another-link')?.checked,
+    show_progress_bar: !!byId('show-progress-bar')?.checked,
+    shuffle_questions: !!byId('shuffle-questions')?.checked,
+  });
+}
+
+function applyFormSettingsToControls(prefix = 'new', settings = DEFAULT_FORM_SETTINGS) {
+  const normalized = normalizeFormSettings(settings);
+  const setChecked = (suffix, value) => {
+    const input = document.getElementById(`${prefix}-setting-${suffix}`);
+    if (input) input.checked = !!value;
+  };
+  setChecked('collect-email', normalized.collect_email);
+  setChecked('limit-one-response', normalized.limit_one_response);
+  setChecked('allow-edit-after-submit', normalized.allow_edit_after_submit);
+  setChecked('show-submit-another-link', normalized.show_submit_another_link);
+  setChecked('show-progress-bar', normalized.show_progress_bar);
+  setChecked('shuffle-questions', normalized.shuffle_questions);
+  syncFormSettingDependencies(prefix, false);
+}
+
+function syncFormSettingDependencies(prefix = 'new', recordHistory = true) {
+  const collectEmail = document.getElementById(`${prefix}-setting-collect-email`);
+  const limitOne = document.getElementById(`${prefix}-setting-limit-one-response`);
+  const anotherLink = document.getElementById(`${prefix}-setting-show-submit-another-link`);
+  if (limitOne?.checked && collectEmail) collectEmail.checked = true;
+  if (anotherLink) {
+    anotherLink.disabled = !!limitOne?.checked;
+    anotherLink.closest('label')?.style.setProperty('opacity', limitOne?.checked ? '.48' : '1');
+    if (limitOne?.checked) anotherLink.checked = false;
+  }
+  if (recordHistory && prefix === 'new' && typeof scheduleCreateHistoryRecord === 'function') {
+    scheduleCreateHistoryRecord();
+  }
+}
+
+function toggleFormSettingsTab(prefix = 'new', force) {
+  const panel = document.getElementById(`${prefix}-settings-tab-panel`);
+  const btn = document.getElementById(`${prefix}-settings-tab-btn`);
+  if (!panel) return;
+  const next = typeof force === 'boolean' ? force : panel.style.display === 'none';
+  panel.style.display = next ? 'block' : 'none';
+  if (btn) {
+    btn.style.background = next ? '#e0ecff' : '#fff';
+    btn.style.color = next ? '#0250AD' : '#64748b';
+    btn.style.borderColor = next ? '#93c5fd' : '#e2e8f0';
+  }
+}
+
+function renderFormSettingsButton(prefix = 'new') {
+  return `
+    <button id="${prefix}-settings-tab-btn" type="button" onclick="toggleFormSettingsTab('${prefix}')" title="C&#224;i &#273;&#7863;t bi&#7875;u m&#7851;u"
+      style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;font-size:12.5px;font-weight:800;cursor:pointer;transition:all .15s;white-space:nowrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" width="14" height="14"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+      <span>C&#224;i &#273;&#7863;t</span>
+    </button>`;
+}
+
+function renderFormSettingsPanel(prefix = 'new') {
+  const change = `syncFormSettingDependencies('${prefix}')`;
+  const rows = [
+    ['collect-email', 'Y&#234;u c&#7847;u nh&#7853;p email', 'Ng&#432;&#7901;i tr&#7843; l&#7901;i ph&#7843;i nh&#7853;p email tr&#432;&#7899;c khi g&#7917;i ph&#7843;n h&#7891;i.'],
+    ['limit-one-response', 'Gi&#7899;i h&#7841;n 1 l&#7847;n tr&#7843; l&#7901;i', 'Ch&#7863;n g&#7917;i l&#7841;i khi c&#249;ng email &#273;&#227; g&#7917;i ph&#7843;n h&#7891;i.'],
+    ['allow-edit-after-submit', 'Cho ph&#233;p ch&#7881;nh s&#7917;a sau khi g&#7917;i', 'L&#432;u thi&#7871;t l&#7853;p &#273;&#7875; h&#7895; tr&#7907; lu&#7891;ng ch&#7881;nh s&#7917;a ph&#7843;n h&#7891;i sau n&#224;y.'],
+    ['show-submit-another-link', 'Hi&#7875;n th&#7883; link g&#7917;i c&#226;u tr&#7843; l&#7901;i kh&#225;c', 'Sau khi g&#7917;i xong, ng&#432;&#7901;i tr&#7843; l&#7901;i c&#243; th&#7875; m&#7903; l&#7841;i bi&#7875;u m&#7851;u &#273;&#7875; g&#7917;i th&#234;m.'],
+  ].map(([id, title, desc]) => `
+    <label style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 12px;border-top:1px solid #eef2f7;cursor:pointer">
+      <span style="min-width:0">
+        <span style="display:block;font-size:13px;font-weight:800;color:#0f172a">${title}</span>
+        <span style="display:block;margin-top:3px;font-size:12px;font-weight:600;color:#64748b;line-height:1.35">${desc}</span>
+      </span>
+      <input id="${prefix}-setting-${id}" type="checkbox" onchange="${change}" style="width:16px;height:16px;accent-color:#0250AD;flex-shrink:0">
+    </label>`).join('');
+  const presentationRows = [
+    ['show-progress-bar', 'Hi&#7875;n th&#7883; thanh ti&#7871;n &#273;&#7897;', 'Ng&#432;&#7901;i tr&#7843; l&#7901;i th&#7845;y ti&#7871;n &#273;&#7897; ho&#224;n th&#224;nh khi &#273;i&#7873;n bi&#7875;u m&#7851;u.'],
+    ['shuffle-questions', 'X&#225;o tr&#7897;n th&#7913; t&#7921; c&#226;u h&#7887;i', 'C&#226;u h&#7887;i trong m&#7895;i ph&#7847;n s&#7869; &#273;&#432;&#7907;c x&#225;o tr&#7897;n khi m&#7903; bi&#7875;u m&#7851;u c&#244;ng khai.'],
+  ].map(([id, title, desc]) => `
+    <label style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 12px;border-top:1px solid #eef2f7;cursor:pointer">
+      <span style="min-width:0">
+        <span style="display:block;font-size:13px;font-weight:800;color:#0f172a">${title}</span>
+        <span style="display:block;margin-top:3px;font-size:12px;font-weight:600;color:#64748b;line-height:1.35">${desc}</span>
+      </span>
+      <input id="${prefix}-setting-${id}" type="checkbox" onchange="${change}" style="width:16px;height:16px;accent-color:#0250AD;flex-shrink:0">
+    </label>`).join('');
+  return `
+    <div id="${prefix}-settings-tab-panel" style="display:none;margin:0 0 14px;border:1px solid #dbe5f0;border-radius:12px;overflow:hidden;background:#fff">
+      <div style="padding:12px 14px;background:#f8fbff;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:14px;font-weight:900;color:#0f172a">C&#224;i &#273;&#7863;t bi&#7875;u m&#7851;u</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px;font-weight:600">Qu&#7843;n l&#253; c&#225;ch thu th&#7853;p v&#224; tr&#236;nh b&#224;y ph&#7843;n h&#7891;i</div>
+      </div>
+      <div style="padding:10px 12px 0;font-size:11.5px;font-weight:900;text-transform:uppercase;letter-spacing:.02em;color:#64748b">C&#226;u tr&#7843; l&#7901;i</div>
+      ${rows}
+      <div style="padding:12px 12px 0;font-size:11.5px;font-weight:900;text-transform:uppercase;letter-spacing:.02em;color:#64748b;border-top:1px solid #eef2f7">Tr&#236;nh b&#224;y</div>
+      ${presentationRows}
+    </div>`;
+}
 function moveToTrash(form) {
   const trash = loadTrash();
   const deletedAt = Date.now();
@@ -183,14 +312,14 @@ function removeApprovalsByForm(form) {
 
 // Dữ liệu mặc định (seed)
 const DEFAULT_FORMS = [
-  {id:'1',name:'Đăng ký khóa học Tiếng Anh giao tiếp',cat:'Ngoại ngữ',created:'10/03/2026',status:'active',by:'Nguyễn Văn A',initials:'N',img:'https://images.unsplash.com/photo-1546410531-bb4caa6b424đểw=400&h=200&fit=crop',color:'#00008B'},
+  {id:'1',name:'Đăng ký khóa học Tiếng Anh giao tiếp',cat:'Ngoại ngữ',created:'10/03/2026',status:'active',by:'Nguyễn Văn A',initials:'N',img:'https://images.unsplash.com/photo-1546410531-bb4caa6b424đểw=400&h=200&fit=crop',color:'#0250AD'},
   {id:'2',name:'Khảo sát mức độ hài lòng học viên',cat:'Ngoại ngữ',created:'08/03/2026',status:'active',by:'Trần Thị B',initials:'T',img:'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=400&h=200&fit=crop',color:'#8b5cf6'},
-  {id:'3',name:'Đăng ký thi chứng chỉ Tin học',cat:'Tin học',created:'05/03/2026',status:'active',by:'Lê Văn C',initials:'L',img:'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=200&fit=crop',color:'#f97316'},
+  {id:'3',name:'Đăng ký thi chứng chỉ Tin học',cat:'Tin học',created:'05/03/2026',status:'active',by:'Lê Văn C',initials:'L',img:'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=200&fit=crop',color:'#FA7413'},
   {id:'4',name:'Phiếu đánh giá giảng viên',cat:'Ngoại ngữ',created:'03/03/2026',status:'draft',by:'Phạm Thị D',initials:'P',img:'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400&h=200&fit=crop',color:'#ec4899'},
   {id:'5',name:'Đăng ký học thử miễn phí',cat:'Ngoại ngữ',created:'01/03/2026',status:'active',by:'Hoàng Văn E',initials:'H',img:'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&h=200&fit=crop',color:'#10b981'},
   {id:'6',name:'Feedback chương trình học',cat:'Ngoại ngữ',created:'15/12/2025',status:'draft',by:'Vũ Thị F',initials:'V',img:'https://images.unsplash.com/photo-1517842645767-c639042777db?w=400&h=200&fit=crop',color:'#64748b'},
-  {id:'7',name:'Đăng ký tư vấn lộ trình học',cat:'Ngoại ngữ',created:'25/02/2026',status:'active',by:'Đỗ Văn G',initials:'Đ',img:'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&h=200&fit=crop',color:'#00008B'},
-  {id:'8',name:'Khảo sát nhu cầu mở lớp mới',cat:'Ngoại ngữ',created:'20/02/2026',status:'active',by:'Ngô Thị H',initials:'N',img:'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=400&h=200&fit=crop',color:'#f59e0b'},
+  {id:'7',name:'Đăng ký tư vấn lộ trình học',cat:'Ngoại ngữ',created:'25/02/2026',status:'active',by:'Đỗ Văn G',initials:'Đ',img:'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&h=200&fit=crop',color:'#0250AD'},
+  {id:'8',name:'Khảo sát nhu cầu mở lớp mới',cat:'Ngoại ngữ',created:'20/02/2026',status:'active',by:'Ngô Thị H',initials:'N',img:'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=400&h=200&fit=crop',color:'#FA7413'},
 ];
 
 // -- API helpers ------------------------------------------
@@ -229,8 +358,8 @@ function normalizeLibrarySurveyType(value) {
 }
 
 const FORM_CATEGORY_COLORS = {
-  'Ngoại ngữ': '#f97316',
-  'Tin học': '#00008B',
+  'Ngoại ngữ': '#FA7413',
+  'Tin học': '#0250AD',
 };
 const SURVEY_TYPES_BY_CATEGORY = {
   'Ngoại ngữ': ['VSTEP', 'TOEIC'],
@@ -246,7 +375,7 @@ const DEFAULT_FORM_THEME = {
   questionSize: 14,
   textFont: 'Be Vietnam Pro',
   textSize: 13,
-  color: '#00008B',
+  color: '#0250AD',
   background: '#ffffff',
   headerImage: ''
 };
@@ -254,6 +383,29 @@ const DEFAULT_PREVIEW_THEME = {
   ...DEFAULT_FORM_THEME,
   background: '#eef5ff'
 };
+const DEFAULT_FORM_COVER_IMAGE = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fbff"/>
+      <stop offset=".52" stop-color="#e8f0fe"/>
+      <stop offset="1" stop-color="#fff4e8"/>
+    </linearGradient>
+    <pattern id="p" width="72" height="72" patternUnits="userSpaceOnUse">
+      <path d="M0 72 72 0M-18 18 18-18M54 90 90 54" stroke="#dbe5f0" stroke-width="4" opacity=".55"/>
+    </pattern>
+  </defs>
+  <rect width="960" height="360" fill="url(#g)"/>
+  <rect width="960" height="360" fill="url(#p)" opacity=".48"/>
+  <circle cx="168" cy="116" r="54" fill="#FA7413" opacity=".18"/>
+  <circle cx="818" cy="94" r="74" fill="#0250AD" opacity=".12"/>
+  <rect x="312" y="82" width="336" height="196" rx="18" fill="#fff" stroke="#d7e1ef" stroke-width="3"/>
+  <rect x="312" y="82" width="336" height="44" rx="18" fill="#0250AD"/>
+  <rect x="356" y="154" width="206" height="12" rx="6" fill="#cbd5e1"/>
+  <rect x="356" y="186" width="248" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="356" y="218" width="166" height="12" rx="6" fill="#e2e8f0"/>
+</svg>
+`)}`;
 const LEGACY_DEFAULT_BACKGROUNDS = new Set(['', '#ffffff', '#fff', '#f0f4f9']);
 let createFormTheme = { ...DEFAULT_FORM_THEME };
 let createHistoryStack = [];
@@ -378,16 +530,36 @@ function normalizeLibraryQuestion(raw) {
   const target = normalizeSurveyTarget(raw.doi_tuong || raw.target || raw.doiTuong);
   const type = normalizeQuestionType(raw.type || raw.loai || 'choice');
   const allowOther = questionAllowsOther({ ...raw, type });
+  const validationRule = getQuestionValidationRule(raw);
+  const desc = raw.desc || raw.description || raw.mo_ta_cau_hoi || raw.mo_ta || '';
+  const rawValidation = parseJsonObject(raw.validation_json || raw.validation || raw.logic_json);
+  const sectionJump = getQuestionSectionJumpConfig(raw);
+  const advanced = getQuestionAdvancedConfig(raw);
   return {
     ...raw,
     id: raw.id,
     text: raw.text || raw.noi_dung || '',
     type,
+    desc,
+    mo_ta: desc,
+    mo_ta_cau_hoi: desc,
     opts: Array.isArray(raw.opts) ? raw.opts : Array.isArray(raw.lua_chon) ? raw.lua_chon : [],
     rows: Array.isArray(raw.rows) ? raw.rows : Array.isArray(raw.hang) ? raw.hang : [],
     cols: Array.isArray(raw.cols) ? raw.cols : Array.isArray(raw.cot) ? raw.cot : [],
     required: !!(raw.required || raw.bat_buoc),
     bat_buoc: !!(raw.required || raw.bat_buoc),
+    has_description: !!(raw.has_description || desc),
+    has_validation: !!(raw.has_validation || validationRule),
+    has_section_jump: !!(raw.has_section_jump || sectionJump.enabled),
+    section_jump: sectionJump.enabled ? sectionJump : undefined,
+    has_shuffle: !!(raw.has_shuffle || rawValidation.shuffle_options),
+    has_limit_col: advanced.limitOnePerColumn,
+    has_shuffle_rows: advanced.shuffleRows,
+    has_include_time: advanced.includeTime,
+    has_include_year: advanced.includeYear,
+    time_type: advanced.timeType,
+    validation: validationRule || undefined,
+    validation_json: raw.validation_json || raw.logic_json || (raw.validation && typeof raw.validation !== 'object' ? raw.validation : ''),
     allowOther,
     allow_other: allowOther,
     bo_mon: category,
@@ -489,7 +661,7 @@ async function loadForms() {
         by: displayName,
         initials: displayName[0]?.toUpperCase() || 'Q',
         img: f.anh_bia || '',
-        color: getFormCategoryColor(category),
+        color: f.mau_chu_de || f.theme_color || getFormCategoryColor(category),
         mo_ta: f.mo_ta || '',
         desc: f.mo_ta || '',
         loi_ket: f.loi_ket || '',
@@ -499,7 +671,16 @@ async function loadForms() {
         approval_deadline: f.approval_deadline || f.han_chot_duyet || '',
         anh_bia: f.anh_bia || '',
         mau_nen: f.mau_nen || '',
+        mau_chu_de: f.mau_chu_de || f.theme_color || '',
         font_family: f.font_family || '',
+        theme: {
+          headerImage: f.anh_bia || '',
+          background: f.mau_nen || '',
+          color: f.mau_chu_de || f.theme_color || '',
+          headerFont: f.font_family || '',
+        },
+        settings: normalizeFormSettings(f),
+        ...normalizeFormSettings(f),
       };
     });
   } catch(e) {
@@ -508,6 +689,8 @@ async function loadForms() {
       ...f,
       cat: normalizeLibraryCategory(f.cat),
       color: getFormCategoryColor(f.cat),
+      settings: normalizeFormSettings(f),
+      ...normalizeFormSettings(f),
     }));
   }
 }
@@ -636,12 +819,42 @@ function autoOpenDirectFormView() {
     clearViewFormQuery();
   }, 120);
 }
+function autoOpenCreateFormFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('action') !== 'create') return;
+  setTimeout(() => {
+    openFormModal(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('action');
+    const query = url.searchParams.toString();
+    history.replaceState(history.state || {}, '', `${url.pathname}${query ? `?${query}` : ''}${url.hash}`);
+  }, 120);
+}
+function autoApplyStatusFilterFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const statusParam = params.get('status');
+  if (!statusParam) return;
+  const validStatuses = ['draft', 'pending', 'active', 'rejected', 'closed'];
+  const normalized = statusParam.toLowerCase();
+  if (!validStatuses.includes(normalized)) return;
+  setTimeout(() => {
+    const select = document.getElementById('status-filter');
+    if (select) {
+      select.value = normalized;
+      if (typeof filterForms === 'function') filterForms();
+    }
+  }, 0);
+}
+
 (async () => {
   FORMS = await loadForms();
   filtered = sortFormsForManagement(FORMS);
   renderGrid(filtered);
+  // Sau khi data load xong, áp dụng filter từ URL (delay để filterForms đã được parse)
+  setTimeout(autoApplyStatusFilterFromQuery, 150);
   autoOpenRejectedFormEdit();
   autoOpenDirectFormView();
+  autoOpenCreateFormFromQuery();
 })();
 
 
@@ -665,7 +878,7 @@ setTimeout(() => {
 const sBadge = s => {
   const status = String(s || 'draft').toLowerCase();
   if (status === 'active') return '<span class="badge badge-green">Hoạt động</span>';
-  if (status === 'pending') return '<span class="badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a">Chờ phê duyệt</span>';
+  if (status === 'pending') return '<span class="badge" style="background:#fef3c7;color:#FA7413;border:1px solid #fde68a">Chờ phê duyệt</span>';
   if (status === 'rejected') return '<span class="badge" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca">Bị từ chối</span>';
   if (status === 'closed' || status === 'archived') return '<span class="badge" style="background:#e2e8f0;color:#334155;border:1px solid #cbd5e1">Đã đóng biểu mẫu</span>';
   return '<span class="badge badge-yellow">Nháp</span>';
@@ -784,7 +997,7 @@ document.getElementById('page-content').innerHTML = `
       font-weight: 500;
     }
     .rich-title-editor a {
-      color: #00008B;
+      color: #0250AD;
       text-decoration: underline;
     }
     .rich-title-editor ol,
@@ -837,7 +1050,7 @@ document.getElementById('page-content').innerHTML = `
       border: 1px solid rgba(255,255,255,.75);
       border-radius: 50%;
       background: #fff;
-      color: #00008B;
+      color: #0250AD;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
@@ -853,12 +1066,12 @@ document.getElementById('page-content').innerHTML = `
     #create-form-modal .create-desc-toggle svg, #edit-form-modal .create-desc-toggle svg {
       width: 22px;
       height: 22px;
-      color: #00008B;
-      stroke: #00008B !important;
+      color: #0250AD;
+      stroke: #0250AD !important;
       display: block;
     }
     #create-form-modal .create-desc-toggle svg path, #edit-form-modal .create-desc-toggle svg path {
-      stroke: #00008B !important;
+      stroke: #0250AD !important;
     }
     #create-form-modal .create-desc-toggle[hidden], #edit-form-modal .create-desc-toggle[hidden] {
       display: none !important;
@@ -866,7 +1079,7 @@ document.getElementById('page-content').innerHTML = `
     #create-form-modal .modal-header.is-default-look .create-desc-toggle,
     #edit-form-modal .create-desc-toggle {
       background: #fff;
-      color: #00008B;
+      color: #0250AD;
       border-color: rgba(255,255,255,.75);
     }
     .rich-title-toolbar,
@@ -890,7 +1103,7 @@ document.getElementById('page-content').innerHTML = `
     #edit-form-modal #collapse-edit-btn,
     #edit-form-modal #edit-form-header-actions .icon-btn {
       background: #fff !important;
-      color: #00008B !important;
+      color: #0250AD !important;
       border-color: rgba(255,255,255,.75) !important;
       box-shadow: 0 8px 18px rgba(0,0,0,.14);
     }
@@ -902,7 +1115,7 @@ document.getElementById('page-content').innerHTML = `
     #edit-form-modal .field-format-toolbar button *,
     #edit-form-modal #collapse-edit-btn *,
     #edit-form-modal #edit-form-header-actions .icon-btn * {
-      color: #00008B !important;
+      color: #0250AD !important;
       stroke: currentColor !important;
     }
     #create-form-modal .modal-header.is-default-look .rich-title-toolbar button:hover,
@@ -914,7 +1127,7 @@ document.getElementById('page-content').innerHTML = `
     #edit-form-modal #collapse-edit-btn:hover,
     #edit-form-modal #edit-form-header-actions .icon-btn:hover {
       background: #eef5ff !important;
-      color: #00008B !important;
+      color: #0250AD !important;
     }
     #create-form-modal .modal-header.is-default-look #create-form-header-actions .icon-btn:disabled,
     #edit-form-modal #edit-form-header-actions .icon-btn:disabled {
@@ -925,7 +1138,7 @@ document.getElementById('page-content').innerHTML = `
   <!-- CREATE FORM MODAL -->
   <div class="modal-overlay" id="create-form-modal">
     <div class="modal" onclick="event.stopPropagation()" style="max-width:920px;width:min(92vw,920px);border-radius:16px;display:flex;flex-direction:column">
-      <div class="modal-header" style="position:relative;align-items:flex-start;padding:18px 112px 14px 24px;background:#00008B;color:#fff;border-bottom:0;max-height:220px;overflow:hidden">
+      <div class="modal-header" style="flex-shrink:0;position:relative;align-items:flex-start;padding:18px 112px 14px 24px;background:#0250AD;color:#fff;border-bottom:0;max-height:220px;overflow:hidden">
         <div style="display:flex;align-items:flex-start;gap:10px;width:100%;min-width:0">
           <button id="collapse-form-btn" class="btn btn-outline btn-sm" onclick="toggleCreateFormFullscreen()" style="display:none;align-items:center;gap:6px;margin-top:2px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>
@@ -956,28 +1169,28 @@ document.getElementById('page-content').innerHTML = `
                 onpaste="pastePlainTextIntoRichField(event, 'new-form-desc-editor')"></div>
               ${renderTextFormatToolbar('new-form-desc-editor', { hidden: true, toolbarFor: 'new-form-desc' })}
               <button type="button" id="new-form-desc-toggle" class="create-desc-toggle" onclick="toggleNewFormDescExpanded()" title="Mở rộng mô tả" aria-label="Mở rộng mô tả" hidden>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#0250AD" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
               </button>
             </div>
           </div>
         </div>
         <div id="create-form-header-actions" style="position:absolute;right:24px;top:22px;z-index:3;display:flex;align-items:center;gap:6px">
-          <button class="icon-btn" title="Giao diện" onclick="toggleCreateThemePanel()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button class="icon-btn" title="Giao diện" onclick="toggleCreateThemePanel()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 3C7 3 3 6.8 3 11.5S7.1 20 12.2 20h1.3c1.3 0 2.3-1.1 2.1-2.4-.1-.7-.4-1.3-.8-1.8-.7-.9-.1-2.3 1.1-2.3H18c1.7 0 3-1.4 3-3.1C21 6.3 17 3 12 3z"/></svg>
           </button>
-          <button id="create-undo-btn" class="icon-btn" title="Hoàn tác" onclick="undoCreateForm()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button id="create-undo-btn" class="icon-btn" title="Hoàn tác" onclick="undoCreateForm()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
           </button>
-          <button id="create-redo-btn" class="icon-btn" title="Làm lại" onclick="redoCreateForm()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button id="create-redo-btn" class="icon-btn" title="Làm lại" onclick="redoCreateForm()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
           </button>
-          <button class="icon-btn" title="Lấy liên kết" onclick="copyCreatePreviewLink()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button class="icon-btn" title="Lấy liên kết" onclick="copyCreatePreviewLink()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"/></svg>
           </button>
-          <button class="icon-btn" title="Thêm cộng tác viên" onclick="openCreateCollaboratorsPanel()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button class="icon-btn" title="Thêm cộng tác viên" onclick="openCreateCollaboratorsPanel()" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
           </button>
-          <button id="expand-form-btn" class="icon-btn" title="Phóng to" onclick="toggleCreateFormFullscreen()" style="color:var(--gray-400);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-400)'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+          <button id="expand-form-btn" class="icon-btn" title="Phóng to" onclick="toggleCreateFormFullscreen()" style="color:var(--gray-400);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-400)'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
           <button class="icon-btn close-btn" onclick="closeFormModal()">${IC.close}</button>
         </div>
       </div>
@@ -1000,19 +1213,11 @@ document.getElementById('page-content').innerHTML = `
             </select>
           </div>
           <div>
-            <label class="form-label">Đối tượng khảo sát <span style="color:var(--red)">*</span></label>
-            <select id="new-form-target" class="input" required style="width:100%;background:#f8f9fb">
-              <option value="Tất cả">Tất cả</option>
-              <option value="Sinh viên">Sinh viên</option>
-              <option value="Người đi làm">Người đi làm</option>
-            </select>
-          </div>
-          <div>
             <label class="form-label">Ngày đóng biểu mẫu</label>
             <input type="date" id="new-form-close" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" onchange="syncHiddenToDisplay(this.value); if(isPastInputDate(this.value)){showToast('Không được chọn ngày đóng trong quá khứ','error'); this.value=''; document.getElementById('new-form-close-display').value='';}">
             <input type="text" id="new-form-close-display" class="input" placeholder="dd/mm/yyyy" readonly style="width:100%;background:#f8f9fb;height:38px;font-size:12.5px;cursor:pointer" onclick="openCloseDatePicker()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openCloseDatePicker()}">
             <label style="display:flex;align-items:center;gap:6px;margin-top:7px;cursor:pointer;font-size:12.5px;color:var(--gray-600)">
-              <input type="checkbox" id="new-form-no-close" style="width:15px;height:15px;accent-color:var(--sidebar-active,#df2f0b);cursor:pointer"
+              <input type="checkbox" id="new-form-no-close" style="width:15px;height:15px;accent-color:#FA7413;cursor:pointer"
                 onchange="setCreateNoCloseState(this.checked);scheduleCreateHistoryRecord()">
               Không đóng
             </label>
@@ -1023,7 +1228,7 @@ document.getElementById('page-content').innerHTML = `
         <div class="form-group" id="approval-note-group" style="display:block">
           <div style="margin-bottom:12px">
             <label style="height:38px;width:100%;display:flex;align-items:center;gap:8px;padding:0 12px;border:1px solid #cbd5e1;border-radius:8px;background:#f8f9fb;color:var(--gray-700);font-size:13px;font-weight:700;cursor:pointer">
-              <input id="new-approval-urgent" type="checkbox" style="width:15px;height:15px;accent-color:var(--sidebar-active,#df2f0b)" onchange="toggleUrgentApprovalFields()">
+              <input id="new-approval-urgent" type="checkbox" style="width:15px;height:15px;accent-color:#FA7413" onchange="toggleUrgentApprovalFields()">
               Duyệt gấp
             </label>
           </div>
@@ -1061,20 +1266,17 @@ document.getElementById('page-content').innerHTML = `
           <!-- Header -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <span style="font-size:13.5px;font-weight:700;color:var(--gray-700)">
-              Tổng <span id="q-sel-count" style="color:#00008B">0</span> câu hỏi
+              Tổng <span id="q-sel-count" style="color:#0250AD">0</span> câu hỏi
             </span>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
               <button onclick="toggleLibrary()" class="fm-library-toggle"
-                style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:12.5px;font-weight:600;color:#64748b;cursor:pointer;transition:all .15s;white-space:nowrap"
-                onmouseenter="this.style.borderColor='#00008B';this.style.color='#00008B'"
-                onmouseleave="this.style.borderColor='#e2e8f0';this.style.color='#64748b'">
+                style="display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:9px;border:none;background:#0250AD;font-size:12.5px;font-weight:700;color:#fff;cursor:pointer;transition:all .15s;white-space:nowrap;box-shadow:0 2px 8px rgba(2,80,173,.18)"
+                onmouseenter="this.style.background='#0147a3';this.style.boxShadow='0 4px 14px rgba(2,80,173,.28)'"
+                onmouseleave="this.style.background='#0250AD';this.style.boxShadow='0 2px 8px rgba(2,80,173,.18)'">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4v15.5A2.5 2.5 0 006.5 22H20V6a2 2 0 00-2-2H6.5A2.5 2.5 0 004 6.5"/></svg>
-                Thư viện (<span id="q-total-count">0</span>)
+                Thu vi?n (<span id="q-total-count">0</span>)
               </button>
-              <button type="button" data-add-direct-q="first-section" onclick="handleAddDirectQ(event, 'first-section')" class="fm-add-question-btn btn btn-primary btn-sm" title="Thêm câu hỏi" style="min-width:128px;height:34px;padding:0 14px;background:var(--sky);border-color:var(--sky-dark);display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:9px;white-space:nowrap;font-weight:700">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>Thêm câu hỏi</span>
-              </button>
+              ${renderFormSettingsButton('new')}
             </div>
           </div>
 
@@ -1083,7 +1285,7 @@ document.getElementById('page-content').innerHTML = `
           <div id="library-dialog" onclick="event.stopPropagation()" style="width:min(92vw,920px);max-height:min(84vh,720px);display:flex;flex-direction:column;border:1px solid #cfe0ff;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 28px 70px rgba(15,23,42,.28)">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:linear-gradient(180deg,#f8fbff 0%,#eef5ff 100%);border-bottom:1px solid #dbe8ff">
               <div style="display:flex;align-items:center;gap:9px;min-width:0">
-                <div style="width:32px;height:32px;border-radius:10px;background:#00008B;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <div style="width:32px;height:32px;border-radius:10px;background:#0250AD;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4v15.5A2.5 2.5 0 006.5 22H20V6a2 2 0 00-2-2H6.5A2.5 2.5 0 004 6.5"/></svg>
                 </div>
                 <div>
@@ -1105,11 +1307,7 @@ document.getElementById('page-content').innerHTML = `
               <select id="lib-survey-filter" class="input" style="height:38px;font-size:13px;width:150px;flex-shrink:0;padding:0 10px;background:#f8fbff" onchange="renderQList()">
                 <option value="Tất cả">Tất cả</option>
               </select>
-              <select id="lib-target-filter" class="input" style="height:38px;font-size:13px;width:138px;flex-shrink:0;padding:0 10px;background:#f8fbff" onchange="renderQList()">
-                <option value="Tất cả">Tất cả</option>
-                <option value="Sinh viên">Sinh viên</option>
-                <option value="Người đi làm">Người đi làm</option>
-              </select>
+              <select id="lib-target-filter" style="display:none"></select>
               <div class="input-wrap" style="margin:0;flex:1">
                 <div class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
                 <input type="text" id="lib-search" class="input" placeholder="Tìm câu hỏi..." style="font-size:13px;height:38px;background:#f8fbff" oninput="renderQList()">
@@ -1117,10 +1315,10 @@ document.getElementById('page-content').innerHTML = `
             </div>
             <div id="q-list-wrap" style="flex:1;min-height:220px;max-height:420px;overflow-y:auto;background:#fff"></div>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid #e2e8f0;background:#fff">
-              <div style="font-size:12.5px;color:#64748b">Đã chọn <strong id="library-selected-count" style="color:#00008B">0</strong> câu hỏi</div>
+              <div style="font-size:12.5px;color:#64748b">Đã chọn <strong id="library-selected-count" style="color:#0250AD">0</strong> câu hỏi</div>
               <div style="display:flex;gap:8px;align-items:center">
                 <button class="btn btn-outline btn-sm" onclick="closeLibraryModal()" style="height:36px">Hủy</button>
-                <button class="btn btn-primary btn-sm" onclick="confirmLibrarySelection()" style="height:36px;min-width:128px;background:#00008B;border-color:#00008B">
+                <button class="btn btn-primary btn-sm" onclick="confirmLibrarySelection()" style="height:36px;min-width:128px;background:#0250AD;border-color:#0250AD">
                   + Thêm câu hỏi
                 </button>
               </div>
@@ -1129,6 +1327,7 @@ document.getElementById('page-content').innerHTML = `
           </div>
 
           <!-- Danh sách câu hỏi trực tiếp -->
+          ${renderFormSettingsPanel('new')}
           <div id="direct-q-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px"></div>
           <div id="direct-q-empty" style="border:1.5px solid var(--gray-200);border-radius:12px;padding:18px 16px;text-align:center;color:var(--gray-400);font-size:13px">
             Chưa có câu hỏi nào. Bấm "+ Thêm câu hỏi" hoặc chọn từ Thư viện.
@@ -1163,11 +1362,11 @@ document.getElementById('page-content').innerHTML = `
         <div style="display:flex;align-items:center;gap:10px">
           <div style="font-size:13px;color:var(--gray-500)">Đã chọn <strong id="q-bottom-count" style="color:var(--sky)">0</strong> câu hỏi</div>
           <button type="button" onclick="openFormPreview()" title="Xem trước biểu mẫu"
-            style="height:38px;min-width:118px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 14px;border-radius:10px;border:1.5px solid #00008B;background:#fff;font-size:12.5px;font-weight:900;color:#00008B;cursor:pointer;transition:background .15s,border-color .15s,color .15s,box-shadow .15s;white-space:nowrap"
-            onmouseenter="this.style.background='#dbeafe';this.style.borderColor='#00008B';this.style.color='#00008B';this.style.boxShadow='0 6px 16px rgba(0,0,139,.16)'"
-            onmouseleave="this.style.background='#fff';this.style.borderColor='#00008B';this.style.color='#00008B';this.style.boxShadow='none'"
-            onmousedown="this.style.background='#bfdbfe';this.style.color='#00008B'"
-            onmouseup="this.style.background='#dbeafe';this.style.color='#00008B'">
+            style="height:38px;min-width:118px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 14px;border-radius:10px;border:1.5px solid #0250AD;background:#fff;font-size:12.5px;font-weight:900;color:#0250AD;cursor:pointer;transition:background .15s,border-color .15s,color .15s,box-shadow .15s;white-space:nowrap"
+            onmouseenter="this.style.background='#dbeafe';this.style.borderColor='#0250AD';this.style.color='#0250AD';this.style.boxShadow='0 6px 16px rgba(2,80,173,.16)'"
+            onmouseleave="this.style.background='#fff';this.style.borderColor='#0250AD';this.style.color='#0250AD';this.style.boxShadow='none'"
+            onmousedown="this.style.background='#bfdbfe';this.style.color='#0250AD'"
+            onmouseup="this.style.background='#dbeafe';this.style.color='#0250AD'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             Xem trước
           </button>
@@ -1198,7 +1397,7 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
           </svg>
         </button>
       </div>
-      <div id="form-preview-body" style="flex:1;overflow-y:auto;padding:0;background:radial-gradient(circle at top left,rgba(0,0,139,.12),transparent 28%),linear-gradient(180deg,#f7fbff 0%,#eef5ff 100%)"></div>
+      <div id="form-preview-body" style="flex:1;overflow-y:auto;padding:0;background:radial-gradient(circle at top left,rgba(2,80,173,.12),transparent 28%),linear-gradient(180deg,#f7fbff 0%,#eef5ff 100%)"></div>
     </div>
   </div>
 `);
@@ -1215,7 +1414,7 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
           <div id="fm-confirm-message" style="margin-top:8px;font-size:14px;line-height:1.55;color:#475569"></div>
         </div>
       </div>
-      <div id="fm-confirm-note" style="display:none;margin:4px 24px 0;padding:12px 14px;border-radius:14px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:13px;line-height:1.45;font-weight:700"></div>
+      <div id="fm-confirm-note" style="display:none;margin:4px 24px 0;padding:12px 14px;border-radius:14px;background:#FA7413;border:1px solid #FA7413;color:#fff;font-size:13px;line-height:1.45;font-weight:700"></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;padding:20px 24px 24px">
         <button type="button" class="btn btn-outline" onclick="handleConfirmDialog(false)" id="fm-confirm-cancel" style="height:40px;min-width:96px">Hủy</button>
         <button type="button" class="btn btn-primary" onclick="handleConfirmDialog(true)" id="fm-confirm-ok" style="height:40px;min-width:128px;background:#dc2626;border-color:#dc2626">Xác nhận</button>
@@ -1370,6 +1569,11 @@ function closeLibraryModal() {
 function getLibraryQuestionClone(source) {
   const type = normalizeQuestionType(source.type || source.loai || 'choice');
   const allowOther = questionAllowsOther({ ...source, type });
+  const desc = source.desc || source.description || source.mo_ta_cau_hoi || source.mo_ta || '';
+  const validationRule = getQuestionValidationRule(source);
+  const sourceValidation = parseJsonObject(source.validation_json || source.validation || source.logic_json);
+  const sectionJump = getQuestionSectionJumpConfig(source);
+  const advanced = getQuestionAdvancedConfig(source);
   return {
     id: 'dq-lib-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
     thu_vien_id: Number(source.id) || null,
@@ -1384,6 +1588,20 @@ function getLibraryQuestionClone(source) {
     cols: source.cols ? [...source.cols] : [],
     scale: source.scale ? { ...source.scale } : undefined,
     rating: source.rating ? { ...source.rating } : undefined,
+    desc,
+    mo_ta: desc,
+    mo_ta_cau_hoi: desc,
+    has_description: !!(source.has_description || desc),
+    has_validation: !!(source.has_validation || validationRule),
+    has_section_jump: !!(source.has_section_jump || sectionJump.enabled),
+    section_jump: sectionJump.enabled ? sectionJump : undefined,
+    has_shuffle: !!(source.has_shuffle || sourceValidation.shuffle_options),
+    has_limit_col: advanced.limitOnePerColumn,
+    has_shuffle_rows: advanced.shuffleRows,
+    has_include_time: advanced.includeTime,
+    has_include_year: advanced.includeYear,
+    time_type: advanced.timeType,
+    validation: validationRule || undefined,
     validation_json: source.validation_json || source.validation || source.logic_json || '',
     allowOther,
     allow_other: allowOther,
@@ -1589,7 +1807,7 @@ function renderQuestionTypeDropdown(selectedType, context, target) {
     <div class="question-type-dropdown" style="position:relative;flex-shrink:0;min-width:230px" onclick="event.stopPropagation()">
       <button type="button" onclick="toggleQuestionTypeMenu('${menuId}')"
         style="width:100%;height:38px;padding:0 10px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fafbff;color:#374151;display:flex;align-items:center;gap:9px;font-size:12.5px;font-family:inherit;cursor:pointer;transition:border .15s"
-        onfocus="this.style.borderColor='#00008B'" onblur="this.style.borderColor='#e2e8f0'">
+        onfocus="this.style.borderColor='#0250AD'" onblur="this.style.borderColor='#e2e8f0'">
         <span style="width:18px;display:inline-flex;align-items:center;justify-content:center;color:#64748b;flex-shrink:0">${DQ_TYPE_ICON[normalizedType] || ''}</span>
         <span style="flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${getTypeOptionLabel(normalizedType)}</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="14" height="14" style="flex-shrink:0;color:#475569"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1712,6 +1930,26 @@ function questionAllowsOther(q = {}) {
   );
 }
 
+function getQuestionSectionJumpConfig(q = {}) {
+  const validation = parseJsonObject(q.validation_json || q.validation || q.logic_json);
+  const cfg = q.section_jump || validation.section_jump || {};
+  return {
+    enabled: !!(q.has_section_jump || cfg.enabled),
+    optionActions: cfg.optionActions && typeof cfg.optionActions === 'object' ? { ...cfg.optionActions } : {},
+  };
+}
+
+function getQuestionAdvancedConfig(q = {}) {
+  const validation = parseJsonObject(q.validation_json || q.validation || q.logic_json);
+  return {
+    limitOnePerColumn: !!(q.has_limit_col || validation.limit_one_per_column),
+    shuffleRows: !!(q.has_shuffle_rows || validation.shuffle_rows),
+    includeTime: !!(q.has_include_time || validation.include_time),
+    includeYear: q.has_include_year === false || validation.include_year === false ? false : true,
+    timeType: q.time_type || validation.time_type || 'time',
+  };
+}
+
 function setQuestionAllowOther(q, value) {
   if (!q) return;
   const enabled = !!value && supportsOtherOption(q.type || q.loai || 'choice');
@@ -1728,6 +1966,23 @@ function setQuestionAllowOther(q, value) {
 function getQuestionValidationJson(q = {}) {
   const validation = parseJsonObject(q.validation_json || q.validation || q.logic_json);
   const type = normalizeQuestionType(q.type || q.loai);
+  const rule = q.validation && typeof q.validation === 'object' && !Array.isArray(q.validation) ? q.validation : null;
+  const explicitlyDisabled = q.has_validation === false || q.showValidation === false;
+  const hasRule = !explicitlyDisabled && !!(q.has_validation || q.showValidation || rule || validation.type);
+  if (hasRule && rule) {
+    validation.type = rule.type || validation.type || (type === 'paragraph' ? 'length' : type === 'checkbox' ? 'select' : 'number');
+    validation.condition = rule.condition || validation.condition || '';
+    validation.value = rule.value ?? validation.value ?? '';
+    if (rule.value2 !== undefined) validation.value2 = rule.value2;
+    else if (!['between', 'not_between'].includes(validation.condition)) delete validation.value2;
+    validation.customError = rule.customError ?? validation.customError ?? '';
+  } else if (!hasRule) {
+    delete validation.type;
+    delete validation.condition;
+    delete validation.value;
+    delete validation.value2;
+    delete validation.customError;
+  }
   if (type === 'scale') {
     validation.scale_config = getQuestionScaleConfig(q);
   }
@@ -1751,12 +2006,106 @@ function getQuestionValidationJson(q = {}) {
     delete validation.allowOther;
     delete validation.has_other_option;
   }
+  const jumpConfig = getQuestionSectionJumpConfig(q);
+  if (jumpConfig.enabled && ['choice', 'dropdown'].includes(type)) {
+    validation.section_jump = jumpConfig;
+  } else {
+    delete validation.section_jump;
+  }
+  if (q.has_shuffle) {
+    validation.shuffle_options = true;
+  } else {
+    delete validation.shuffle_options;
+  }
+  const advanced = getQuestionAdvancedConfig(q);
+  if (['grid_radio', 'grid_checkbox'].includes(type) && advanced.limitOnePerColumn) {
+    validation.limit_one_per_column = true;
+  } else {
+    delete validation.limit_one_per_column;
+  }
+  if (['grid_radio', 'grid_checkbox'].includes(type) && advanced.shuffleRows) {
+    validation.shuffle_rows = true;
+  } else {
+    delete validation.shuffle_rows;
+  }
+  if (type === 'date' && advanced.includeTime) {
+    validation.include_time = true;
+  } else {
+    delete validation.include_time;
+  }
+  if (type === 'date' && advanced.includeYear === false) {
+    validation.include_year = false;
+  } else {
+    delete validation.include_year;
+  }
+  if (type === 'time' && advanced.timeType === 'duration') {
+    validation.time_type = 'duration';
+  } else {
+    delete validation.time_type;
+  }
   return Object.keys(validation).length ? JSON.stringify(validation) : null;
+}
+
+function getQuestionValidationRule(q = {}) {
+  if (q.validation && typeof q.validation === 'object' && !Array.isArray(q.validation)) return { ...q.validation };
+  const validation = parseJsonObject(q.validation_json || q.logic_json);
+  if (!validation.type) return null;
+  return {
+    type: validation.type,
+    condition: validation.condition || '',
+    value: validation.value ?? '',
+    value2: validation.value2 ?? '',
+    customError: validation.customError || '',
+  };
 }
 
 function renderOtherOptionIcon(type, color = '#94a3b8') {
   const isCheckbox = normalizeQuestionType(type) === 'checkbox';
   return `<span style="width:15px;height:15px;border-radius:${isCheckbox ? '3px' : '50%'};border:2px solid ${color};flex-shrink:0;display:inline-block;background:#fff"></span>`;
+}
+
+function getDirectSectionJumpTargets(items = directQuestions) {
+  const targets = [];
+  let pageIndex = 0;
+  const firstSectionIndex = (items || []).findIndex(isSectionItem);
+  if (firstSectionIndex > 0) {
+    targets.push({ value: 'page:0', label: 'Phần 1' });
+    pageIndex = 1;
+  }
+  (items || []).forEach((item) => {
+    if (!isSectionItem(item)) return;
+    const title = String(item.title || item.noi_dung || '').replace(/<[^>]*>/g, '').trim();
+    targets.push({ value: `page:${pageIndex}`, label: `Phần ${pageIndex + 1}${title ? `: ${title}` : ''}` });
+    pageIndex += 1;
+  });
+  return targets;
+}
+
+function renderSectionJumpEditor(q, items = directQuestions) {
+  const type = normalizeQuestionType(q.type || q.loai || 'choice');
+  if (!['choice', 'dropdown'].includes(type) || !q.has_section_jump) return '';
+  const opts = (q.opts || q.lua_chon || []).map(opt => typeof opt === 'string' ? opt : opt?.noi_dung).filter(opt => String(opt || '').trim());
+  if (!opts.length) return '';
+  const cfg = getQuestionSectionJumpConfig(q);
+  const targets = getDirectSectionJumpTargets(items);
+  const sectionOptions = targets.map(target => `<option value="${target.value}">${escapeHtml(target.label)}</option>`).join('');
+  const safeId = String(q.id).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return `
+    <div style="margin-top:12px;padding:10px 12px;border:1px solid #e0e7ff;border-radius:10px;background:#f8fbff">
+      <div style="font-size:11px;font-weight:800;color:#0250AD;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Chuyển tới phần dựa trên câu trả lời</div>
+      ${opts.map((opt, oi) => {
+        const selected = cfg.optionActions?.[oi] || 'continue';
+        return `
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,260px);gap:8px;align-items:center;margin-top:6px">
+            <div style="font-size:12.5px;color:#334155;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(opt || `Lựa chọn ${oi + 1}`)}</div>
+            <select onchange="dqSetSectionJump('${safeId}',${oi},this.value)" style="height:32px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;font-size:12px;font-weight:700;padding:0 8px;outline:none">
+              <option value="continue" ${selected === 'continue' ? 'selected' : ''}>Tiếp tục đến phần tiếp theo</option>
+              ${sectionOptions.replace(`value="${selected}"`, `value="${selected}" selected`)}
+              <option value="submit" ${selected === 'submit' ? 'selected' : ''}>Gửi biểu mẫu</option>
+            </select>
+          </div>`;
+      }).join('')}
+    </div>`;
 }
 
 function renderOtherOptionEditor(q, normalizedType, mode, target) {
@@ -1796,7 +2145,7 @@ function renderRatingPreview(config, compact = false) {
     ${Array.from({ length: rating.count }, (_, i) => `
       <div style="display:flex;flex-direction:column;align-items:center;gap:${compact ? '4px' : '6px'};min-width:${compact ? '26px' : '34px'}">
         <span style="font-size:12px;font-weight:700;color:#475569">${i + 1}</span>
-        <svg onclick="var w=this.closest('.rating-preview-wrap-${uid}');if(w){var svgs=w.querySelectorAll('svg');svgs.forEach((s,idx)=>{s.setAttribute('fill',idx<=${i}?'#f59e0b':'none');s.setAttribute('stroke',idx<=${i}?'#f59e0b':'#cbd5e1');});}" style="cursor:pointer;transition:all .15s" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.7" width="${compact ? '24' : '30'}" height="${compact ? '24' : '30'}"><polygon points="12 2 15 9 22 9 16 14 18 21 12 17 6 21 8 14 2 9 9 9"/></svg>
+        <svg onclick="var w=this.closest('.rating-preview-wrap-${uid}');if(w){var svgs=w.querySelectorAll('svg');svgs.forEach((s,idx)=>{s.setAttribute('fill',idx<=${i}?'#FA7413':'none');s.setAttribute('stroke',idx<=${i}?'#FA7413':'#cbd5e1');});}" style="cursor:pointer;transition:all .15s" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.7" width="${compact ? '24' : '30'}" height="${compact ? '24' : '30'}"><polygon points="12 2 15 9 22 9 16 14 18 21 12 17 6 21 8 14 2 9 9 9"/></svg>
       </div>
     `).join('')}
   </div>`;
@@ -1808,10 +2157,10 @@ function renderRatingConfigEditor(q, mode, target) {
     ? `editQSetRating(${Number(target)},'count',this.value)`
     : `dqSetRating('${String(target).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}','count',this.value)`;
   return `
-    <div style="padding:12px 14px;border:1px solid #fde68a;border-radius:12px;background:#fffbeb">
-      <div style="font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Xếp hạng</div>
+    <div style="padding:12px 14px;border:1px solid #FA7413;border-radius:12px;background:#FA7413">
+      <div style="font-size:11px;font-weight:700;color:#FA7413;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Xếp hạng</div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-        <select onchange="${setter}" style="height:36px;min-width:84px;padding:0 10px;border:1px solid #fbbf24;border-radius:8px;background:#fff;color:#0f172a;font-size:13px;font-weight:700;outline:none">
+        <select onchange="${setter}" style="height:36px;min-width:84px;padding:0 10px;border:1px solid #FA7413;border-radius:8px;background:#fff;color:#0f172a;font-size:13px;font-weight:700;outline:none">
           ${Array.from({ length: 8 }, (_, i) => i + 3).map(n => `<option value="${n}" ${rating.count === n ? 'selected' : ''}>${n}</option>`).join('')}
         </select>
       </div>
@@ -1869,6 +2218,140 @@ function renderScaleConfigEditor(q, mode, target) {
         </label>
       </div>
     </div>`;
+}
+
+function renderValidationConfigEditor(q, mode, target) {
+  const v = q.validation || { type: 'number', condition: 'gt', value: '', customError: '' };
+  const type = normalizeQuestionType(q.loai || q.type || 'short_text');
+  
+  let typeOptions = [];
+  let conditions = [];
+  
+  if (type === 'short_text') {
+    typeOptions = [
+      { val: 'number', label: 'Số' },
+      { val: 'text', label: 'Văn bản' },
+      { val: 'length', label: 'Độ dài' },
+      { val: 'regex', label: 'Biểu thức chính quy' }
+    ];
+    if (!v.type || !typeOptions.some(o => o.val === v.type)) v.type = 'number';
+  } else if (type === 'paragraph' || type === 'long_text') {
+    typeOptions = [
+      { val: 'length', label: 'Độ dài' },
+      { val: 'regex', label: 'Biểu thức chính quy' }
+    ];
+    if (!v.type || !typeOptions.some(o => o.val === v.type)) v.type = 'length';
+  } else if (type === 'checkbox' || type === 'multiple_choice' && Array.isArray(q.opts)) {
+    // Checkbox is for "Select exactly", "Select at least", etc.
+    // In our system, checkbox is checkbox. 
+    // Wait! Form builder allows checkboxes to be multiple_choice with checkbox style, but let's assume it's "checkbox".
+    typeOptions = [
+      { val: 'select', label: 'Chọn số lượng' }
+    ];
+    v.type = 'select';
+  } else {
+    // Not supported
+    return '';
+  }
+
+  if (v.type === 'length') {
+    conditions = [
+      { val: 'max', label: 'Tối đa số ký tự' },
+      { val: 'min', label: 'Tối thiểu số ký tự' }
+    ];
+    if (v.condition !== 'max' && v.condition !== 'min') v.condition = 'max';
+  } else if (v.type === 'number') {
+    conditions = [
+      { val: 'gt', label: 'Lớn hơn' },
+      { val: 'gte', label: 'Lớn hơn hoặc bằng' },
+      { val: 'lt', label: 'Nhỏ hơn' },
+      { val: 'lte', label: 'Nhỏ hơn hoặc bằng' },
+      { val: 'eq', label: 'Bằng' },
+      { val: 'neq', label: 'Không bằng' },
+      { val: 'between', label: 'Nằm giữa' },
+      { val: 'not_between', label: 'Không nằm giữa' },
+      { val: 'is_number', label: 'Là số' }
+    ];
+  } else if (v.type === 'text') {
+    conditions = [
+      { val: 'contains', label: 'Chứa' },
+      { val: 'not_contains', label: 'Không chứa' },
+      { val: 'email', label: 'Địa chỉ email' },
+      { val: 'url', label: 'URL' }
+    ];
+  } else if (v.type === 'regex') {
+    conditions = [
+      { val: 'contains', label: 'Chứa' },
+      { val: 'not_contains', label: 'Không chứa' },
+      { val: 'matches', label: 'Trùng khớp' },
+      { val: 'not_matches', label: 'Không trùng khớp' }
+    ];
+  } else if (v.type === 'select') {
+    conditions = [
+      { val: 'min_select', label: 'Chọn ít nhất' },
+      { val: 'max_select', label: 'Chọn nhiều nhất' },
+      { val: 'exact_select', label: 'Chọn chính xác' }
+    ];
+    if (!v.condition || !conditions.some(c => c.val === v.condition)) v.condition = 'min_select';
+  }
+
+  const safeTarget = String(target).replace(/\\/g, '\\\\').replace(/'/g, "\\\'");
+  const setterPrefix = mode === 'edit' 
+    ? `editFormQuestions[${target}].validation`
+    : `(function(){let item=_dqFindQ('${safeTarget}');if(!item.validation)item.validation={type:'${v.type}',condition:'${v.condition||''}',value:'',customError:''};item.has_validation=true;return item.validation})()`;
+    
+  const updateScript = mode === 'edit' ? 'renderEditQuestions()' : 'renderDirectQList()';
+  
+  const onTypeChange = `${setterPrefix}.type=this.value;${setterPrefix}.condition='';${setterPrefix}.value='';${updateScript}`;
+  const onConditionChange = `${setterPrefix}.condition=this.value;${updateScript}`;
+  const onValueChange = `${setterPrefix}.value=this.value;`;
+  const onValue2Change = `${setterPrefix}.value2=this.value;`;
+  const onCustomErrorChange = `${setterPrefix}.customError=this.value;`;
+  const onClose = mode === 'edit'
+    ? `delete editFormQuestions[${target}].validation;editFormQuestions[${target}].showValidation=false;editFormQuestions[${target}].has_validation=false;${updateScript}`
+    : `(function(){let item=_dqFindQ('${safeTarget}');if(item){delete item.validation;item.has_validation=false;} ${updateScript}})()`;
+
+  const needsTwoValues = v.type === 'number' && (v.condition === 'between' || v.condition === 'not_between');
+  const needsNoValue = (v.type === 'number' && v.condition === 'is_number') || (v.type === 'text' && (v.condition === 'email' || v.condition === 'url'));
+
+  return `
+    <div style="margin-top:16px;padding:16px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;position:relative">
+      <button onclick="${onClose}" style="position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:#94a3b8;padding:4px;border-radius:6px" onmouseenter="this.style.background='#f1f5f9';this.style.color='#ef4444'" onmouseleave="this.style.background='none';this.style.color='#94a3b8'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div style="font-size:13px;font-weight:700;color:#0250AD;margin-bottom:12px">Xác thực phản hồi</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start">
+        ${typeOptions.length > 1 ? `
+        <select onchange="${onTypeChange}" style="height:36px;padding:0 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#334155;background:#fff;outline:none;min-width:120px">
+          ${typeOptions.map(o => `<option value="${o.val}" ${v.type === o.val ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+        ` : ''}
+        <select onchange="${onConditionChange}" style="height:36px;padding:0 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#334155;background:#fff;outline:none;min-width:140px">
+          ${conditions.map(c => `<option value="${c.val}" ${v.condition === c.val ? 'selected' : ''}>${c.label}</option>`).join('')}
+        </select>
+        ${!needsNoValue ? `
+        <input type="${v.type === 'number' || v.type === 'length' || v.type === 'select' ? 'number' : 'text'}" 
+          value="${(v.value||'').replace(/"/g,'&quot;')}" 
+          placeholder="${v.type === 'select' ? 'Số lượng' : (v.type === 'regex' ? 'Mẫu (pattern)' : 'Giá trị')}"
+          oninput="${onValueChange}"
+          style="height:36px;padding:0 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#334155;outline:none;width:120px">
+        ` : ''}
+        ${needsTwoValues ? `
+        <span style="font-size:13px;color:#64748b;line-height:36px">và</span>
+        <input type="number" 
+          value="${(v.value2||'').replace(/"/g,'&quot;')}" 
+          placeholder="Số thứ 2"
+          oninput="${onValue2Change}"
+          style="height:36px;padding:0 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#334155;outline:none;width:120px">
+        ` : ''}
+        <input type="text" 
+          value="${(v.customError||'').replace(/"/g,'&quot;')}" 
+          placeholder="Văn bản lỗi tùy chỉnh"
+          oninput="${onCustomErrorChange}"
+          style="height:36px;padding:0 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#334155;outline:none;flex:1;min-width:200px;margin-right:24px">
+      </div>
+    </div>
+  `;
 }
 
 function getFormTitleEditor() {
@@ -1965,8 +2448,8 @@ function setNewFormDescToggleIcon(expanded) {
   toggle.setAttribute('aria-label', toggle.title);
   toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   toggle.innerHTML = expanded
-    ? '<svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>'
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="#0250AD" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="#0250AD" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 }
 
 function updateNewFormDescCollapseState() {
@@ -2021,11 +2504,29 @@ function syncRichTextFieldFromEditor(editorId) {
   const value = updateRichEditorEmptyState(editor);
   if (target) target.value = value;
   if (editor.dataset.directQuestionId) dqSetText(editor.dataset.directQuestionId, value);
+  if (editor.dataset.directQuestionDescId) {
+    const item = typeof _dqFindQ === 'function'
+      ? _dqFindQ(editor.dataset.directQuestionDescId)
+      : directQuestions.find(q => sameQuestionId(q.id, editor.dataset.directQuestionDescId));
+    if (item) {
+      item.desc = value;
+      item.mo_ta = value;
+      item.mo_ta_cau_hoi = value;
+    }
+  }
   if (editor.dataset.directSectionId && editor.dataset.directSectionField) {
     const section = directQuestions.find(q => sameQuestionId(q.id, editor.dataset.directSectionId));
     if (section) section[editor.dataset.directSectionField] = value;
   }
   if (editor.dataset.editQuestionIndex) editQSetText(Number(editor.dataset.editQuestionIndex), value);
+  if (editor.dataset.editQuestionDescIndex !== undefined) {
+    const item = editFormQuestions[Number(editor.dataset.editQuestionDescIndex)];
+    if (item) {
+      item.desc = value;
+      item.mo_ta = value;
+      item.mo_ta_cau_hoi = value;
+    }
+  }
   if (editor.dataset.editSectionIndex && editor.dataset.editSectionField) {
     const section = editFormQuestions[Number(editor.dataset.editSectionIndex)];
     if (section) section[editor.dataset.editSectionField] = value;
@@ -2035,6 +2536,14 @@ function syncRichTextFieldFromEditor(editorId) {
   if (targetId === 'edit-form-loi-ket') updateEditFormLoiKetCount(value);
   if (editorId === 'new-form-desc-editor') updateNewFormDescCollapseState();
   if (editorId === 'edit-form-desc-editor') updateEditFormDescCollapseState();
+}
+
+function syncRichTitleBlockFieldFromEditor(editorId, qId, field) {
+  const editor = document.getElementById(editorId);
+  if (!editor) return;
+  const value = updateRichEditorEmptyState(editor);
+  const item = typeof _dqFindQ === 'function' ? _dqFindQ(qId) : null;
+  if (item) item[field] = value;
 }
 
 function setRichTextFieldValue(fieldId, value = '') {
@@ -2496,7 +3005,8 @@ function renderQuestionFormatToolbar(inputId, options = {}) {
   return renderTextFormatToolbar(inputId, options);
 }
 function renderTextAnswerBuilder(type) {
-  const normalizedType = normalizeQuestionType(type);
+  const q = type && typeof type === 'object' ? type : null;
+  const normalizedType = normalizeQuestionType(q ? (q.type || q.loai) : type);
   if (normalizedType === 'short_text') {
     return `
       <div style="padding-left:30px;margin-top:10px">
@@ -2510,7 +3020,7 @@ function renderTextAnswerBuilder(type) {
       <div style="padding-left:30px;margin-top:10px">
         <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Đoạn văn bản</div>
         <textarea disabled rows="4" placeholder="Văn bản trả lời dài"
-          style="width:100%;padding:10px 12px;border:1.5px solid #fdba74;border-radius:10px;font-size:12.5px;background:#fff;color:#7c2d12;resize:vertical;outline:none"></textarea>
+          style="width:100%;padding:10px 12px;border:1.5px solid #FA7413;border-radius:10px;font-size:12.5px;background:#fff;color:#FA7413;resize:vertical;outline:none"></textarea>
       </div>`;
   }
   if (normalizedType === 'upload') {
@@ -2523,13 +3033,25 @@ function renderTextAnswerBuilder(type) {
       </div>`;
   }
   if (normalizedType === 'date' || normalizedType === 'time') {
-    const label = normalizedType === 'date' ? 'Ngày' : 'Giờ';
-    const inputType = normalizedType === 'date' ? 'date' : 'time';
+    const advanced = q ? getQuestionAdvancedConfig(q) : {};
+    const isDuration = normalizedType === 'time' && advanced.timeType === 'duration';
+    const label = normalizedType === 'date' ? 'Ngày' : (isDuration ? 'Thời lượng' : 'Giờ');
+    const inputType = normalizedType === 'date'
+      ? (advanced.includeTime ? 'datetime-local' : (advanced.includeYear === false ? 'text' : 'date'))
+      : 'time';
+    const placeholder = normalizedType === 'date' && advanced.includeYear === false ? 'mm/dd' : '';
     return `
       <div style="padding-left:30px;margin-top:10px">
         <div style="font-size:11px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${label}</div>
-        <input disabled type="${inputType}"
+        ${isDuration ? `
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input disabled type="number" placeholder="Giờ" style="width:74px;padding:9px 10px;border:1.5px solid #bbf7d0;border-radius:10px;font-size:12.5px;background:#f8fffb;color:#64748b;outline:none">
+          <input disabled type="number" placeholder="Phút" style="width:74px;padding:9px 10px;border:1.5px solid #bbf7d0;border-radius:10px;font-size:12.5px;background:#f8fffb;color:#64748b;outline:none">
+          <input disabled type="number" placeholder="Giây" style="width:74px;padding:9px 10px;border:1.5px solid #bbf7d0;border-radius:10px;font-size:12.5px;background:#f8fffb;color:#64748b;outline:none">
+        </div>` : `
+        <input disabled type="${inputType}" placeholder="${placeholder}"
           style="width:min(100%,240px);padding:9px 12px;border:1.5px solid #bbf7d0;border-radius:10px;font-size:12.5px;background:#f8fffb;color:#64748b;outline:none">
+        `}
       </div>`;
   }
   return '';
@@ -2601,12 +3123,12 @@ function renderEditLibraryList() {
         <div style="flex:1;min-width:0">
           <div style="font-size:13.5px;font-weight:700;color:#0f172a;line-height:1.45;margin-bottom:5px">${previewEsc(q.text || 'Câu hỏi chưa có nội dung')}</div>
           <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-            <span style="font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:#eef2ff;color:#00008B">${typeLabel(q.type)}</span>
+            <span style="font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:#eef2ff;color:#0250AD">${typeLabel(q.type)}</span>
             ${hasOpts ? `<span style="font-size:11.5px;color:#64748b">${q.opts.length} lựa chọn</span>` : ''}
           </div>
         </div>
         <button type="button" onclick="editInsertLibraryQuestion('${sid}')"
-          style="display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;color:#00008B;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap">
+          style="display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;color:#0250AD;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Thêm
         </button>
@@ -2739,6 +3261,7 @@ function getCreateFormStateSnapshot() {
     directQuestions: cloneForHistory(directQuestions || []),
     theme: cloneForHistory(createFormTheme),
     collaborators: cloneForHistory(createCollaborators),
+    settings: getFormSettingsFromControls('new'),
   };
 }
 
@@ -2771,6 +3294,7 @@ function applyCreateFormStateSnapshot(state) {
   directQuestions = cloneForHistory(state.directQuestions || []);
   createFormTheme = { ...DEFAULT_FORM_THEME, ...(state.theme || {}) };
   createCollaborators = cloneForHistory(state.collaborators || []);
+  applyFormSettingsToControls('new', state.settings || DEFAULT_FORM_SETTINGS);
   updateUrgentReasonCount();
   toggleApprovalNoteField();
   renderQList();
@@ -2837,7 +3361,7 @@ function syncThemePanelControls() {
 
 function renderThemeColorGrid() {
   const colors = ['#db4437','#673ab7','#3f51b5','#4285f4','#03a9f4','#00acc1','#ff5722','#ff9800','#009688','#4caf50','#607d8b','#9e9e9e'];
-  const backgrounds = ['#ffffff','#f8fafc','#eef5ff','#f3e8ff','#fef3c7','#ffedd5','#dcfce7','#e0f2fe','#fce7f3','#f1f5f9','#e5e7eb','#111827'];
+  const backgrounds = ['#ffffff','#f8fafc','#eef5ff','#f3e8ff','#FA7413','#FA7413','#dcfce7','#e0f2fe','#fce7f3','#f1f5f9','#e5e7eb','#111827'];
   const render = (id, list, key) => {
     const wrap = document.getElementById(id);
     if (!wrap) return;
@@ -2917,7 +3441,7 @@ function applyCreateTheme() {
     header.style.maxHeight = useDefaultEditLook ? '220px' : '';
     header.style.overflow = useDefaultEditLook ? 'hidden' : '';
     header.style.background = useDefaultEditLook
-      ? '#00008B'
+      ? '#0250AD'
       : theme.headerImage
       ? `linear-gradient(90deg,rgba(255,255,255,.92),rgba(255,255,255,.78)),url("${theme.headerImage}") center/cover`
       : '#fff';
@@ -2935,7 +3459,7 @@ function applyCreateTheme() {
     desc.style.fontWeight = useDefaultEditLook ? '500' : '400';
   }
   document.querySelectorAll('#create-form-header-actions .icon-btn').forEach(btn => {
-    btn.style.color = useDefaultEditLook ? '#00008B' : 'var(--gray-500)';
+    btn.style.color = useDefaultEditLook ? '#0250AD' : 'var(--gray-500)';
     btn.style.background = useDefaultEditLook ? '#fff' : '';
     btn.style.border = useDefaultEditLook ? '1px solid rgba(255,255,255,.75)' : '';
     btn.style.boxShadow = useDefaultEditLook ? '0 8px 18px rgba(0,0,0,.14)' : '';
@@ -3054,7 +3578,7 @@ function showConfirmDialog({
   }
 
   const palette = variant === 'warning'
-    ? { bg: '#fff7ed', fg: '#ea580c', btn: '#ea580c', border: '#ea580c' }
+    ? { bg: '#FA7413', fg: '#FA7413', btn: '#FA7413', border: '#FA7413' }
     : { bg: '#fee2e2', fg: '#dc2626', btn: '#dc2626', border: '#dc2626' };
 
   titleEl.textContent = title;
@@ -3132,13 +3656,13 @@ function renderQuestionPreview(q) {
   if (normalizedType === 'choice') {
     return opts.map((o,i) => `
       <label style="display:flex;align-items:center;gap:9px;padding:6px 0;font-size:13.5px;color:#374151;cursor:pointer">
-        <span style="width:17px;height:17px;border-radius:50%;border:2px solid #00008B;flex-shrink:0;display:inline-block"></span>${o||`Lựa chọn ${i+1}`}
+        <span style="width:17px;height:17px;border-radius:50%;border:2px solid #0250AD;flex-shrink:0;display:inline-block"></span>${o||`Lựa chọn ${i+1}`}
       </label>`).join('');
   }
   if (normalizedType === 'checkbox') {
     return opts.map((o,i) => `
       <label style="display:flex;align-items:center;gap:9px;padding:6px 0;font-size:13.5px;color:#374151;cursor:pointer">
-        <span style="width:16px;height:16px;border-radius:3px;border:2px solid #00008B;flex-shrink:0;display:inline-block"></span>${o||`Lựa chọn ${i+1}`}
+        <span style="width:16px;height:16px;border-radius:3px;border:2px solid #0250AD;flex-shrink:0;display:inline-block"></span>${o||`Lựa chọn ${i+1}`}
       </label>`).join('');
   }
   if (normalizedType === 'dropdown') {
@@ -3150,7 +3674,7 @@ function renderQuestionPreview(q) {
     const rows = getGridRows(q);
     const cols = getGridCols(q);
     if (!rows.length || !cols.length) {
-      return `<div style="padding:10px 12px;border:1px dashed #f59e0b;border-radius:10px;background:#fffbeb;color:#92400e;font-size:12.5px;font-weight:700">Câu hỏi lưới cần có ít nhất 1 hàng và 1 cột.</div>`;
+      return `<div style="padding:10px 12px;border:1px dashed #FA7413;border-radius:10px;background:#FA7413;color:#fff;font-size:12.5px;font-weight:700">Câu hỏi lưới cần có ít nhất 1 hàng và 1 cột.</div>`;
     }
     const isRadio = normalizedType === 'grid_radio';
     return `<div style="overflow-x:auto;margin-top:4px">
@@ -3158,14 +3682,14 @@ function renderQuestionPreview(q) {
         <thead>
           <tr>
             <th style="padding:6px 12px;text-align:left;color:#64748b;font-weight:500;border-bottom:2px solid #e2e8f0"></th>
-            ${cols.map(c=>`<th style="padding:6px 12px;text-align:center;color:#00008B;font-weight:600;border-bottom:2px solid #e2e8f0;white-space:nowrap">${c}</th>`).join('')}
+            ${cols.map(c=>`<th style="padding:6px 12px;text-align:center;color:#0250AD;font-weight:600;border-bottom:2px solid #e2e8f0;white-space:nowrap">${c}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
           ${rows.map((r,ri)=>`<tr style="background:${ri%2===0?'#f8faff':'#fff'}">
             <td style="padding:7px 12px;color:#374151;font-weight:500;border-bottom:1px solid #f1f5f9;white-space:nowrap">${r}</td>
             ${cols.map(()=>`<td style="padding:7px 12px;text-align:center;border-bottom:1px solid #f1f5f9">
-              <span style="display:inline-block;width:${isRadio?'16px':'14px'};height:${isRadio?'16px':'14px'};border-radius:${isRadio?'50%':'3px'};border:2px solid #00008B;vertical-align:middle"></span>
+              <span style="display:inline-block;width:${isRadio?'16px':'14px'};height:${isRadio?'16px':'14px'};border-radius:${isRadio?'50%':'3px'};border:2px solid #0250AD;vertical-align:middle"></span>
             </td>`).join('')}
           </tr>`).join('')}
         </tbody>
@@ -3219,7 +3743,7 @@ function openFormPreview(pushHistory = true) {
 
   body.innerHTML = `
     <div style="max-width:1180px;margin:0 auto">
-      <div style="background:linear-gradient(135deg,#00008B 0%,#00008B 52%,#00008B 100%);border-radius:28px;padding:28px 32px;margin-bottom:24px;color:#00008B;box-shadow:0 24px 48px rgba(0,0,139,.14)">
+      <div style="background:linear-gradient(135deg,#0250AD 0%,#0250AD 52%,#0250AD 100%);border-radius:28px;padding:28px 32px;margin-bottom:24px;color:#0250AD;box-shadow:0 24px 48px rgba(2,80,173,.14)">
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
           ${cat ? `<span style="font-size:12px;background:rgba(255,255,255,0.5);padding:6px 12px;border-radius:999px;font-weight:700">${cat}</span>` : ''}
           <span style="font-size:12px;background:rgba(255,255,255,0.5);padding:6px 12px;border-radius:999px;font-weight:700">Tổng ${sel.length} câu hỏi</span>
@@ -3230,10 +3754,10 @@ function openFormPreview(pushHistory = true) {
 
       <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:24px">
         ${sel.map((q, i) => `
-          <div style="border:1px solid #00008B;border-radius:22px;padding:20px 22px;background:rgba(255,255,255,.9);box-shadow:0 10px 26px rgba(0,0,139,.08)">
+          <div style="border:1px solid #0250AD;border-radius:22px;padding:20px 22px;background:rgba(255,255,255,.9);box-shadow:0 10px 26px rgba(2,80,173,.08)">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
               <div style="display:flex;align-items:flex-start;gap:14px;flex:1;min-width:0">
-                <div style="width:36px;height:36px;border-radius:50%;background:#00008B;color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${i+1}</div>
+                <div style="width:36px;height:36px;border-radius:50%;background:#0250AD;color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${i+1}</div>
                 <div style="flex:1;min-width:0">
                 <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:12px;line-height:1.5">${formatRichText(q.text, q.required)}</div>
                   ${renderQuestionMedia(q)}
@@ -3241,14 +3765,14 @@ function openFormPreview(pushHistory = true) {
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-                <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${TYPE_LABEL_MAP[normalizeQuestionType(q.type)] || normalizeQuestionType(q.type)}</span>
+                <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:#0250AD;color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${TYPE_LABEL_MAP[normalizeQuestionType(q.type)] || normalizeQuestionType(q.type)}</span>
               </div>
             </div>
           </div>`).join('')}
       </div>
 
       <div style="padding-bottom:20px;text-align:center">
-        <button disabled style="padding:12px 36px;background:#00008B;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:not-allowed;opacity:.78">Gửi phản hồi</button>
+        <button disabled style="padding:12px 36px;background:#0250AD;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:not-allowed;opacity:.78">Gửi phản hồi</button>
       </div>
     </div>`;
 
@@ -3273,8 +3797,8 @@ function sanitizeRichTextHref(value) {
 
 function applyInlineRichText(value) {
   return value
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => `<a href="${sanitizeRichTextHref(href)}" target="_blank" rel="noopener" style="color:#00008B;text-decoration:underline">${text}</a>`)
-    .replace(/&lt;a href=&quot;([\s\S]*?)&quot;&gt;([\s\S]*?)&lt;\/a&gt;/g, (_, href, text) => `<a href="${sanitizeRichTextHref(href)}" target="_blank" rel="noopener" style="color:#00008B;text-decoration:underline">${text}</a>`)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => `<a href="${sanitizeRichTextHref(href)}" target="_blank" rel="noopener" style="color:#0250AD;text-decoration:underline">${text}</a>`)
+    .replace(/&lt;a href=&quot;([\s\S]*?)&quot;&gt;([\s\S]*?)&lt;\/a&gt;/g, (_, href, text) => `<a href="${sanitizeRichTextHref(href)}" target="_blank" rel="noopener" style="color:#0250AD;text-decoration:underline">${text}</a>`)
     .replace(/&lt;strong&gt;([\s\S]*?)&lt;\/strong&gt;/g, '<strong>$1</strong>')
     .replace(/&lt;b&gt;([\s\S]*?)&lt;\/b&gt;/g, '<strong>$1</strong>')
     .replace(/&lt;em&gt;([\s\S]*?)&lt;\/em&gt;/g, '<em>$1</em>')
@@ -3454,7 +3978,7 @@ function renderPreviewOptionPills(q, kind = 'radio', includeOther = false, contr
   const nameAttr = type === 'radio' ? `name="${previewEsc(controlName)}"` : '';
   const otherId = `${controlName}_other`;
   const otherTextId = `${controlName}_other_text`;
-  const controlStyle = `width:18px;height:18px;accent-color:#00008B;cursor:pointer;flex-shrink:0`;
+  const controlStyle = `width:18px;height:18px;accent-color:#0250AD;cursor:pointer;flex-shrink:0`;
   
   let vj = {}; try { vj = typeof q.validation_json === 'string' ? JSON.parse(q.validation_json) : q.validation_json; } catch(e){}
   const optImgs = vj && vj.option_images ? vj.option_images : {};
@@ -3499,7 +4023,7 @@ function renderInteractiveScalePreview(q) {
           ${hasLabels ? `<td style="padding:0 10px 0 0;white-space:nowrap;font-size:12.5px;font-weight:700;color:#64748b;text-align:left;width:1%">${previewEsc(scale.labelMin || '')}</td>` : ''}
           ${values.map(n => `<td style="padding:4px 0;text-align:center">
             <label style="display:flex;flex-direction:column;align-items:center;cursor:pointer">
-              <input type="radio" name="${previewEsc(name)}" value="${n}" style="width:20px;height:20px;accent-color:#00008B;cursor:pointer;margin:0">
+              <input type="radio" name="${previewEsc(name)}" value="${n}" style="width:20px;height:20px;accent-color:#0250AD;cursor:pointer;margin:0">
             </label>
           </td>`).join('')}
           ${hasLabels ? `<td style="padding:0 0 0 10px;white-space:nowrap;font-size:12.5px;font-weight:700;color:#64748b;text-align:right;width:1%">${previewEsc(scale.labelMax || '')}</td>` : ''}
@@ -3520,7 +4044,7 @@ function renderInteractiveRatingPreview(q) {
         <span style="font-size:12px;font-weight:700;color:#64748b">${value}</span>
         <input type="radio" name="${previewEsc(name)}" value="${value}"
           style="position:absolute;opacity:0;width:0;height:0"
-          onchange="(function(el){var wrap=el.closest('[id^=rating-wrap]');if(!wrap)return;var val=Number(el.value);wrap.querySelectorAll('.preview-star').forEach(function(s,idx){s.textContent=idx<val?'★':'☆';s.style.color=idx<val?'#f59e0b':'#cbd5e1';});})( this)">
+          onchange="(function(el){var wrap=el.closest('[id^=rating-wrap]');if(!wrap)return;var val=Number(el.value);wrap.querySelectorAll('.preview-star').forEach(function(s,idx){s.textContent=idx<val?'★':'☆';s.style.color=idx<val?'#FA7413':'#cbd5e1';});})( this)">
         <span class="preview-star" style="font-size:30px;line-height:1;color:#cbd5e1;cursor:pointer">☆</span>
       </label>`;
     }).join('')}
@@ -3551,15 +4075,15 @@ function renderQuestionPreview(q) {
     const rows = getGridRows(q);
     const cols = getGridCols(q);
     if (!rows.length || !cols.length) {
-      return `<div style="padding:12px 14px;border:1px dashed #f59e0b;border-radius:12px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:700">Cau hoi luoi can co it nhat 1 hang va 1 cot.</div>`;
+      return `<div style="padding:12px 14px;border:1px dashed #FA7413;border-radius:12px;background:#FA7413;color:#fff;font-size:13px;font-weight:700">Cau hoi luoi can co it nhat 1 hang va 1 cot.</div>`;
     }
     const isRadio = normalizedType === 'grid_radio';
     return `<div style="overflow-x:auto">
-      <table style="border-collapse:separate;border-spacing:0;width:100%;min-width:420px;table-layout:fixed;border:1px solid #00008B;border-radius:16px;overflow:hidden;background:#fff">
+      <table style="border-collapse:separate;border-spacing:0;width:100%;min-width:420px;table-layout:fixed;border:1px solid #0250AD;border-radius:16px;overflow:hidden;background:#fff">
         <thead>
           <tr>
-            <th style="padding:12px 14px;text-align:left;background:#00008B;color:#fff;font-size:13px;font-weight:700;border-bottom:1px solid #00008B"></th>
-            ${cols.map(col => `<th style="padding:12px 14px;text-align:center;background:#00008B;color:#fff;font-size:13px;font-weight:700;border-bottom:1px solid #00008B">${previewEsc(col)}</th>`).join('')}
+            <th style="padding:12px 14px;text-align:left;background:#0250AD;color:#fff;font-size:13px;font-weight:700;border-bottom:1px solid #0250AD"></th>
+            ${cols.map(col => `<th style="padding:12px 14px;text-align:center;background:#0250AD;color:#fff;font-size:13px;font-weight:700;border-bottom:1px solid #0250AD">${previewEsc(col)}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
@@ -3567,7 +4091,7 @@ function renderQuestionPreview(q) {
             <tr style="background:${rowIndex % 2 === 0 ? '#fff' : '#fcfdff'}">
               <td style="padding:14px;color:#0f172a;font-size:14px;font-weight:600;border-bottom:${rowIndex === rows.length - 1 ? 'none' : '1px solid #eef4ff'}">${previewEsc(row)}</td>
               ${cols.map((col, colIndex) => `<td style="padding:14px;text-align:center;border-bottom:${rowIndex === rows.length - 1 ? 'none' : '1px solid #eef4ff'}">
-                <input type="${isRadio ? 'radio' : 'checkbox'}" ${isRadio ? `name="${previewEsc(`${controlName}_${rowIndex}`)}"` : ''} value="${previewEsc(col)}" style="width:18px;height:18px;accent-color:#00008B;cursor:pointer">
+                <input type="${isRadio ? 'radio' : 'checkbox'}" ${isRadio ? `name="${previewEsc(`${controlName}_${rowIndex}`)}"` : ''} value="${previewEsc(col)}" style="width:18px;height:18px;accent-color:#0250AD;cursor:pointer">
               </td>`).join('')}
             </tr>
           `).join('')}
@@ -3597,6 +4121,16 @@ function normalizeQuestionForPreview(q) {
       type: 'section',
       text: q.title || q.noi_dung || q.text || '',
       desc: q.desc || q.description || q.mo_ta_cau_hoi || '',
+    };
+  }
+
+  if (isTitleBlockItem(q)) {
+    return {
+      ...q,
+      type: 'title_block',
+      _isTitleBlock: true,
+      title: q.title || '',
+      desc: q.desc || q.description || '',
     };
   }
 
@@ -3668,22 +4202,33 @@ function renderFormPreviewSurface(formInfo, questions) {
 
       <div style="display:flex;flex-direction:column;gap:16px;padding:12px 0 28px">
         ${currentPreviewPage.section ? `
-          <div style="border:1px solid #fbbf24;border-left:6px solid #f59e0b;border-radius:20px;padding:20px 22px;background:linear-gradient(180deg,#fffbeb 0%,#fff7ed 100%);box-shadow:0 12px 26px rgba(180,83,9,.08)">
-            <div style="font-size:12px;font-weight:900;color:#b45309;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Phần ${getSectionNumber(normalizedQuestions, currentPreviewPage.sectionIndex)} / ${getTotalSectionCount(normalizedQuestions)}</div>
+          <div style="border:1px solid #FA7413;border-left:6px solid #FA7413;border-radius:20px;padding:20px 22px;background:linear-gradient(180deg,#FA7413 0%,#FA7413 100%);box-shadow:0 12px 26px rgba(250,116,19,.08)">
+            <div style="font-size:12px;font-weight:900;color:#FA7413;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Phần ${getSectionNumber(normalizedQuestions, currentPreviewPage.sectionIndex)} / ${getTotalSectionCount(normalizedQuestions)}</div>
             <div style="font-size:24px;font-weight:900;color:#78350f;line-height:1.3">${formatRichText(currentPreviewPage.section.text || `Phần ${getSectionNumber(normalizedQuestions, currentPreviewPage.sectionIndex)}`)}</div>
-            ${currentPreviewPage.section.desc ? `<div style="font-size:14px;color:#92400e;line-height:1.55;margin-top:8px">${formatRichText(currentPreviewPage.section.desc)}</div>` : ''}
+            ${currentPreviewPage.section.desc ? `<div style="font-size:14px;color:#FA7413;line-height:1.55;margin-top:8px">${formatRichText(currentPreviewPage.section.desc)}</div>` : ''}
           </div>
         ` : (hasPreviewPages ? `
-          <div style="border:1px solid #fbbf24;border-left:6px solid #f59e0b;border-radius:20px;padding:14px 18px;background:linear-gradient(180deg,#fffbeb 0%,#fff7ed 100%);box-shadow:0 12px 26px rgba(180,83,9,.06)">
-            <div style="font-size:12px;font-weight:900;color:#b45309;text-transform:uppercase;letter-spacing:.6px">Phần ${previewPageIndex + 1} / ${previewPages.length}</div>
+          <div style="border:1px solid #FA7413;border-left:6px solid #FA7413;border-radius:20px;padding:14px 18px;background:linear-gradient(180deg,#FA7413 0%,#FA7413 100%);box-shadow:0 12px 26px rgba(250,116,19,.06)">
+            <div style="font-size:12px;font-weight:900;color:#FA7413;text-transform:uppercase;letter-spacing:.6px">Phần ${previewPageIndex + 1} / ${previewPages.length}</div>
           </div>
         ` : '')}
-        ${previewQuestionItems.map(({ item: q, originalIndex: i }) => `
-          <div style="border:1px solid ${accent};border-radius:22px;padding:20px 20px 22px;background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,247,237,.95) 100%);box-shadow:0 12px 26px rgba(0,0,139,.08)">
+        ${previewQuestionItems.map(({ item: q, originalIndex: i }) => {
+          // Title block: render kiểu Google Forms - chỉ tiêu đề + mô tả, không có số thứ tự
+          if (isTitleBlockItem(q)) {
+            return `<div style="border:1px solid #e2e8f0;border-left:4px solid ${accent};border-radius:8px;padding:18px 20px;background:#fff">
+              <div style="font-size:18px;font-weight:600;color:#202124;line-height:1.4">${previewEsc(q.title || '')}</div>
+              ${q.desc ? `<div style="margin-top:8px;font-size:14px;color:#5f6368;line-height:1.6">${previewEsc(q.desc)}</div>` : ''}
+            </div>`;
+          }
+          return `<div style="border:1px solid ${accent};border-radius:22px;padding:20px 20px 22px;background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,247,237,.95) 100%);box-shadow:0 12px 26px rgba(2,80,173,.08)">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px">
               <div style="min-width:0;flex:1;display:flex;align-items:flex-start;gap:14px">
                 <div style="width:36px;height:36px;border-radius:50%;background:${accent};color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${getQuestionNumberInSection(normalizedQuestions, i)}</div>
-                <p style="margin:0;font-size:16px;line-height:1.5;font-weight:600;color:#0f172a">${formatRichText(q.text || 'Câu hỏi chưa có nội dung', q.required)}</p>
+                <div style="flex:1">
+                  <p style="margin:0;font-size:16px;line-height:1.5;font-weight:600;color:#0f172a">${formatRichText(q.text || 'Câu hỏi chưa có nội dung', q.required)}</p>
+                  ${q.has_description && q.desc ? `<div style="margin-top:6px;font-size:13.5px;color:#475569;line-height:1.55">${formatRichText(q.desc)}</div>` : ''}
+                  ${q.has_validation && q.validation && q.validation.customError ? `<div style="margin-top:8px;font-size:12.5px;color:#dc2626;font-weight:500;display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>${String(q.validation.customError).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
+                </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
                 <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:${accent};color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${previewQuestionChip(q.type)}</span>
@@ -3691,8 +4236,8 @@ function renderFormPreviewSurface(formInfo, questions) {
             </div>
             ${renderQuestionMedia(q)}
             ${renderQuestionPreview(q)}
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
       </div>
       <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap">
         ${hasPreviewPages && previewPageIndex > 0 ? `<button type="button" onclick="setFormPreviewPage(${previewPageIndex - 1})" style="min-width:118px;height:48px;padding:0 20px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;color:${accent};font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(15,23,42,.08)">Quay lại</button>` : ''}
@@ -3741,31 +4286,31 @@ function openFormPreview(pushHistory = true) {
   body.innerHTML = `
     <div style="max-width:1080px;margin:0 auto;padding:52px 20px 64px;font-family:'Be Vietnam Pro',sans-serif;color:#0f172a">
       <section style="background:transparent;border:0;border-radius:0;padding:0;box-shadow:none">
-        <div style="min-height:180px;margin-bottom:18px;position:relative;overflow:hidden;border-radius:30px;background:linear-gradient(135deg,#00008B 0%,#00008B 50%,#00008B 100%);box-shadow:0 24px 48px rgba(0,0,139,.16);display:flex;flex-direction:column;justify-content:flex-end;padding:28px 30px">
+        <div style="min-height:180px;margin-bottom:18px;position:relative;overflow:hidden;border-radius:30px;background:linear-gradient(135deg,#0250AD 0%,#0250AD 50%,#0250AD 100%);box-shadow:0 24px 48px rgba(2,80,173,.16);display:flex;flex-direction:column;justify-content:flex-end;padding:28px 30px">
           <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(219,234,254,.92) 0%,rgba(224,242,254,.84) 42%,rgba(199,210,254,.9) 100%)"></div>
           <div style="position:absolute;inset:0;background:radial-gradient(circle at top right,rgba(255,255,255,.32),transparent 34%),radial-gradient(circle at bottom left,rgba(255,255,255,.22),transparent 28%)"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-              <span style="padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.36);color:#00008B;font-size:12px;font-weight:700">${previewEsc(cat)}</span>
-              <span style="padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.36);color:#00008B;font-size:12px;font-weight:700">Tổng ${sel.length} câu hỏi</span>
+              <span style="padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.36);color:#0250AD;font-size:12px;font-weight:700">${previewEsc(cat)}</span>
+              <span style="padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.36);color:#0250AD;font-size:12px;font-weight:700">Tổng ${sel.length} câu hỏi</span>
             </div>
-            <h1 style="margin:0;font-size:32px;font-weight:700;line-height:1.2;color:#00008B">${formatRichText(name)}</h1>
-            ${desc ? `<p style="margin:12px 0 0;color:#00008B;font-size:16px">${formatRichText(desc)}</p>` : ''}
+            <h1 style="margin:0;font-size:32px;font-weight:700;line-height:1.2;color:#0250AD">${formatRichText(name)}</h1>
+            ${desc ? `<p style="margin:12px 0 0;color:#0250AD;font-size:16px">${formatRichText(desc)}</p>` : ''}
           </div>
         </div>
 
-        <div style="padding:8px 8px 14px;color:#00008B;font-size:14px">Ng&agrave;y t&#7841;o: <strong style="color:#c2410c">${previewEsc(createdAt)}</strong></div>
+        <div style="padding:8px 8px 14px;color:#0250AD;font-size:14px">Ng&agrave;y t&#7841;o: <strong style="color:#FA7413">${previewEsc(createdAt)}</strong></div>
 
         <div style="display:flex;flex-direction:column;gap:16px">
           ${sel.map((q, i) => `
-            <div style="border:1px solid #00008B;border-radius:22px;padding:20px 20px 22px;background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,247,237,.95) 100%);box-shadow:0 12px 26px rgba(0,0,139,.08)">
+            <div style="border:1px solid #0250AD;border-radius:22px;padding:20px 20px 22px;background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,247,237,.95) 100%);box-shadow:0 12px 26px rgba(2,80,173,.08)">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px">
                 <div style="min-width:0;flex:1;display:flex;align-items:flex-start;gap:14px">
-                  <div style="width:36px;height:36px;border-radius:50%;background:#00008B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0">${i + 1}</div>
+                  <div style="width:36px;height:36px;border-radius:50%;background:#0250AD;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0">${i + 1}</div>
                   <p style="margin:0;font-size:16px;line-height:1.5;font-weight:600;color:#0f172a">${formatRichText(q.text, q.required)}</p>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-                  <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${previewQuestionChip(q.type)}</span>
+                  <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:#0250AD;color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${previewQuestionChip(q.type)}</span>
                 </div>
               </div>
               ${renderQuestionMedia(q)}
@@ -3819,6 +4364,8 @@ function openFormModal(pushHistory = true) {
   if (noCloseInput) noCloseInput.checked = true;
   const savedLoiKet = localStorage.getItem(NEW_FORM_LOI_KET_DRAFT_KEY) || '';
   setRichTextFieldValue('new-form-loi-ket', savedLoiKet);
+  applyFormSettingsToControls('new', DEFAULT_FORM_SETTINGS);
+  toggleFormSettingsTab('new', false);
   toggleApprovalNoteField();
   renderQList();
   renderDirectQList();
@@ -3919,8 +4466,9 @@ function hasMeaningfulCreateFormDraftChanges() {
   const items = typeof getAllFormItems === 'function' ? getAllFormItems() : [];
   const hasFilledItem = items.some(hasMeaningfulQuestionDraftContent);
   const themeChanged = JSON.stringify(createFormTheme) !== JSON.stringify(DEFAULT_FORM_THEME);
+  const settingsChanged = JSON.stringify(getFormSettingsFromControls('new')) !== JSON.stringify(DEFAULT_FORM_SETTINGS);
 
-  return hasBasicInput || targetChanged || closeChanged || urgentChanged || hasFilledItem || themeChanged;
+  return hasBasicInput || targetChanged || closeChanged || urgentChanged || hasFilledItem || themeChanged || settingsChanged;
 }
 
 function getCreateFormDraftSnapshot() {
@@ -3954,6 +4502,7 @@ function getCreateFormDraftSnapshot() {
     urgentReason: document.getElementById('new-approval-urgent-reason')?.value?.trim() || '',
     theme: createFormTheme,
     collaborators: createCollaborators,
+    settings: getFormSettingsFromControls('new'),
     items: compactItems
   });
 }
@@ -4018,6 +4567,8 @@ function resetAndCloseCreateForm(fromHistory = false) {
   createHistoryStack = [];
   createRedoStack = [];
   toggleCreateThemePanel(false);
+  applyFormSettingsToControls('new', DEFAULT_FORM_SETTINGS);
+  toggleFormSettingsTab('new', false);
   applyCreateTheme();
   renderCreateCollaborators();
   hideRichTitleToolbar();
@@ -4237,8 +4788,8 @@ function showExitFormConfirm(name, desc, cat, hasQ) {
   d.innerHTML = `
     <div onclick="event.stopPropagation()" style="background:#fff;border-radius:20px;padding:28px 28px 20px;max-width:420px;width:min(92vw,420px);box-shadow:0 20px 60px rgba(0,0,0,0.18);animation:fadeInDown .15s ease;font-family:inherit">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-        <div style="width:40px;height:40px;border-radius:10px;background:#fef3c7;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div style="width:40px;height:40px;border-radius:10px;background:#FA7413;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#FA7413" stroke-width="2" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </div>
         <div>
           <div style="font-size:15px;font-weight:700;color:#0f172a">Thoát không lưu?</div>
@@ -4251,8 +4802,8 @@ function showExitFormConfirm(name, desc, cat, hasQ) {
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <button onclick="document.getElementById('exit-form-confirm').remove();submitForm(true)"
-          style="padding:10px;background:#00008B;color:#fff;border:none;border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer;transition:background .15s"
-          onmouseenter="this.style.background='#00008B'" onmouseleave="this.style.background='#00008B'">
+          style="padding:10px;background:#0250AD;color:#fff;border:none;border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer;transition:background .15s"
+          onmouseenter="this.style.background='#0250AD'" onmouseleave="this.style.background='#0250AD'">
           Lưu & Tạo biểu mẫu
         </button>
         <button onclick="document.getElementById('exit-form-confirm').remove();forceCloseFormModal()"
@@ -4295,7 +4846,7 @@ function renderQList() {
   }
 
   const typeLabel = t => getTypeOptionLabel(normalizeQuestionType(t));
-  const typeColor = t => ({choice:'#00008B;color:#00008B',checkbox:'#f0fdf4;color:#166534',dropdown:'#fef9c3;color:#854d0e',paragraph:'#eef2ff;color:#334155',short_text:'#f8fafc;color:#475569',long_text:'#eef2ff;color:#334155',text:'#f8fafc;color:#475569',upload:'#f8fafc;color:#475569',rating:'#fff7ed;color:#c2410c',scale:'#fdf4ff;color:#7e22ce',date:'#ecfdf5;color:#065f46',time:'#ecfdf5;color:#065f46',grid_radio:'#fdf4ff;color:#6b21a8',grid_checkbox:'#f0fdf4;color:#065f46'}[normalizeQuestionType(t)]||'#f1f5f9;color:#374151');
+  const typeColor = t => ({choice:'#0250AD;color:#0250AD',checkbox:'#f0fdf4;color:#166534',dropdown:'#fef9c3;color:#FA7413',paragraph:'#eef2ff;color:#334155',short_text:'#f8fafc;color:#475569',long_text:'#eef2ff;color:#334155',text:'#f8fafc;color:#475569',upload:'#f8fafc;color:#475569',rating:'#FA7413;color:#FA7413',scale:'#fdf4ff;color:#7e22ce',date:'#ecfdf5;color:#065f46',time:'#ecfdf5;color:#065f46',grid_radio:'#fdf4ff;color:#6b21a8',grid_checkbox:'#f0fdf4;color:#065f46'}[normalizeQuestionType(t)]||'#f1f5f9;color:#374151');
 
   let html = '';
   filtered.forEach(q => {
@@ -4312,17 +4863,17 @@ function renderQList() {
       <!-- Main row -->
       <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer" onclick="toggleQ('${sid}')">
         <input type="checkbox" id="qcb-${sid}" ${checked?'checked':''} onclick="event.stopPropagation();toggleQ('${sid}')"
-          style="width:16px;height:16px;accent-color:#00008B;flex-shrink:0;cursor:pointer">
+          style="width:16px;height:16px;accent-color:#0250AD;flex-shrink:0;cursor:pointer">
         <div style="flex:1;min-width:0">
           <div style="font-size:13.5px;font-weight:${checked?'700':'600'};color:${checked?'#1e293b':'#334155'};line-height:1.45;margin-bottom:5px">${q.text||'<em style=\"color:#94a3b8\">Câu hỏi chưa có nội dung</em>'}</div>
           <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
             <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:${tc}">${tl}</span>
-            ${surveyType ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#00008B">${escapeHtml(surveyType)}</span>` : ''}
-            ${target ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#fff7ed;color:#c2410c">${escapeHtml(target)}</span>` : ''}
+            ${surveyType ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#0250AD">${escapeHtml(surveyType)}</span>` : ''}
+            ${target ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#FA7413;color:#fff">${escapeHtml(target)}</span>` : ''}
             ${hasOpts ? `<span style="font-size:11.5px;color:#64748b">${q.opts.length} lựa chọn</span>` : ''}
           </div>
         </div>
-          ${checked ? `<svg viewBox="0 0 24 24" fill="none" stroke="#00008B" stroke-width="2.5" width="16" height="16" style="flex-shrink:0;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
+          ${checked ? `<svg viewBox="0 0 24 24" fill="none" stroke="#0250AD" stroke-width="2.5" width="16" height="16" style="flex-shrink:0;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
       </div>
     </div>`;
   });
@@ -4422,6 +4973,7 @@ function deselectAllQ() {
 // --- DIRECT QUESTION LIST (card trực tiếp) ---
 let directQuestions = []; // [{id, text, type, opts, required}]
 let activeDirectQuestionId = '';
+let _dqUserDeselected = false; // true when user explicitly clicked outside to deselect
 
 // Dùng chung TYPE_LABEL_MAP, NEEDS_OPTS, NEEDS_GRID đã khai báo ở trên
 const DQ_NEEDS_OPTS = NEEDS_OPTS;
@@ -4445,7 +4997,7 @@ const DQ_TYPE_ICON = {
   time:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="12" cy="12" r="9"/><path d="M12 7v6l4 2"/></svg>`,
 };
 const DQ_TYPE_COLOR = {
-  short_text:'#4b5563',paragraph:'#4b5563',choice:'#00008B',checkbox:'#166534',dropdown:'#854d0e',upload:'#475569',scale:'#7e22ce',rating:'#b45309',grid_radio:'#6b21a8',grid_checkbox:'#065f46',date:'#065f46',time:'#065f46'
+  short_text:'#4b5563',paragraph:'#4b5563',choice:'#0250AD',checkbox:'#166534',dropdown:'#FA7413',upload:'#475569',scale:'#7e22ce',rating:'#FA7413',grid_radio:'#6b21a8',grid_checkbox:'#065f46',date:'#065f46',time:'#065f46'
 };
 
 function sameQuestionId(a, b) {
@@ -4461,8 +5013,12 @@ function isPresentationItem(item) {
   return type === 'presentation_image' || type === 'presentation_video';
 }
 
+function isTitleBlockItem(item) {
+  return !!(item?._isTitleBlock) || normalizeQuestionType(item?.type || item?.loai) === 'title_block';
+}
+
 function countRealQuestions(items) {
-  return (items || []).filter(item => !isSectionItem(item) && !isPresentationItem(item)).length;
+  return (items || []).filter(item => !isSectionItem(item) && !isPresentationItem(item) && !isTitleBlockItem(item)).length;
 }
 
 function getQuestionNumberInSection(items, index) {
@@ -4470,7 +5026,7 @@ function getQuestionNumberInSection(items, index) {
   for (let i = 0; i <= index; i++) {
     if (isSectionItem(items[i])) {
       number = 0;
-    } else if (!isPresentationItem(items[i])) {
+    } else if (!isPresentationItem(items[i]) && !isTitleBlockItem(items[i])) {
       number += 1;
     }
   }
@@ -4527,6 +5083,8 @@ function buildQuestionPayload(items) {
       id: q.id,
       thu_vien_id: q.thu_vien_id || null,
       noi_dung: q.text || q.noi_dung || '',
+      desc: q.desc || q.description || q.mo_ta_cau_hoi || '',
+      mo_ta_cau_hoi: q.desc || q.description || q.mo_ta_cau_hoi || '',
       loai: type,
       bat_buoc: q.required || q.bat_buoc || false,
       lua_chon: (type === 'scale' || type === 'rating') ? [] : (q.opts || q.lua_chon || []).map(opt => typeof opt === 'string' ? opt : opt.noi_dung).filter(opt => String(opt || '').trim()),
@@ -4616,7 +5174,7 @@ function assertFormPayloadWithinLimit(payload) {
 async function normalizeQuestionMediaForSave(items) {
   const normalized = [];
   for (const q of (items || [])) {
-    if (isSectionItem(q)) {
+    if (isSectionItem(q) || isTitleBlockItem(q)) {
       normalized.push(q);
       continue;
     }
@@ -4662,7 +5220,7 @@ async function normalizeQuestionMediaForSave(items) {
 }
 
 function getCleanFormItemsForSave(items) {
-  return (items || []).map(q => isSectionItem(q) ? q : ({
+  return (items || []).map(q => isSectionItem(q) ? q : isTitleBlockItem(q) ? { id: q.id, type: 'title_block', _isTitleBlock: true, title: q.title || '', desc: q.desc || '' } : (({
     ...q,
     opts: ['scale', 'rating'].includes(normalizeQuestionType(q.type || q.loai)) ? [] : (q.opts || q.lua_chon || [])
       .map(opt => typeof opt === 'string' ? opt : opt.noi_dung)
@@ -4677,7 +5235,7 @@ function getCleanFormItemsForSave(items) {
     video: isVideoDataUrl(q.video || q.video_url) ? '' : (q.video || q.video_url || ''),
     hinh_anh_url: q.hinh_anh_url || q.image_url || q.image || '',
     video_url: isVideoDataUrl(q.video_url || q.video) ? '' : (q.video_url || q.video || ''),
-  }));
+  })));
 }
 
 function normalizeOptionForDuplicateCheck(value) {
@@ -4709,7 +5267,7 @@ function isDuplicateOptionAt(options = [], index, value) {
 function setOptionDuplicateState(input, isDuplicate) {
   if (!input) return;
   input.dataset.duplicate = isDuplicate ? '1' : '';
-  input.style.borderColor = isDuplicate ? '#ef4444' : (document.activeElement === input ? '#00008B' : '#e2e8f0');
+  input.style.borderColor = isDuplicate ? '#ef4444' : (document.activeElement === input ? '#0250AD' : '#e2e8f0');
   input.style.boxShadow = isDuplicate ? '0 0 0 2px rgba(239,68,68,.12)' : '';
   let msg = input.parentElement?.querySelector?.('.option-duplicate-msg');
   if (isDuplicate) {
@@ -4787,7 +5345,7 @@ function dqDragStart(event, id) {
   // Làm mới card đang kéo
   setTimeout(() => {
     const el = document.getElementById('dqcard-' + id);
-    if (el) { el.style.opacity = '0.4'; el.style.boxShadow = '0 0 0 2px #00008B'; }
+    if (el) { el.style.opacity = '0.4'; el.style.boxShadow = '0 0 0 2px #0250AD'; }
   }, 0);
 }
 
@@ -4796,16 +5354,16 @@ function dqDragOver(event) {
   event.dataTransfer.dropEffect = 'move';
   // Highlight card đang hover
   const card = event.currentTarget;
-  if (card) card.style.borderColor = '#00008B';
+  if (card) card.style.borderColor = '#0250AD';
 }
 
 function dqDrop(event, targetId) {
   event.preventDefault();
-  if (!_dqDragId || _dqDragId === targetId) return;
+  if (!_dqDragId || sameQuestionId(_dqDragId, targetId)) return;
 
   // Tìm trong directQuestions
-  const fromIdxD = directQuestions.findIndex(q => q.id === _dqDragId);
-  const toIdxD   = directQuestions.findIndex(q => q.id === targetId);
+  const fromIdxD = directQuestions.findIndex(q => sameQuestionId(q.id, _dqDragId));
+  const toIdxD   = directQuestions.findIndex(q => sameQuestionId(q.id, targetId));
   if (fromIdxD !== -1 && toIdxD !== -1) {
     const [moved] = directQuestions.splice(fromIdxD, 1);
     directQuestions.splice(toIdxD, 0, moved);
@@ -4925,7 +5483,28 @@ function dqInsertAfter(id) {
   }, 50);
 }
 
+function dqAddTitleBlock(afterId) {
+  const newBlock = { id: 'dq-' + Date.now(), type: 'title_block', _isTitleBlock: true, title: '', desc: '' };
+  if (afterId && afterId !== 'end') {
+    const idx = directQuestions.findIndex(x => sameQuestionId(x.id, afterId));
+    if (idx >= 0) {
+      directQuestions.splice(idx + 1, 0, newBlock);
+    } else {
+      directQuestions.push(newBlock);
+    }
+  } else {
+    directQuestions.push(newBlock);
+  }
+  activeDirectQuestionId = String(newBlock.id);
+  renderDirectQList();
+  setTimeout(() => {
+    const titleEl = document.getElementById('dq-tb-title-' + newBlock.id);
+    if (titleEl) titleEl.focus();
+  }, 50);
+}
+
 function setActiveDirectQuestion(id, focus = true) {
+  _dqUserDeselected = false;
   activeDirectQuestionId = String(id || '');
   renderDirectQList();
   if (!focus || !activeDirectQuestionId) return;
@@ -4936,6 +5515,7 @@ function setActiveDirectQuestion(id, focus = true) {
 }
 
 function setActiveDirectSection(id, focus = true) {
+  _dqUserDeselected = false;
   activeDirectQuestionId = String(id || '');
   renderDirectQList();
   if (!focus || !activeDirectQuestionId) return;
@@ -4976,7 +5556,7 @@ function renderDirectQuestionCollapsedCard(q, questionNo, normalizedType) {
       </div>
       <div style="flex:1;min-width:0;padding:18px 20px">
         <div style="display:flex;align-items:flex-start;gap:14px">
-          <div style="width:28px;height:28px;border-radius:50%;background:#00008B;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
+          <div style="width:28px;height:28px;border-radius:50%;background:#0250AD;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
           <div style="flex:1;min-width:0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
             <div style="flex:1;min-width:0">
               <div style="font-size:18px;font-weight:800;color:#0f172a;line-height:1.35;margin-bottom:14px">${title}</div>
@@ -4984,7 +5564,7 @@ function renderDirectQuestionCollapsedCard(q, questionNo, normalizedType) {
               <div style="pointer-events:none">${renderQuestionPreview(q)}</div>
             </div>
             <div style="flex-shrink:0">
-              <span style="padding:5px 11px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:800;white-space:nowrap">${getTypeOptionLabel(normalizedType)}</span>
+              <span style="padding:5px 11px;border-radius:999px;background:#0250AD;color:#fff;font-size:12px;font-weight:800;white-space:nowrap">${getTypeOptionLabel(normalizedType)}</span>
             </div>
           </div>
         </div>
@@ -4995,10 +5575,10 @@ function renderDirectQuestionCollapsedCard(q, questionNo, normalizedType) {
 function renderDirectImplicitSectionHeader(totalSections) {
   return `
     <div onclick="dqActivateImplicitFirstSection()" title="Bấm để chỉnh sửa phần 1"
-      style="border:1.5px dashed #fbbf24;border-radius:12px;background:#fffbeb;padding:10px 14px;display:flex;align-items:center;gap:8px;color:#b45309;cursor:pointer;transition:box-shadow .15s"
+      style="border:1.5px dashed #FA7413;border-radius:12px;background:#FA7413;padding:10px 14px;display:flex;align-items:center;gap:8px;color:#fff;cursor:pointer;transition:box-shadow .15s"
       onmouseenter="this.style.boxShadow='0 6px 18px rgba(245,158,11,.14)'"
       onmouseleave="this.style.boxShadow='none'">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="#FA7413" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       <span style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px">Phần 1 / ${totalSections}</span>
     </div>`;
 }
@@ -5010,12 +5590,12 @@ function renderDirectSectionCollapsedCard(q, sectionNo, totalSections) {
     <div id="dqcard-${q.id}"
       onclick="setActiveDirectSection('${q.id}')"
       title="Bấm để chỉnh sửa phần"
-      style="border:1px solid #fde68a;border-left:5px solid #f59e0b;border-radius:12px;background:#fffdf4;box-shadow:0 1px 3px rgba(15,23,42,.04);display:flex;cursor:pointer;transition:box-shadow .15s">
+      style="border:1px solid #FA7413;border-left:5px solid #FA7413;border-radius:12px;background:#fffdf4;box-shadow:0 1px 3px rgba(15,23,42,.04);display:flex;cursor:pointer;transition:box-shadow .15s">
       <div class="dq-drag-handle" title="Kéo để đổi vị trí" draggable="true"
         onclick="event.stopPropagation()"
         ondragstart="dqDragStart(event,'${q.id}')"
         ondragend="dqDragEnd(event)"
-        style="display:flex;align-items:center;justify-content:center;width:20px;flex-shrink:0;cursor:grab;color:#fbbf24;border-right:1px solid #fef3c7;padding:0 2px;border-radius:12px 0 0 12px">
+        style="display:flex;align-items:center;justify-content:center;width:20px;flex-shrink:0;cursor:grab;color:#FA7413;border-right:1px solid #FA7413;padding:0 2px;border-radius:12px 0 0 12px">
         <svg viewBox="0 0 10 16" width="10" height="16" fill="currentColor">
           <circle cx="3" cy="2" r="1.5"/><circle cx="7" cy="2" r="1.5"/>
           <circle cx="3" cy="6" r="1.5"/><circle cx="7" cy="6" r="1.5"/>
@@ -5025,10 +5605,10 @@ function renderDirectSectionCollapsedCard(q, sectionNo, totalSections) {
       </div>
       <div style="flex:1;min-width:0;padding:14px 18px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          <span style="font-size:10.5px;font-weight:800;color:#b45309;text-transform:uppercase;letter-spacing:.5px">Phần ${sectionNo} / ${totalSections}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#FA7413" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <span style="font-size:10.5px;font-weight:800;color:#FA7413;text-transform:uppercase;letter-spacing:.5px">Phần ${sectionNo} / ${totalSections}</span>
         </div>
-        <div style="font-size:17px;font-weight:800;color:#92400e;line-height:1.35;margin-bottom:${desc ? '6px' : '0'}">${title}</div>
+        <div style="font-size:17px;font-weight:800;color:#FA7413;line-height:1.35;margin-bottom:${desc ? '6px' : '0'}">${title}</div>
         ${desc ? `<div style="font-size:13px;color:#78350f;line-height:1.45">${desc}</div>` : ''}
       </div>
     </div>`;
@@ -5038,13 +5618,36 @@ function renderDirectInlineAddButton(afterId) {
   const safeAfterId = String(afterId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   return `<div style="display:flex;justify-content:flex-start;padding:10px 0 4px">
     <button type="button" onclick="dqInsertAfter('${safeAfterId}')" class="fm-add-question-btn" title="Thêm câu hỏi dưới mục đang chọn"
-      style="min-width:132px;height:36px;padding:0 14px;border:1.5px dashed #00008B;border-radius:10px;background:#fff;color:#00008B;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:700;white-space:nowrap"
-      onmouseenter="this.style.background='#eef2ff';this.style.borderColor='#00008B'"
-      onmouseleave="this.style.background='#fff';this.style.borderColor='#00008B'">
+      style="min-width:132px;height:36px;padding:0 14px;border:1.5px dashed #0250AD;border-radius:10px;background:#fff;color:#0250AD;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:700;white-space:nowrap"
+      onmouseenter="this.style.background='#eef2ff';this.style.borderColor='#0250AD'"
+      onmouseleave="this.style.background='#fff';this.style.borderColor='#0250AD'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       <span>Thêm câu hỏi</span>
     </button>
   </div>`;
+}
+
+function toggleDirectQuestionOptionsMenu(event, id, button) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  const menu = document.getElementById(`q-options-menu-${id}`);
+  if (!menu) return;
+  const willOpen = menu.style.display !== 'block';
+  document.querySelectorAll('.q-options-menu').forEach(item => {
+    if (item !== menu) item.style.display = 'none';
+  });
+  menu.style.display = willOpen ? 'block' : 'none';
+  if (!willOpen) return;
+  const closer = (e) => {
+    if (menu.contains(e.target) || button?.contains(e.target)) return;
+    menu.style.display = 'none';
+    document.removeEventListener('pointerdown', closer, true);
+    document.removeEventListener('click', closer, true);
+  };
+  setTimeout(() => {
+    document.addEventListener('pointerdown', closer, true);
+    document.addEventListener('click', closer, true);
+  }, 0);
 }
 
 function renderDirectQList() {
@@ -5071,8 +5674,8 @@ function renderDirectQList() {
     }
     addWrapper.innerHTML = `<div style="display:flex;justify-content:flex-start;padding:10px 0 2px">
       <button type="button" data-add-direct-q="end" onclick="handleAddDirectQ(event, 'end')" class="fm-add-question-btn" title="Thêm câu hỏi"
-        style="min-width:132px;height:36px;padding:0 14px;border:1.5px dashed #00008B;border-radius:10px;background:#fff;color:#00008B;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:700;white-space:nowrap"
-        onmouseenter="this.style.background='#eef2ff';this.style.borderColor='#00008B'" onmouseleave="this.style.background='#fff';this.style.borderColor='#00008B'">
+        style="min-width:132px;height:36px;padding:0 14px;border:1.5px dashed #0250AD;border-radius:10px;background:#fff;color:#0250AD;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:700;white-space:nowrap"
+        onmouseenter="this.style.background='#eef2ff';this.style.borderColor='#0250AD'" onmouseleave="this.style.background='#fff';this.style.borderColor='#0250AD'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         <span>Thêm câu hỏi</span>
       </button>
@@ -5081,8 +5684,10 @@ function renderDirectQList() {
   }
   if (empty) empty.style.display = 'none';
   const firstRealQuestion = allQ.find(q => !q._isSection);
-  if (!activeDirectQuestionId && firstRealQuestion) activeDirectQuestionId = String(firstRealQuestion.id);
+  if (!activeDirectQuestionId && firstRealQuestion && !_dqUserDeselected) activeDirectQuestionId = String(firstRealQuestion.id);
   if (activeDirectQuestionId && !allQ.some(q => sameQuestionId(q.id, activeDirectQuestionId))) {
+    // Active question was removed — allow auto-select for new additions
+    _dqUserDeselected = false;
     activeDirectQuestionId = firstRealQuestion ? String(firstRealQuestion.id) : '';
   }
 
@@ -5099,19 +5704,19 @@ function renderDirectQList() {
       const isActiveSection = sameQuestionId(q.id, activeDirectQuestionId);
       if (!isActiveSection) return renderDirectSectionCollapsedCard(q, sectionNo, totalSections);
       return `
-    <div id="dqcard-${q.id}" style="border:2px dashed #fbbf24;border-radius:12px;background:#fffbeb;padding:0;display:flex">
+    <div id="dqcard-${q.id}" style="border:2px dashed #FA7413;border-radius:12px;background:#FA7413;padding:0;display:flex">
       <div style="flex:1;min-width:0;padding:12px 14px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          <span style="font-size:10.5px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.5px">Phần ${sectionNo} / ${totalSections}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#FA7413" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <span style="font-size:10.5px;font-weight:700;color:#FA7413;text-transform:uppercase;letter-spacing:.5px">Phần ${sectionNo} / ${totalSections}</span>
         </div>
         <div id="dq-section-title-${q.id}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'dq-section-title-${q.id}')">
           <div id="dq-section-title-${q.id}" class="rich-title-editor" contenteditable="true" role="textbox" aria-label="Tiêu đề phần"
             data-direct-section-id="${q.id}" data-direct-section-field="title"
             data-placeholder="Tiêu đề phần..."
-            style="width:100%;min-height:34px;padding:6px 10px;border:1.5px solid #fde68a;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;outline:none;background:#fff;color:#92400e;transition:border .15s;box-sizing:border-box;white-space:pre-wrap;word-break:break-word"
-            onfocus="this.style.borderColor='#f59e0b';showFieldToolbar('dq-section-title-${q.id}')"
-            onblur="this.style.borderColor='#fde68a';syncRichTextFieldFromEditor('dq-section-title-${q.id}')"
+            style="width:100%;min-height:34px;padding:6px 10px;border:1.5px solid #FA7413;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;outline:none;background:#fff;color:#FA7413;transition:border .15s;box-sizing:border-box;white-space:pre-wrap;word-break:break-word"
+            onfocus="this.style.borderColor='#FA7413';showFieldToolbar('dq-section-title-${q.id}')"
+            onblur="this.style.borderColor='#FA7413';syncRichTextFieldFromEditor('dq-section-title-${q.id}')"
             oninput="syncRichTextFieldFromEditor('dq-section-title-${q.id}')"
             onkeydown="handleRichFieldKeydown(event, 'dq-section-title-${q.id}')"
             onclick="handleRichFieldClick(event, 'dq-section-title-${q.id}')"
@@ -5122,9 +5727,9 @@ function renderDirectQList() {
           <div id="dq-section-desc-${q.id}" class="rich-title-editor" contenteditable="true" role="textbox" aria-label="Mô tả phần"
             data-direct-section-id="${q.id}" data-direct-section-field="desc"
             data-placeholder="Mô tả phần (tùy chọn)..."
-            style="width:100%;min-height:32px;padding:5px 10px;border:1px solid #fde68a;border-radius:7px;font-size:12.5px;font-family:inherit;outline:none;background:#fff;color:#78350f;transition:border .15s;box-sizing:border-box;white-space:pre-wrap;word-break:break-word"
-            onfocus="this.style.borderColor='#f59e0b';showFieldToolbar('dq-section-desc-${q.id}')"
-            onblur="this.style.borderColor='#fde68a';syncRichTextFieldFromEditor('dq-section-desc-${q.id}')"
+            style="width:100%;min-height:32px;padding:5px 10px;border:1px solid #FA7413;border-radius:7px;font-size:12.5px;font-family:inherit;outline:none;background:#fff;color:#78350f;transition:border .15s;box-sizing:border-box;white-space:pre-wrap;word-break:break-word"
+            onfocus="this.style.borderColor='#FA7413';showFieldToolbar('dq-section-desc-${q.id}')"
+            onblur="this.style.borderColor='#FA7413';syncRichTextFieldFromEditor('dq-section-desc-${q.id}')"
             oninput="syncRichTextFieldFromEditor('dq-section-desc-${q.id}')"
             onkeydown="handleRichFieldKeydown(event, 'dq-section-desc-${q.id}')"
             onclick="handleRichFieldClick(event, 'dq-section-desc-${q.id}')"
@@ -5132,29 +5737,29 @@ function renderDirectQList() {
           ${renderTextFormatToolbar(`dq-section-desc-${q.id}`, { hidden: true })}
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;border-left:1px solid #fde68a;min-width:40px;flex:0 0 40px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;border-left:1px solid #FA7413;min-width:40px;flex:0 0 40px">
         <button onclick="dqDuplicateSection('${q.id}')" title="Sao chép phần"
-          style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:#b45309;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.background='#fef3c7';this.style.color='#92400e'"
-          onmouseleave="this.style.background='none';this.style.color='#b45309'">
+          style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:#FA7413;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
+          onmouseenter="this.style.background='#FA7413';this.style.color='#FA7413'"
+          onmouseleave="this.style.background='none';this.style.color='#FA7413'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="9" y="9" width="11" height="11" rx="2"/><rect x="4" y="4" width="11" height="11" rx="2"/></svg>
         </button>
         <button onclick="dqMoveSection('${q.id}', -1)" title="Di chuyển phần lên"
-          style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:#b45309;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.background='#fef3c7';this.style.color='#92400e'"
-          onmouseleave="this.style.background='none';this.style.color='#b45309'">
+          style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:#FA7413;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
+          onmouseenter="this.style.background='#FA7413';this.style.color='#FA7413'"
+          onmouseleave="this.style.background='none';this.style.color='#FA7413'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>
         </button>
         <button onclick="dqMoveSection('${q.id}', 1)" title="Di chuyển phần xuống"
-          style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:#b45309;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.background='#fef3c7';this.style.color='#92400e'"
-          onmouseleave="this.style.background='none';this.style.color='#b45309'">
+          style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:#FA7413;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
+          onmouseenter="this.style.background='#FA7413';this.style.color='#FA7413'"
+          onmouseleave="this.style.background='none';this.style.color='#FA7413'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M12 5v14"/><path d="M18 13l-6 6-6-6"/></svg>
         </button>
         <button onclick="dqMergeSectionWithPrevious('${q.id}')" title="Hợp nhất với phần trên"
-          style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:#b45309;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.background='#fef3c7';this.style.color='#92400e'"
-          onmouseleave="this.style.background='none';this.style.color='#b45309'">
+          style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:#FA7413;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
+          onmouseenter="this.style.background='#FA7413';this.style.color='#FA7413'"
+          onmouseleave="this.style.background='none';this.style.color='#FA7413'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M5 7h14"/><path d="M5 17h14"/><path d="M12 4v16"/><path d="M8 11l4 4 4-4"/></svg>
         </button>
         <button onclick="dqRemoveSection('${q.id}')" title="Xóa phần"
@@ -5166,7 +5771,137 @@ function renderDirectQList() {
       </div>
     </div>${inlineAddHtml}`;
     }
+    // Render title block card
+    if (isTitleBlockItem(q)) {
+      const isActive = sameQuestionId(q.id, activeDirectQuestionId);
+      if (!isActive) {
+        return `<div id="dqcard-${q.id}" onclick="setActiveDirectQuestion('${q.id}',false)" style="border:1px solid #e2e8f0;border-left:4px solid #0250AD;border-radius:8px;background:#fff;padding:14px 18px;cursor:pointer;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseleave="this.style.boxShadow='none'">
+          <div style="font-size:16px;font-weight:600;color:#202124;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${q.title ? formatRichText(q.title) : '<span style="color:#9aa0a6;font-style:italic">(Tiêu đề)</span>'}</div>
+          ${q.desc ? `<div style="font-size:13px;color:#5f6368;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${formatRichText(q.desc)}</div>` : ''}
+        </div>`;
+      }
+      return `
+      <div id="dqcard-${q.id}" style="border:1px solid #e2e8f0;border-left:4px solid #0250AD;border-radius:8px;background:#fff;display:flex">
+        <div style="flex:1;min-width:0;padding:14px 16px">
+          <div id="dq-tb-title-${q.id}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'dq-tb-title-${q.id}')">
+            <div id="dq-tb-title-${q.id}" class="dq-placeholder-gray rich-title-editor" contenteditable="true" role="textbox" aria-label="Tiêu đề"
+              data-placeholder="Tiêu đề"
+              style="width:100%;min-height:32px;padding:6px 0;border:none;border-bottom:2px solid #1a73e8;font-size:16px;font-weight:500;font-family:inherit;outline:none;background:transparent;color:#202124;margin-bottom:4px;box-sizing:border-box;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text"
+              onfocus="showFieldToolbar('dq-tb-title-${q.id}')"
+              onblur="syncRichTitleBlockFieldFromEditor('dq-tb-title-${q.id}','${q.id}','title')"
+              oninput="syncRichTitleBlockFieldFromEditor('dq-tb-title-${q.id}','${q.id}','title')"
+              onkeydown="handleRichFieldKeydown(event, 'dq-tb-title-${q.id}')"
+              onclick="handleRichFieldClick(event, 'dq-tb-title-${q.id}')"
+              onpaste="pastePlainTextIntoRichField(event, 'dq-tb-title-${q.id}')">${formatRichTextForEditor(q.title || '')}</div>
+            <div style="margin-top:4px;margin-bottom:6px">
+              ${renderTextFormatToolbar(`dq-tb-title-${q.id}`, { hidden: true, hideLists: true })}
+            </div>
+          </div>
+          <div id="dq-tb-desc-${q.id}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'dq-tb-desc-${q.id}')" style="margin-top:6px">
+            <div id="dq-tb-desc-${q.id}" class="dq-placeholder-gray rich-title-editor" contenteditable="true" role="textbox" aria-label="Mô tả"
+              data-placeholder="Mô tả (tùy chọn)"
+              style="width:100%;min-height:28px;padding:5px 0;border:none;border-bottom:1px solid #e2e8f0;font-size:13px;font-family:inherit;outline:none;background:transparent;color:#5f6368;box-sizing:border-box;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text"
+              onfocus="showFieldToolbar('dq-tb-desc-${q.id}')"
+              onblur="syncRichTitleBlockFieldFromEditor('dq-tb-desc-${q.id}','${q.id}','desc')"
+              oninput="syncRichTitleBlockFieldFromEditor('dq-tb-desc-${q.id}','${q.id}','desc')"
+              onkeydown="handleRichFieldKeydown(event, 'dq-tb-desc-${q.id}')"
+              onclick="handleRichFieldClick(event, 'dq-tb-desc-${q.id}')"
+              onpaste="pastePlainTextIntoRichField(event, 'dq-tb-desc-${q.id}')">${formatRichTextForEditor(q.desc || '')}</div>
+            <div style="margin-top:4px">
+              ${renderTextFormatToolbar(`dq-tb-desc-${q.id}`, { hidden: true })}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-left:1px solid #f1f5f9;min-width:40px">
+          <button onclick="dqDuplicate('${q.id}')" title="Sao chép"
+            style="width:30px;height:30px;border:none;background:none;cursor:pointer;color:#9aa0a6;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
+            onmouseenter="this.style.color='#0250AD';this.style.background='#e8f0fe'"
+            onmouseleave="this.style.color='#9aa0a6';this.style.background='none'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+          <button onclick="dqRemove('${q.id}')" title="Xóa"
+            style="width:30px;height:30px;border:none;background:none;cursor:pointer;color:#9aa0a6;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
+            onmouseenter="this.style.color='#ef4444';this.style.background='#fef2f2'"
+            onmouseleave="this.style.color='#9aa0a6';this.style.background='none'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+          </button>
+        </div>
+      </div>${inlineAddHtml}`;
+    }
     const normalizedType = normalizeQuestionType(q.type);
+    
+    // Build options menu dynamically based on type
+    let qMenuOptionsHtml = `
+      <div style="padding:4px 12px 6px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">Hiển thị</div>
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="const chk=this.querySelector('input');chk.checked=!chk.checked;if(typeof dqToggleDescription==='function')dqToggleDescription('${q.id}',chk.checked);else showToast('Chức năng đang được phát triển','warning')">
+        <input type="checkbox" style="accent-color:#0250AD;width:14px;height:14px;margin:0;pointer-events:none" ${q.has_description ? 'checked' : ''}>
+        Mô tả
+      </div>
+    `;
+
+    if (['short_text', 'paragraph', 'checkbox'].includes(normalizedType)) {
+      qMenuOptionsHtml += `
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="const chk=this.querySelector('input');chk.checked=!chk.checked;if(typeof dqToggleValidation==='function')dqToggleValidation('${q.id}',chk.checked);else showToast('Chức năng đang được phát triển','warning')">
+        <input type="checkbox" style="accent-color:#0250AD;width:14px;height:14px;margin:0;pointer-events:none" ${q.has_validation ? 'checked' : ''}>
+        Xác thực phản hồi
+      </div>`;
+    }
+
+    if (['choice', 'dropdown'].includes(normalizedType)) {
+      qMenuOptionsHtml += `
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="const chk=this.querySelector('input');chk.checked=!chk.checked;if(typeof dqToggleSectionJump==='function')dqToggleSectionJump('${q.id}',chk.checked);else showToast('Chức năng đang được phát triển','info')">
+        <input type="checkbox" style="accent-color:#0250AD;width:14px;height:14px;margin:0;pointer-events:none" ${q.has_section_jump ? 'checked' : ''}>
+        Chuyển tới phần dựa trên câu trả lời
+      </div>`;
+    }
+
+    if (['choice', 'checkbox', 'dropdown'].includes(normalizedType)) {
+      qMenuOptionsHtml += `
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="const chk=this.querySelector('input');chk.checked=!chk.checked;if(typeof dqToggleShuffle==='function')dqToggleShuffle('${q.id}',chk.checked);else showToast('Chức năng đang được phát triển','info')">
+        <input type="checkbox" style="accent-color:#0250AD;width:14px;height:14px;margin:0;pointer-events:none" ${q.has_shuffle ? 'checked' : ''}>
+        Sắp xếp lại thứ tự đáp án
+      </div>`;
+    }
+
+    if (['grid_radio', 'grid_checkbox'].includes(normalizedType)) {
+      qMenuOptionsHtml += `
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="const chk=this.querySelector('input');chk.checked=!chk.checked;if(typeof dqToggleLimitCol==='function')dqToggleLimitCol('${q.id}',chk.checked);else showToast('Chức năng đang được phát triển','info')">
+        <input type="checkbox" style="accent-color:#0250AD;width:14px;height:14px;margin:0;pointer-events:none" ${q.has_limit_col ? 'checked' : ''}>
+        Giới hạn một câu trả lời mỗi cột
+      </div>
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="const chk=this.querySelector('input');chk.checked=!chk.checked;if(typeof dqToggleShuffleRows==='function')dqToggleShuffleRows('${q.id}',chk.checked);else showToast('Chức năng đang được phát triển','info')">
+        <input type="checkbox" style="accent-color:#0250AD;width:14px;height:14px;margin:0;pointer-events:none" ${q.has_shuffle_rows ? 'checked' : ''}>
+        Trộn thứ tự hàng
+      </div>`;
+    }
+
+    if (normalizedType === 'date') {
+      qMenuOptionsHtml += `
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="const chk=this.querySelector('input');chk.checked=!chk.checked;if(typeof dqToggleIncludeTime==='function')dqToggleIncludeTime('${q.id}',chk.checked);else showToast('Chức năng đang được phát triển','info')">
+        <input type="checkbox" style="accent-color:#0250AD;width:14px;height:14px;margin:0;pointer-events:none" ${q.has_include_time ? 'checked' : ''}>
+        Bao gồm giờ
+      </div>
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="const chk=this.querySelector('input');chk.checked=!chk.checked;if(typeof dqToggleIncludeYear==='function')dqToggleIncludeYear('${q.id}',chk.checked);else showToast('Chức năng đang được phát triển','info')">
+        <input type="checkbox" style="accent-color:#0250AD;width:14px;height:14px;margin:0;pointer-events:none" ${q.has_include_year !== false ? 'checked' : ''}>
+        Bao gồm năm
+      </div>`;
+    }
+
+    if (normalizedType === 'time') {
+      const timeType = q.time_type || 'time';
+      qMenuOptionsHtml += `
+      <div style="height:1px;background:#e2e8f0;margin:4px 0"></div>
+      <div style="padding:4px 12px 6px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">Loại câu trả lời</div>
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="if(typeof dqSetTimeType==='function')dqSetTimeType('${q.id}','time');else showToast('Chức năng đang được phát triển','info')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="${timeType === 'time' ? '#0250AD' : 'transparent'}" stroke-width="3" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>
+        Giờ
+      </div>
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#334155" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'" onclick="if(typeof dqSetTimeType==='function')dqSetTimeType('${q.id}','duration');else showToast('Chức năng đang được phát triển','info')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="${timeType === 'duration' ? '#0250AD' : 'transparent'}" stroke-width="3" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>
+        Thời lượng
+      </div>`;
+    }
+
     const needsOpts = DQ_NEEDS_OPTS.includes(normalizedType);
     const needsGrid = DQ_NEEDS_GRID.includes(normalizedType);
     const opts = q.opts || [];
@@ -5218,7 +5953,7 @@ function renderDirectQList() {
       <div id="dq-text-${q.id}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'dq-text-${q.id}')">
         <!-- Row: số + input câu hỏi + dropdown loại -->
         <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:22px;height:22px;border-radius:50%;background:#00008B;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
+          <div style="width:22px;height:22px;border-radius:50%;background:#0250AD;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
           <div id="dq-text-${q.id}" class="dq-placeholder-gray rich-title-editor" contenteditable="true" role="textbox" aria-label="${normalizedType==='presentation_image'?'Tiêu đề hình ảnh':normalizedType==='presentation_video'?'Tiêu đề video':'Nội dung câu hỏi'}"
             data-direct-question-id="${q.id}"
             draggable="false"
@@ -5226,7 +5961,7 @@ function renderDirectQList() {
             style="flex:1;width:100%;min-height:35px;padding:7px 11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit;line-height:1.45;outline:none;background:#fafbff;transition:border .15s;min-width:0;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text"
             onmousedown="event.stopPropagation()"
             ondragstart="event.preventDefault()"
-            onfocus="this.style.borderColor='#00008B';showFieldToolbar('dq-text-${q.id}')"
+            onfocus="this.style.borderColor='#0250AD';showFieldToolbar('dq-text-${q.id}')"
             onblur="this.style.borderColor='#e2e8f0';syncRichTextFieldFromEditor('dq-text-${q.id}')"
             oninput="syncRichTextFieldFromEditor('dq-text-${q.id}')"
             onkeydown="handleRichFieldKeydown(event, 'dq-text-${q.id}')"
@@ -5238,6 +5973,24 @@ function renderDirectQList() {
           ${renderQuestionFormatToolbar(`dq-text-${q.id}`, { hidden: true })}
         </div>
       </div>
+
+      ${q.has_description ? `
+        <div id="dq-desc-${q.id}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'dq-desc-${q.id}')" style="margin-left:${isPresentationItem(q)?'0':'30px'};margin-top:6px">
+          <div id="dq-desc-${q.id}" class="dq-placeholder-gray rich-title-editor" contenteditable="true" role="textbox" aria-label="Mô tả câu hỏi"
+            data-direct-question-desc-id="${q.id}"
+            data-placeholder="Mô tả câu hỏi"
+            style="width:100%;min-height:30px;padding:4px 0;border:0;border-bottom:1px solid #e2e8f0;font-size:12.5px;font-family:inherit;line-height:1.45;color:#64748b;background:transparent;outline:none;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text;transition:border .15s"
+            onmousedown="event.stopPropagation()"
+            onfocus="this.style.borderColor='#0250AD';showFieldToolbar('dq-desc-${q.id}')"
+            onblur="this.style.borderColor='#e2e8f0';syncRichTextFieldFromEditor('dq-desc-${q.id}')"
+            oninput="syncRichTextFieldFromEditor('dq-desc-${q.id}')"
+            onkeydown="handleRichFieldKeydown(event, 'dq-desc-${q.id}')"
+            onclick="handleRichFieldClick(event, 'dq-desc-${q.id}')"
+            onpaste="pastePlainTextIntoRichField(event, 'dq-desc-${q.id}')">${formatRichTextForEditor(q.desc || '')}</div>
+          <div style="margin-top:4px">
+            ${renderQuestionFormatToolbar(`dq-desc-${q.id}`, { hidden: true })}
+          </div>
+        </div>` : ''}
 
       ${getQuestionImageUrl(q) ? (() => {
         const align = q.image_align || parseJsonObject(q.validation_json || q.validation || q.logic_json).image_align || 'left';
@@ -5315,21 +6068,24 @@ function renderDirectQList() {
             const removeBtn = opts.length > 1 ? `<button onclick="dqRemoveOpt('${q.id}',${oi})" title="Xóa lựa chọn" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;transition:all .15s" onmouseenter="this.style.color='#ef4444'" onmouseleave="this.style.color='#cbd5e1'">X</button>` : '';
             let vj = {}; try { vj = typeof q.validation_json === 'string' ? JSON.parse(q.validation_json) : q.validation_json; } catch(e){}
             const optImgUrl = vj && vj.option_images && vj.option_images[oi] ? vj.option_images[oi] : null;
-            const imgBtn = `<button onclick="dqChangeOptImage('${q.id}', ${oi})" title="Thêm hình ảnh" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#94a3b8;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='#94a3b8'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>`;
+            const imgBtn = `<button onclick="dqChangeOptImage('${q.id}', ${oi})" title="Thêm hình ảnh" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#94a3b8;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='#94a3b8'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>`;
             const imgPreview = optImgUrl ? `<div style="margin-top:6px;margin-left:27px;position:relative;display:inline-block"><img src="${optImgUrl}" style="height:60px;object-fit:contain;border-radius:6px;border:1px solid #e2e8f0;"><button onclick="dqRemoveOptImage('${q.id}', ${oi})" title="Xóa ảnh" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#ef4444;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;box-shadow:0 1px 3px rgba(0,0,0,0.2);">X</button></div>` : '';
-            return `<div ondragover="dqOptDragOver(event,'${q.id}',${oi})" ondrop="dqOptDrop(event,'${q.id}',${oi})" style="margin-bottom:6px;transition:opacity .15s"><div style="display:flex;align-items:center;gap:6px;">${dragHandle}${optIcon}<input type="text" value="${o.replace(/"/g,'&quot;')}" placeholder="Lựa chọn ${oi+1}" style="flex:1;padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s" onfocus="this.style.borderColor=this.dataset.duplicate==='1'?'#ef4444':'#00008B'" onblur="updateDirectOptionDuplicateState(this,'${q.id}',${oi},true);if(this.dataset.duplicate!=='1')this.style.borderColor='#e2e8f0'" oninput="dqSetOpt('${q.id}',${oi},this.value);updateDirectOptionDuplicateState(this,'${q.id}',${oi},false)" onkeydown="if(event.key==='Enter'){event.preventDefault();dqAddOpt('${q.id}');}">${imgBtn}${removeBtn}</div>${imgPreview}</div>`;
+            return `<div ondragover="dqOptDragOver(event,'${q.id}',${oi})" ondrop="dqOptDrop(event,'${q.id}',${oi})" style="margin-bottom:6px;transition:opacity .15s"><div style="display:flex;align-items:center;gap:6px;">${dragHandle}${optIcon}<input type="text" value="${o.replace(/"/g,'&quot;')}" placeholder="Lựa chọn ${oi+1}" style="flex:1;padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s" onfocus="this.style.borderColor=this.dataset.duplicate==='1'?'#ef4444':'#0250AD'" onblur="updateDirectOptionDuplicateState(this,'${q.id}',${oi},true);if(this.dataset.duplicate!=='1')this.style.borderColor='#e2e8f0'" oninput="dqSetOpt('${q.id}',${oi},this.value);updateDirectOptionDuplicateState(this,'${q.id}',${oi},false)" onkeydown="if(event.key==='Enter'){event.preventDefault();dqAddOpt('${q.id}');}">${imgBtn}${removeBtn}</div>${imgPreview}</div>`;
           }).join('')}
         </div>
         <button onclick="dqAddOpt('${q.id}')"
-          style="padding:5px 14px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:12px;font-weight:600;transition:all .15s;margin-top:2px"
-          onmouseenter="this.style.background='#00008B';this.style.borderColor='#fff'"
-          onmouseleave="this.style.background='transparent';this.style.borderColor='#00008B'">+ Thêm lựa chọn</button>
+          style="padding:5px 14px;background:transparent;border:1.5px dashed #0250AD;border-radius:7px;cursor:pointer;color:#0250AD;font-size:12px;font-weight:600;transition:all .15s;margin-top:2px"
+          onmouseenter="this.style.background='#0250AD';this.style.borderColor='#fff'"
+          onmouseleave="this.style.background='transparent';this.style.borderColor='#0250AD'">+ Thêm lựa chọn</button>
         ${renderOtherOptionEditor(q, normalizedType, 'direct', q.id)}
+        ${renderSectionJumpEditor(q, allQ)}
         `}
 
       </div>` : ''}
 
-      ${!needsOpts && !needsGrid ? renderTextAnswerBuilder(normalizedType) : ''}
+
+      ${!needsOpts && !needsGrid ? renderTextAnswerBuilder(q) : ''}
+      ${['short_text','paragraph','checkbox'].includes(normalizedType) && q.has_validation ? renderValidationConfigEditor(q, 'direct', q.id) : ''}
 
       ${needsGrid ? `
       <!-- Lưới: hàng + cột -->
@@ -5356,14 +6112,14 @@ function renderDirectQList() {
         </div>
         <!-- Cột -->
         <div>
-          <div style="font-size:11px;font-weight:700;color:#00008B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Cột (lựa chọn)</div>
+          <div style="font-size:11px;font-weight:700;color:#0250AD;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Cột (lựa chọn)</div>
           <div id="dq-cols-${q.id}">
             ${cols.map((c,ci)=>`
             <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
-              <span style="width:14px;height:14px;border-radius:${normalizedType==='grid_radio'?'50%':'3px'};border:1.5px solid #00008B;flex-shrink:0;display:inline-block;background:#fff"></span>
+              <span style="width:14px;height:14px;border-radius:${normalizedType==='grid_radio'?'50%':'3px'};border:1.5px solid #0250AD;flex-shrink:0;display:inline-block;background:#fff"></span>
               <input type="text" value="${c.replace(/"/g,'&quot;')}" placeholder="Cột ${ci+1}"
                 style="flex:1;padding:5px 9px;border:1px solid #e2e8f0;border-radius:7px;font-size:12px;background:#fff;outline:none;transition:border .15s"
-                onfocus="this.style.borderColor='#00008B'" onblur="this.style.borderColor='#e2e8f0'"
+                onfocus="this.style.borderColor='#0250AD'" onblur="this.style.borderColor='#e2e8f0'"
                 oninput="dqSetCol('${q.id}',${ci},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();dqAddCol('${q.id}');}">
               ${cols.length>1?`<button onclick="dqRemoveCol('${q.id}',${ci})"
                 style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;line-height:1;flex-shrink:0;transition:color .15s"
@@ -5371,8 +6127,8 @@ function renderDirectQList() {
             </div>`).join('')}
           </div>
           <button onclick="dqAddCol('${q.id}')"
-            style="padding:4px 10px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:11.5px;font-weight:600;transition:all .15s;margin-top:2px"
-            onmouseenter="this.style.background='#00008B'" onmouseleave="this.style.background='transparent'">+ Thêm cột</button>
+            style="padding:4px 10px;background:transparent;border:1.5px dashed #0250AD;border-radius:7px;cursor:pointer;color:#0250AD;font-size:11.5px;font-weight:600;transition:all .15s;margin-top:2px"
+            onmouseenter="this.style.background='#0250AD'" onmouseleave="this.style.background='transparent'">+ Thêm cột</button>
         </div>
       </div>` : ''}
 
@@ -5384,19 +6140,23 @@ function renderDirectQList() {
           <div style="position:relative;width:34px;height:18px">
             <input type="checkbox" ${q.required ? 'checked' : ''} onchange="dqSetRequired('${q.id}',this.checked)"
               style="opacity:0;width:0;height:0;position:absolute">
-            <span style="position:absolute;inset:0;background:${q.required ? '#00008B' : '#cbd5e1'};border-radius:9px;transition:background .2s;cursor:pointer"></span>
+            <span style="position:absolute;inset:0;background:${q.required ? '#0250AD' : '#cbd5e1'};border-radius:9px;transition:background .2s;cursor:pointer"></span>
             <span style="position:absolute;top:3px;left:${q.required ? '18px' : '3px'};width:12px;height:12px;background:#fff;border-radius:50%;transition:left .2s;pointer-events:none"></span>
           </div>
-          <span style="font-size:12px;font-weight:600;color:${q.required ? '#00008B' : '#94a3b8'}">Bắt buộc</span>
+          <span style="font-size:12px;font-weight:600;color:${q.required ? '#0250AD' : '#94a3b8'}">Bắt buộc</span>
         </label>`}
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto">
           ${isPresentationItem(q) ? '' : renderLibrarySaveButton({ saved: isQuestionSavedInLibrary(q), onclick: `dqSaveToLibrary('${q.id}', this)` })}
-          <button onclick="dqRemove('${q.id}')" title="Xóa câu hỏi"
-            style="height:34px;padding:0 12px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#dc2626;font-size:12px;font-weight:800;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap"
-            onmouseenter="this.style.background='#fef2f2';this.style.borderColor='#f87171'" onmouseleave="this.style.background='#fff';this.style.borderColor='#fecaca'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-            Xóa
-          </button>
+          <div style="position:relative;display:inline-block">
+            <button onmousedown="event.preventDefault();event.stopPropagation();toggleDirectQuestionOptionsMenu(event,'${q.id}',this)" onclick="event.preventDefault();event.stopPropagation()" title="Tùy chọn"
+              style="height:34px;width:34px;border:none;border-radius:50%;background:transparent;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s"
+              onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='transparent'">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+            <div id="q-options-menu-${q.id}" class="q-options-menu" style="display:none;position:absolute;bottom:100%;right:0;margin-bottom:8px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);min-width:180px;z-index:50;padding:6px 0">
+              ${qMenuOptionsHtml}
+            </div>
+          </div>
         </div>
       </div>
       </div><!-- end main content -->
@@ -5406,14 +6166,21 @@ function renderDirectQList() {
         <!-- Nhập câu hỏi từ thư viện -->
         <button onclick="toggleLibrary('${q.id}')" title="Nhập câu hỏi từ thư viện"
           style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.color='#00008B';this.style.background='#eef5ff'"
+          onmouseenter="this.style.color='#0250AD';this.style.background='#eef5ff'"
           onmouseleave="this.style.color:#94a3b8;this.style.background='none'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4v15.5A2.5 2.5 0 006.5 22H20V6a2 2 0 00-2-2H6.5A2.5 2.5 0 004 6.5"/><path d="M8 8h8"/><path d="M8 12h6"/></svg>
+        </button>
+        <!-- Them tieu de va mo ta -->
+        <button onclick="dqAddTitleBlock('${q.id}')" title="Thêm tiêu đề và mô tả"
+          style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
+          onmouseenter="this.style.color='#16a34a';this.style.background='#f0fdf4'"
+          onmouseleave="this.style.color='#94a3b8';this.style.background='none'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="14" y2="10"/><rect x="4" y="14" width="16" height="6" rx="1"/></svg>
         </button>
         <!-- Thêm hình ảnh -->
         <button onclick="dqAddImage('${q.id}')" title="Thêm hình ảnh"
           style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.color='#00008B';this.style.background='#00008B'"
+          onmouseenter="this.style.color='#0250AD';this.style.background='#0250AD'"
           onmouseleave="this.style.color='#94a3b8';this.style.background='none'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
         </button>
@@ -5427,7 +6194,7 @@ function renderDirectQList() {
         <!-- Thêm phần (section) -->
         <button onclick="dqAddSection('${q.id}')" title="Thêm phần bên dưới"
           style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.color='#f59e0b';this.style.background='#fef3c7'"
+          onmouseenter="this.style.color='#FA7413';this.style.background='#FA7413'"
           onmouseleave="this.style.color='#94a3b8';this.style.background='none'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/></svg>
         </button>
@@ -5450,7 +6217,26 @@ function renderDirectQList() {
     </div>${inlineAddHtml}`;
   }).join('');
 
+  // If no card is active (user deselected all), show the add button at the bottom
+  if (!activeDirectQuestionId) {
+    let addWrapper = document.getElementById('direct-q-add-btn');
+    if (!addWrapper) {
+      addWrapper = document.createElement('div');
+      addWrapper.id = 'direct-q-add-btn';
+      list.parentNode.insertBefore(addWrapper, list.nextSibling);
+    }
+    addWrapper.innerHTML = `<div style="display:flex;justify-content:flex-start;padding:10px 0 2px">
+      <button type="button" data-add-direct-q="end" onclick="_dqUserDeselected=false;handleAddDirectQ(event, 'end')" class="fm-add-question-btn" title="Thêm câu hỏi"
+        style="min-width:132px;height:36px;padding:0 14px;border:1.5px dashed #0250AD;border-radius:10px;background:#fff;color:#0250AD;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:700;white-space:nowrap"
+        onmouseenter="this.style.background='#eef2ff';this.style.borderColor='#0250AD'" onmouseleave="this.style.background='#fff';this.style.borderColor='#0250AD'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>Thêm câu hỏi</span>
+      </button>
+    </div>`;
+  }
+
 }
+
 
 function getAllFormQuestions() {
   return getAllFormItems().filter(q => !q._isSection);
@@ -5636,6 +6422,8 @@ function buildLibraryQuestionFallback(q, context, opts) {
     survey_type: context.surveyType,
     doi_tuong: context.target,
     target: context.target,
+    desc: q.desc || q.mo_ta || q.mo_ta_cau_hoi || '',
+    mo_ta_cau_hoi: q.desc || q.mo_ta || q.mo_ta_cau_hoi || '',
     opts,
     validation_json: getQuestionValidationJson(q),
     allowOther: questionAllowsOther(q),
@@ -5661,6 +6449,8 @@ async function postQuestionToLibrary(q, context, opts) {
       doi_tuong: context.target,
       target: context.target,
       opts,
+      desc: q.desc || q.mo_ta || q.mo_ta_cau_hoi || '',
+      mo_ta_cau_hoi: q.desc || q.mo_ta || q.mo_ta_cau_hoi || '',
       required: !!q.required,
       bat_buoc: !!q.required,
       validation_json: getQuestionValidationJson(q),
@@ -6068,17 +6858,121 @@ function dqToggleOther(id, enabled) {
   setQuestionAllowOther(q, enabled);
   renderDirectQList();
 }
+function getDefaultValidationRuleForQuestion(q = {}) {
+  const type = normalizeQuestionType(q.type || q.loai || 'short_text');
+  if (type === 'paragraph' || type === 'long_text') return { type: 'length', condition: 'max', value: '', customError: '' };
+  if (type === 'checkbox') return { type: 'select', condition: 'min_select', value: '', customError: '' };
+  return { type: 'number', condition: 'gt', value: '', customError: '' };
+}
+function dqToggleDescription(id, enabled) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  q.has_description = !!enabled;
+  if (!enabled) {
+    q.desc = '';
+    q.mo_ta = '';
+    q.mo_ta_cau_hoi = '';
+  }
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  renderDirectQList();
+}
+function dqToggleValidation(id, enabled) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  q.has_validation = !!enabled;
+  if (enabled) {
+    q.validation = getQuestionValidationRule(q) || getDefaultValidationRuleForQuestion(q);
+  } else {
+    delete q.validation;
+  }
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  renderDirectQList();
+}
+function dqToggleSectionJump(id, enabled) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  const type = normalizeQuestionType(q.type || q.loai || 'choice');
+  if (!['choice', 'dropdown'].includes(type)) return;
+  q.has_section_jump = !!enabled;
+  if (enabled) {
+    q.section_jump = getQuestionSectionJumpConfig(q);
+    q.section_jump.enabled = true;
+  } else {
+    delete q.section_jump;
+  }
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  renderDirectQList();
+}
+function dqSetSectionJump(id, optionIndex, action) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  q.has_section_jump = true;
+  const cfg = getQuestionSectionJumpConfig(q);
+  cfg.enabled = true;
+  cfg.optionActions[String(optionIndex)] = action || 'continue';
+  q.section_jump = cfg;
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+}
+function dqToggleShuffle(id, enabled) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  q.has_shuffle = !!enabled;
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  renderDirectQList();
+}
+function dqToggleLimitCol(id, enabled) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  q.has_limit_col = !!enabled;
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  renderDirectQList();
+}
+function dqToggleShuffleRows(id, enabled) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  q.has_shuffle_rows = !!enabled;
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  renderDirectQList();
+}
+function dqToggleIncludeTime(id, enabled) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  q.has_include_time = !!enabled;
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  renderDirectQList();
+}
+function dqToggleIncludeYear(id, enabled) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  q.has_include_year = !!enabled;
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  renderDirectQList();
+}
+function dqSetTimeType(id, value) {
+  const q = _dqFindQ(id);
+  if (!q) return;
+  q.time_type = value === 'duration' ? 'duration' : 'time';
+  q._collapsed = false;
+  if (typeof recordCreateHistory === 'function') recordCreateHistory();
+  renderDirectQList();
+}
 function dqRemoveOpt(id, oi) {
   const q = _dqFindQ(id);
   if (q && q.opts.length > 1) { q.opts.splice(oi, 1); renderDirectQList(); }
 }
 function dqRemove(id) {
-  if (id.startsWith('dq-')) {
-    directQuestions = directQuestions.filter(q => !sameQuestionId(q.id, id));
-  } else {
-    selectedQuestions.delete(id);
-    renderQList();
-  }
+  directQuestions = directQuestions.filter(q => !sameQuestionId(q.id, id));
+  selectedQuestions.delete(String(id));
+  renderQList();
   renderDirectQList();
 }
 
@@ -6133,6 +7027,7 @@ async function submitForm(skipCloseConfirm = false, options = {}) {
   const noCloseInput = document.getElementById('new-form-no-close');
   const closeDate = noCloseInput?.checked ? '' : (closeInput?.value || '');
   const loiKet = document.getElementById('new-form-loi-ket')?.value?.trim() || '';
+  const formSettings = getFormSettingsFromControls('new');
   const approvalDeadline = document.getElementById('new-approval-deadline')?.value || '';
   const urgentApproval = !!document.getElementById('new-approval-urgent')?.checked;
   const urgentReason = document.getElementById('new-approval-urgent-reason')?.value?.trim() || '';
@@ -6175,9 +7070,12 @@ async function submitForm(skipCloseConfirm = false, options = {}) {
       mo_ta: desc,
       ngay_dong: closeDate || null,
       loi_ket: loiKet,
+      settings: formSettings,
+      ...formSettings,
       ...(customTheme ? {
         anh_bia: createFormTheme.headerImage || null,
         mau_nen: createFormTheme.background || null,
+        mau_chu_de: createFormTheme.color || null,
         font_family: createFormTheme.headerFont || null,
       } : {}),
       cong_tac: createCollaborators,
@@ -6228,11 +7126,14 @@ async function submitForm(skipCloseConfirm = false, options = {}) {
     by: byName,
     initials: byName[0]?.toUpperCase() || 'A',
     img: hasCustomFormTheme(createFormTheme) ? (createFormTheme.headerImage || '') : '',
-    color: getFormCategoryColor(cat),
+    color: hasCustomFormTheme(createFormTheme) ? (createFormTheme.color || getFormCategoryColor(cat)) : getFormCategoryColor(cat),
     anh_bia: hasCustomFormTheme(createFormTheme) ? (createFormTheme.headerImage || '') : '',
     mau_nen: hasCustomFormTheme(createFormTheme) ? (createFormTheme.background || '') : '',
+    mau_chu_de: hasCustomFormTheme(createFormTheme) ? (createFormTheme.color || '') : '',
     font_family: hasCustomFormTheme(createFormTheme) ? (createFormTheme.headerFont || '') : '',
     theme: hasCustomFormTheme(createFormTheme) ? cloneForHistory(createFormTheme) : {},
+    settings: formSettings,
+    ...formSettings,
     questions: cleanFormItems,
     approval_priority: urgentApproval ? 'urgent' : 'normal',
     approval_deadline: approvalDeadline,
@@ -6364,7 +7265,7 @@ function showFormMenu(btnEl, formId) {
   const active = isActiveForm(form);
   const pending = String(form?.status || form?.trang_thai || '').toLowerCase() === 'pending';
 
-  menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>', 'Xem trước', '#374151', () => openViewModal(formId)));
+
   if (!active && !pending) {
     menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>', 'Chỉnh sửa', '#374151', () => openEditModal(formId)));
   }
@@ -6372,7 +7273,7 @@ function showFormMenu(btnEl, formId) {
     menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>', 'Chia s\u1ebb', '#374151', () => openShareModal(formId)));
   menu.appendChild(divider());
   if (active) {
-    menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><rect x="6" y="4" width="12" height="16" rx="2"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></svg>', 'Đóng biểu mẫu', '#b45309', () => closeActiveForm(formId)));
+    menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><rect x="6" y="4" width="12" height="16" rx="2"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></svg>', 'Đóng biểu mẫu', '#FA7413', () => closeActiveForm(formId)));
   } else if (canDeleteFormsNow()) {
     menu.appendChild(item('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>', 'Xóa biểu mẫu', '#ef4444', () => deleteForm(formId)));
   }
@@ -6396,13 +7297,23 @@ if (!document.getElementById('fmenu-style')) {
 }
 
 function getFormCoverImage(form) {
-  return String(form?.anh_bia || form?.theme?.headerImage || '').trim();
+  return String(form?.anh_bia || form?.theme?.headerImage || form?.img || '').trim();
+}
+
+function getFormThemeColor(form, fallback = '#0250AD') {
+  const value = String(form?.theme?.color || form?.mau_chu_de || form?.theme_color || form?.color || '').trim();
+  return /^#[0-9a-f]{3,8}$/i.test(value) ? value : fallback;
 }
 
 function getFormSoftBackground(form, categoryColor) {
   const base = String(form?.mau_nen || form?.theme?.background || '').trim();
   const color = /^#[0-9a-f]{3,8}$/i.test(base) ? base : (categoryColor || '#eef5ff');
-  return `linear-gradient(135deg,${color} 0%,#ffffff 78%)`;
+  return `linear-gradient(135deg,${color} 0%,#ffffff 82%)`;
+}
+
+function getFormPlainBackground(form, fallback = '#f8fafc') {
+  const base = String(form?.mau_nen || form?.theme?.background || '').trim();
+  return /^#[0-9a-f]{3,8}$/i.test(base) ? base : fallback;
 }
 
 function getPreviewPlainText(value, fallback = '') {
@@ -6492,6 +7403,45 @@ function renderFormListThumb(form, categoryColor) {
     </div>`;
 }
 
+function safeCssUrl(value) {
+  return String(value || '').replace(/'/g, '%27').replace(/"/g, '%22');
+}
+
+function renderGoogleFormThumb(form, categoryColor) {
+  const coverImage = getFormCoverImage(form);
+  const themeColor = getFormThemeColor(form, categoryColor);
+  const background = getFormPlainBackground(form, '#f8fafc');
+  const media = coverImage
+    ? `<img src="${escapeHtml(coverImage)}" alt="${escapeHtml(getPreviewPlainText(form?.name, 'Biểu mẫu'))}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`
+    : `<div style="width:100%;height:100%;background:${background};display:flex;align-items:center;justify-content:center;padding:18px 24px;box-sizing:border-box">
+        <div style="width:128px;height:74px;border-radius:6px;background:#fff;border:1px solid rgba(148,163,184,.55);box-shadow:0 3px 8px rgba(15,23,42,.10);overflow:hidden">
+          <div style="height:13px;background:${themeColor}"></div>
+          <div style="padding:10px 14px">
+            <div style="height:5px;width:78%;border-radius:999px;background:#cbd5e1;margin-bottom:8px"></div>
+            <div style="height:5px;width:58%;border-radius:999px;background:#e2e8f0;margin-bottom:8px"></div>
+            <div style="height:5px;width:68%;border-radius:999px;background:#e2e8f0"></div>
+          </div>
+        </div>
+      </div>`;
+  return `
+    <div class="form-card-thumb" style="height:152px;background:${background};overflow:hidden">
+      ${media}
+      <div style="position:absolute;left:0;right:0;bottom:0;height:3px;background:${themeColor};z-index:2"></div>
+      <div style="position:absolute;top:10px;left:10px;z-index:2">${formStatusBadge(form)}</div>
+    </div>`;
+}
+
+function renderGoogleFormListThumb(form, categoryColor) {
+  const coverImage = getFormCoverImage(form);
+  const themeColor = getFormThemeColor(form, categoryColor);
+  const background = getFormPlainBackground(form, '#f8fafc');
+  return `
+    <div style="width:52px;height:38px;border-radius:6px;flex-shrink:0;background:${background};border:1px solid #dbe5f0;position:relative;overflow:hidden">
+      ${coverImage ? `<img src="${escapeHtml(coverImage)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">` : `<div style="position:absolute;left:12px;right:12px;top:7px;bottom:7px;background:#fff;border:1px solid rgba(148,163,184,.55);border-radius:3px;overflow:hidden"><div style="height:5px;background:${themeColor}"></div><div style="height:3px;width:58%;background:#cbd5e1;margin:5px 5px 0;border-radius:999px"></div></div>`}
+      <div style="position:absolute;left:0;right:0;bottom:0;height:3px;background:${themeColor}"></div>
+    </div>`;
+}
+
 function renderGrid(list) {
   const source = sortFormsForManagement(Array.isArray(list) ? list : []);
   const totalItems = source.length;
@@ -6521,16 +7471,13 @@ function renderGrid(list) {
       const categoryColor = getFormCategoryColor(f.cat || f.danh_muc);
       return `
       <div class="form-card" onclick="openViewModal('${f.id}')" title="Xem câu hỏi">
-        ${renderFormThumb(f, categoryColor)}
+        ${renderGoogleFormThumb(f, categoryColor)}
         <div class="form-card-body">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-            <span style="width:8px;height:8px;border-radius:50%;background:${categoryColor};flex-shrink:0;display:inline-block"></span>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
             <span class="badge" style="font-size:11px;padding:2px 7px;background:var(--gray-100);color:var(--gray-600)">${f.cat}</span>
+            <span style="font-size:12px;color:var(--gray-500);white-space:nowrap">${f.created}</span>
           </div>
           <div class="form-card-name">${formatRichText(f.name)}</div>
-          <div class="form-card-meta" style="margin-top:8px">
-            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${f.created}</span>
-          </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--gray-100);margin-top:10px">
             <div style="display:flex;align-items:center;gap:6px">
               <div style="width:24px;height:24px;border-radius:50%;background:${categoryColor};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">${f.initials}</div>
@@ -6553,7 +7500,7 @@ function renderGrid(list) {
       return `
       <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--gray-100);transition:background .12s;cursor:pointer" onclick="openViewModal('${f.id}')" title="Xem câu hỏi" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background=''">
         <div style="width:4px;height:40px;border-radius:2px;background:${categoryColor};flex-shrink:0"></div>
-        ${renderFormListThumb(f, categoryColor)}
+        ${renderGoogleFormListThumb(f, categoryColor)}
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13.5px;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${formatRichText(f.name)}</div>
           <div style="font-size:12px;color:var(--gray-500)">${f.cat}</div>
@@ -6746,17 +7693,10 @@ function syncDisplayDateToHidden(value) {
 }
 
 function openCloseDatePicker() {
-  const hidden = document.getElementById('new-form-close');
   const display = document.getElementById('new-form-close-display');
   const noClose = document.getElementById('new-form-no-close');
-  if (!hidden || hidden.disabled || noClose?.checked) return;
-  hidden.min = todayInputValue();
-  if (display?.value && !hidden.value) hidden.value = parseDDMMYYYYToISO(display.value) || '';
-  if (typeof hidden.showPicker === 'function') hidden.showPicker();
-  else {
-    hidden.focus();
-    hidden.click();
-  }
+  if (!display || noClose?.checked) return;
+  if (display._flatpickr) { display._flatpickr.open(); }
 }
 
 function normalizeDateToInputValue(value) {
@@ -6904,42 +7844,87 @@ async function closeActiveForm(id) {
   showToast(`Đã đóng biểu mẫu "${f.name}"`, 'success');
 }
 
-async function deleteForm(id) {
-  const f = FORMS.find(f => String(f.id) === String(id));
-  if (!f) return;
-  if (isActiveForm(f)) {
-    showToast('Biểu mẫu đang hoạt động, vui lòng đóng biểu mẫu trước khi xóa.', 'error');
-    return;
+window.openDeleteFormModal = function(idToDelete, formName) {
+  let modal = document.getElementById('fm-entry-delete-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'fm-entry-delete-modal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);z-index:99999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s;';
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:20px;width:90%;max-width:450px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);transform:scale(0.95);transition:transform 0.2s;overflow:hidden;box-sizing:border-box;">
+        <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;border-radius:12px;background:#fee2e2;display:flex;align-items:center;justify-content:center;color:#ef4444;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:var(--gray-800);">Xóa biểu mẫu</div>
+            </div>
+          </div>
+          <button onclick="closeDeleteFormModal()" style="width:32px;height:32px;border-radius:50%;background:#f1f5f9;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;" onmouseenter="this.style.background='#e2e8f0'" onmouseleave="this.style.background='#f1f5f9'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div style="padding:24px;">
+          <div id="fm-entry-del-text" style="font-size:14px;color:var(--gray-700);margin-bottom:16px;line-height:1.5;"></div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:8px;">Lý do xóa <span style="color:#ef4444">*</span></label>
+            <input type="text" id="fm-entry-del-reason" placeholder="Nhập lý do chuyển vào thùng rác..." style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14.5px;color:var(--gray-800);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#ef4444'" onblur="this.style.borderColor='#cbd5e1'">
+          </div>
+        </div>
+        <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;gap:12px;">
+          <button onclick="closeDeleteFormModal()" style="padding:8px 16px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-size:14px;font-weight:600;color:var(--gray-700);cursor:pointer;transition:all 0.2s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='#fff'">Hủy bỏ</button>
+          <button id="fm-entry-confirm-del-btn" style="padding:8px 16px;border-radius:10px;border:none;background:#ef4444;font-size:14px;font-weight:600;color:#fff;cursor:pointer;transition:all 0.2s;" onmouseenter="this.style.background='#dc2626'" onmouseleave="this.style.background='#ef4444'">Chuyển thùng rác</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
   }
-  const ok = await showConfirmDialog({
-    title: 'Chuyển vào thùng rác?',
-    message: `Chuyển biểu mẫu <strong>${escapeHtml(f.name || 'Biểu mẫu không có tiêu đề')}</strong> vào thùng rác.`,
-    note: 'Biểu mẫu sẽ tự động xóa vĩnh viễn sau 30 ngày.',
-    confirmText: 'Chuyển vào thùng rác',
-    cancelText: 'Hủy',
-    variant: 'danger',
-  });
-  if (!ok) return;
 
+  document.getElementById('fm-entry-del-text').innerHTML = `Chuyển biểu mẫu <strong>${escapeHtml(formName || 'Biểu mẫu không có tiêu đề')}</strong> vào thùng rác.<br><br>Biểu mẫu sẽ tự động xóa vĩnh viễn sau 30 ngày.`;
+  document.getElementById('fm-entry-del-reason').value = '';
+
+  document.getElementById('fm-entry-confirm-del-btn').onclick = function () {
+    const reason = document.getElementById('fm-entry-del-reason').value.trim();
+    if (!reason) {
+      if (typeof showToast === 'function') showToast('Vui lòng nhập lý do xóa', 'error');
+      else alert('Vui lòng nhập lý do xóa');
+      return;
+    }
+    executeDeleteForm(idToDelete, reason);
+  };
+
+  modal.style.display = 'flex';
+  modal.offsetHeight; // reflow
+  modal.style.opacity = '1';
+  modal.children[0].style.transform = 'scale(1)';
+
+  setTimeout(() => document.getElementById('fm-entry-del-reason').focus(), 250);
+};
+
+window.closeDeleteFormModal = function () {
+  const modal = document.getElementById('fm-entry-delete-modal');
+  if (modal) {
+    modal.style.opacity = '0';
+    modal.children[0].style.transform = 'scale(0.95)';
+    setTimeout(() => modal.style.display = 'none', 200);
+  }
+};
+
+window.executeDeleteForm = async function(id, reason) {
+  closeDeleteFormModal();
+  
   // Ẩn card ngay lập tức
   const card = document.querySelector(`[onclick*="openViewModal('${id}')"], [onclick*='openViewModal("${id}")']`);
   if (card) card.style.display = 'none';
 
-  const reason = prompt(`Chuyển biểu mẫu "${f.name || 'Biểu mẫu không có tiêu đề'}" vào thùng rác?\n\nNhập lý do xóa (nếu có):`);
-  if (reason === null) {
-    if (card) card.style.display = '';
-    return;
-  }
-
   try {
     const token = localStorage.getItem('token') || '';
+    const ly_do_xoa = reason || 'Không có lý do';
     const res = await fetch(`${API_BASE}/forms/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify({ ly_do_xoa: reason.trim() || 'Không có lý do' })
+      headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ly_do_xoa })
     });
     if (!res.ok) {
       let detail = '';
@@ -6949,26 +7934,29 @@ async function deleteForm(id) {
       } catch (_) {
         detail = await res.text().catch(() => '');
       }
-      throw new Error(detail || `Không thể chuyển biểu mẫu vào thùng rác (HTTP ${res.status})`);
+      throw new Error(detail || 'Không thể xóa biểu mẫu');
     }
-  } catch(e) {
+
+    FORMS = FORMS.filter(f => String(f.id) !== String(id));
+    filtered = filtered.filter(f => String(f.id) !== String(id));
+    renderGrid(filtered);
+    if (typeof showToast === 'function') showToast('Đã chuyển biểu mẫu vào thùng rác', 'success');
+  } catch (error) {
     if (card) card.style.display = '';
-    showToast(e.message || 'Không thể chuyển biểu mẫu vào thùng rác. Vui lòng thử lại.', 'error');
+    console.error(error);
+    if (typeof showToast === 'function') showToast(error.message, 'error');
+    else alert(error.message);
+  }
+};
+
+async function deleteForm(id) {
+  const f = FORMS.find(f => String(f.id) === String(id));
+  if (!f) return;
+  if (isActiveForm(f)) {
+    showToast('Biểu mẫu đang hoạt động, vui lòng đóng biểu mẫu trước khi xóa.', 'error');
     return;
   }
-
-  try {
-    moveToTrash(f, reason.trim() || 'Không có lý do');
-  } catch (e) {
-    console.warn('Không thể lưu bản ghi thùng rác local:', e);
-  }
-  hideApprovalForm(f);
-  removeApprovalsByForm(f);
-  FORMS.splice(FORMS.findIndex(f => f.id === id), 1);
-  filtered = filtered.filter(f => f.id !== id);
-  renderGrid(filtered);
-  // Backend now logs to NhatKyHoatDong, so we don't need window.logActivity here anymore.
-  setTimeout(() => showToast(`Đã chuyển "${f.name}" vào thùng rác`, 'success'), 0);
+  openDeleteFormModal(id, f.name);
 }
 
 async function duplicateForm(id) {
@@ -7049,6 +8037,11 @@ function mapFormItemsToEditItems(items) {
         desc: q.desc || q.description || q.mo_ta_cau_hoi || '',
       };
     }
+    const validationRule = getQuestionValidationRule(q);
+    const desc = q.desc || q.mo_ta || q.mo_ta_cau_hoi || '';
+    const qValidation = parseJsonObject(q.validation_json || q.validation || q.logic_json);
+    const sectionJump = getQuestionSectionJumpConfig(q);
+    const advanced = getQuestionAdvancedConfig(q);
     return {
       id: q.id || ('eq-' + i),
       text: q.text || q.noi_dung || '',
@@ -7058,6 +8051,22 @@ function mapFormItemsToEditItems(items) {
       cols: getGridCols(q),
       scale: getQuestionScaleConfig(q),
       rating: getQuestionRatingConfig(q),
+      desc,
+      mo_ta: desc,
+      mo_ta_cau_hoi: desc,
+      showDesc: !!(q.showDesc || q.has_description || desc),
+      has_description: !!(q.has_description || desc),
+      showValidation: !!(q.showValidation || q.has_validation || validationRule),
+      has_validation: !!(q.has_validation || validationRule),
+      has_section_jump: !!(q.has_section_jump || sectionJump.enabled),
+      section_jump: sectionJump.enabled ? sectionJump : undefined,
+      has_shuffle: !!(q.has_shuffle || qValidation.shuffle_options),
+      has_limit_col: advanced.limitOnePerColumn,
+      has_shuffle_rows: advanced.shuffleRows,
+      has_include_time: advanced.includeTime,
+      has_include_year: advanced.includeYear,
+      time_type: advanced.timeType,
+      validation: validationRule || undefined,
       validation_json: q.validation_json || q.validation || q.logic_json || '',
       image_align: q.image_align || parseJsonObject(q.validation_json || q.validation || q.logic_json || '{}').image_align || 'left',
       image_width: q.image_width || parseJsonObject(q.validation_json || q.validation || q.logic_json || '{}').image_width || '',
@@ -7099,6 +8108,8 @@ function openEditModal(id) {
   setEditNoCloseState(!editCloseValue);
   const localLoiKet = f.loi_ket || '';
   setRichTextFieldValue('edit-form-loi-ket', localLoiKet);
+  applyFormSettingsToControls('edit', f.settings || f);
+  toggleFormSettingsTab('edit', false);
   const editLibraryPanel = document.getElementById('edit-library-panel');
   if (editLibraryPanel) editLibraryPanel.style.display = 'none';
   const editLibSearch = document.getElementById('edit-lib-search');
@@ -7142,6 +8153,7 @@ function openEditModal(id) {
       // Cập nhật lời kết và luôn set từ API; local FORMS không có
       const loiKet = data.loi_ket || '';
       setRichTextFieldValue('edit-form-loi-ket', loiKet);
+      applyFormSettingsToControls('edit', data.settings || data);
     }).catch(() => {});
 }
 
@@ -7171,19 +8183,19 @@ function renderEditQuestions() {
     // Render section card (giống Tạo biểu mẫu mới)
     if (q._isSection) {
       return `
-    <div style="border:2px dashed #fbbf24;border-radius:12px;background:#fffbeb;padding:0;display:flex;margin-bottom:10px">
+    <div style="border:2px dashed #FA7413;border-radius:12px;background:#FA7413;padding:0;display:flex;margin-bottom:10px">
       <div style="flex:1;min-width:0;padding:12px 14px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          <span style="font-size:10.5px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.5px">Phần ${sectionNo}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#FA7413" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <span style="font-size:10.5px;font-weight:700;color:#FA7413;text-transform:uppercase;letter-spacing:.5px">Phần ${sectionNo}</span>
         </div>
         <div id="edit-section-title-${qi}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'edit-section-title-${qi}')">
           <div id="edit-section-title-${qi}" class="rich-title-editor" contenteditable="true" role="textbox" aria-label="Tiêu đề phần"
             data-edit-section-index="${qi}" data-edit-section-field="title"
             data-placeholder="Tiêu đề phần..."
-            style="width:100%;min-height:34px;padding:6px 10px;border:1.5px solid #fde68a;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;outline:none;background:#fff;color:#92400e;transition:border .15s;box-sizing:border-box;white-space:pre-wrap;word-break:break-word"
-            onfocus="this.style.borderColor='#f59e0b';showFieldToolbar('edit-section-title-${qi}')"
-            onblur="this.style.borderColor='#fde68a';syncRichTextFieldFromEditor('edit-section-title-${qi}')"
+            style="width:100%;min-height:34px;padding:6px 10px;border:1.5px solid #FA7413;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;outline:none;background:#fff;color:#FA7413;transition:border .15s;box-sizing:border-box;white-space:pre-wrap;word-break:break-word"
+            onfocus="this.style.borderColor='#FA7413';showFieldToolbar('edit-section-title-${qi}')"
+            onblur="this.style.borderColor='#FA7413';syncRichTextFieldFromEditor('edit-section-title-${qi}')"
             oninput="syncRichTextFieldFromEditor('edit-section-title-${qi}')"
             onkeydown="handleRichFieldKeydown(event, 'edit-section-title-${qi}')"
             onclick="handleRichFieldClick(event, 'edit-section-title-${qi}')"
@@ -7194,9 +8206,9 @@ function renderEditQuestions() {
           <div id="edit-section-desc-${qi}" class="rich-title-editor" contenteditable="true" role="textbox" aria-label="Mô tả phần"
             data-edit-section-index="${qi}" data-edit-section-field="desc"
             data-placeholder="Mô tả phần (tùy chọn)..."
-            style="width:100%;min-height:32px;padding:5px 10px;border:1px solid #fde68a;border-radius:7px;font-size:12.5px;font-family:inherit;outline:none;background:#fff;color:#78350f;transition:border .15s;box-sizing:border-box;white-space:pre-wrap;word-break:break-word"
-            onfocus="this.style.borderColor='#f59e0b';showFieldToolbar('edit-section-desc-${qi}')"
-            onblur="this.style.borderColor='#fde68a';syncRichTextFieldFromEditor('edit-section-desc-${qi}')"
+            style="width:100%;min-height:32px;padding:5px 10px;border:1px solid #FA7413;border-radius:7px;font-size:12.5px;font-family:inherit;outline:none;background:#fff;color:#78350f;transition:border .15s;box-sizing:border-box;white-space:pre-wrap;word-break:break-word"
+            onfocus="this.style.borderColor='#FA7413';showFieldToolbar('edit-section-desc-${qi}')"
+            onblur="this.style.borderColor='#FA7413';syncRichTextFieldFromEditor('edit-section-desc-${qi}')"
             oninput="syncRichTextFieldFromEditor('edit-section-desc-${qi}')"
             onkeydown="handleRichFieldKeydown(event, 'edit-section-desc-${qi}')"
             onclick="handleRichFieldClick(event, 'edit-section-desc-${qi}')"
@@ -7204,16 +8216,16 @@ function renderEditQuestions() {
           ${renderTextFormatToolbar(`edit-section-desc-${qi}`, { hidden: true })}
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;border-left:1px solid #fde68a;min-width:40px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;border-left:1px solid #FA7413;min-width:40px">
         <button onclick="editQAddSection(${qi})" title="Thêm phần bên dưới"
-          style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#fbbf24;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.color='#f59e0b';this.style.background='#fef3c7'"
-          onmouseleave="this.style.color='#fbbf24';this.style.background='none'">
+          style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#FA7413;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
+          onmouseenter="this.style.color='#FA7413';this.style.background='#FA7413'"
+          onmouseleave="this.style.color='#FA7413';this.style.background='none'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <button onclick="editQAddNew(${qi})" title="Thêm câu hỏi bên dưới"
           style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.color='#00008B';this.style.background='#00008B'"
+          onmouseenter="this.style.color='#0250AD';this.style.background='#0250AD'"
           onmouseleave="this.style.color:#94a3b8;this.style.background='none'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -7244,8 +8256,8 @@ function renderEditQuestions() {
         ? `${opts.filter(Boolean).length} lựa chọn`
         : 'Câu trả lời văn bản';
       return `
-    <div onclick="editQExpand(${qi})" title="Bấm để mở câu hỏi" style="border:1.5px solid #00008B;border-left:5px solid #00008B;border-radius:14px;background:linear-gradient(180deg,#ffffff 0%,#00008B 100%);box-shadow:0 10px 24px rgba(15,23,42,.05);display:flex;align-items:center;gap:12px;margin:0 0 10px 0;padding:12px 14px;cursor:pointer">
-      <div style="width:26px;height:26px;border-radius:50%;background:#00008B;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
+    <div onclick="editQExpand(${qi})" title="Bấm để mở câu hỏi" style="border:1.5px solid #0250AD;border-left:5px solid #0250AD;border-radius:14px;background:linear-gradient(180deg,#ffffff 0%,#0250AD 100%);box-shadow:0 10px 24px rgba(15,23,42,.05);display:flex;align-items:center;gap:12px;margin:0 0 10px 0;padding:12px 14px;cursor:pointer">
+      <div style="width:26px;height:26px;border-radius:50%;background:#0250AD;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
       <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:12px">
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${formatRichText(q.text || 'Chưa có nội dung câu hỏi', q.required)}</div>
@@ -7255,7 +8267,7 @@ function renderEditQuestions() {
           </div>
         </div>
         <div style="flex-shrink:0">
-          <span style="padding:3px 9px;border-radius:999px;background:#00008B;color:#fff;font-size:11.5px;font-weight:700;white-space:nowrap">${getTypeOptionLabel(q.type)}</span>
+          <span style="padding:3px 9px;border-radius:999px;background:#0250AD;color:#fff;font-size:11.5px;font-weight:700;white-space:nowrap">${getTypeOptionLabel(q.type)}</span>
         </div>
       </div>
     </div>`;
@@ -7283,12 +8295,12 @@ function renderEditQuestions() {
         <div id="edit-q-text-${qi}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'edit-q-text-${qi}')">
         <!-- Row: số + input câu hỏi + dropdown loại -->
         <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:22px;height:22px;border-radius:50%;background:#00008B;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
+          <div style="width:22px;height:22px;border-radius:50%;background:#0250AD;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${isPresentationItem(q) ? '' : questionNo}</div>
           <div id="edit-q-text-${qi}" class="dq-placeholder-gray rich-title-editor" contenteditable="true" role="textbox" aria-label="Nội dung câu hỏi"
             data-edit-question-index="${qi}"
             data-placeholder="Nhập nội dung câu hỏi..."
             style="flex:1;width:100%;min-height:35px;padding:7px 11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit;line-height:1.45;outline:none;background:#fafbff;transition:border .15s;min-width:0;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text"
-            onfocus="this.style.borderColor='#00008B';showFieldToolbar('edit-q-text-${qi}')"
+            onfocus="this.style.borderColor='#0250AD';showFieldToolbar('edit-q-text-${qi}')"
             onblur="this.style.borderColor='#e2e8f0';syncRichTextFieldFromEditor('edit-q-text-${qi}')"
             oninput="syncRichTextFieldFromEditor('edit-q-text-${qi}')"
             onkeydown="handleRichFieldKeydown(event, 'edit-q-text-${qi}')"
@@ -7299,6 +8311,23 @@ function renderEditQuestions() {
         <div style="margin-left:30px">
           ${renderQuestionFormatToolbar(`edit-q-text-${qi}`, { hidden: true })}
         </div>
+        ${q.showDesc ? `
+        <div id="edit-q-desc-${qi}-wrap" onfocusout="handleFieldToolbarFocusOut(event, 'edit-q-desc-${qi}')" style="margin-left:30px;margin-top:6px">
+          <div id="edit-q-desc-${qi}" class="dq-placeholder-gray rich-title-editor" contenteditable="true" role="textbox" aria-label="Văn bản mô tả"
+            data-edit-question-desc-index="${qi}"
+            data-placeholder="Văn bản mô tả"
+            style="width:100%;min-height:30px;padding:4px 0;border:0;border-bottom:1px solid #e2e8f0;font-size:12.5px;font-family:inherit;line-height:1.45;color:#64748b;background:transparent;outline:none;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text;transition:border .15s"
+            onmousedown="event.stopPropagation()"
+            onfocus="this.style.borderColor='#0250AD';showFieldToolbar('edit-q-desc-${qi}')"
+            onblur="this.style.borderColor='#e2e8f0';syncRichTextFieldFromEditor('edit-q-desc-${qi}')"
+            oninput="syncRichTextFieldFromEditor('edit-q-desc-${qi}')"
+            onkeydown="handleRichFieldKeydown(event, 'edit-q-desc-${qi}')"
+            onclick="handleRichFieldClick(event, 'edit-q-desc-${qi}')"
+            onpaste="pastePlainTextIntoRichField(event, 'edit-q-desc-${qi}')">${formatRichTextForEditor(q.desc || '')}</div>
+          <div style="margin-top:4px">
+            ${renderQuestionFormatToolbar(`edit-q-desc-${qi}`, { hidden: true })}
+          </div>
+        </div>` : ''}
         </div>
 
         ${getQuestionImageUrl(q) ? (() => {
@@ -7352,19 +8381,20 @@ function renderEditQuestions() {
             const eqOptRemoveBtn = opts.length > 1 ? `<button onclick="editQRemoveOpt(${qi},${oi})" title="Xóa lựa chọn" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;transition:all .15s" onmouseenter="this.style.color='#ef4444'" onmouseleave="this.style.color='#cbd5e1'">X</button>` : '';
             let vj = {}; try { vj = typeof q.validation_json === 'string' ? JSON.parse(q.validation_json) : q.validation_json; } catch(e){}
             const optImgUrl = vj && vj.option_images && vj.option_images[oi] ? vj.option_images[oi] : null;
-            const imgBtn = `<button onclick="editQChangeOptImage(${qi}, ${oi})" title="Thêm hình ảnh" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#94a3b8;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='#94a3b8'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>`;
+            const imgBtn = `<button onclick="editQChangeOptImage(${qi}, ${oi})" title="Thêm hình ảnh" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#94a3b8;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='#94a3b8'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>`;
             const imgPreview = optImgUrl ? `<div style="margin-top:6px;margin-left:27px;position:relative;display:inline-block"><img src="${optImgUrl}" style="height:60px;object-fit:contain;border-radius:6px;border:1px solid #e2e8f0;"><button onclick="editQRemoveOptImage(${qi}, ${oi})" title="Xóa ảnh" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#ef4444;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;box-shadow:0 1px 3px rgba(0,0,0,0.2);">X</button></div>` : '';
-            return `<div draggable="true" ondragstart="eqOptDragStart(event,${qi},${oi})" ondragover="eqOptDragOver(event,${qi},${oi})" ondrop="eqOptDrop(event,${qi},${oi})" ondragend="eqOptDragEnd()" style="margin-bottom:6px;transition:opacity .15s"><div style="display:flex;align-items:center;gap:6px;">${eqOptDragHandle}${optIcon}<input type="text" value="${o.replace(/"/g,'&quot;')}" placeholder="Lựa chọn ${oi+1}" style="flex:1;padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s" onfocus="this.style.borderColor=this.dataset.duplicate==='1'?'#ef4444':'#00008B'" onblur="updateEditOptionDuplicateState(this,${qi},${oi},true);if(this.dataset.duplicate!=='1')this.style.borderColor='#e2e8f0'" oninput="editQSetOpt(${qi},${oi},this.value);updateEditOptionDuplicateState(this,${qi},${oi},false)">${imgBtn}${eqOptRemoveBtn}</div>${imgPreview}</div>`;
+            return `<div draggable="true" ondragstart="eqOptDragStart(event,${qi},${oi})" ondragover="eqOptDragOver(event,${qi},${oi})" ondrop="eqOptDrop(event,${qi},${oi})" ondragend="eqOptDragEnd()" style="margin-bottom:6px;transition:opacity .15s"><div style="display:flex;align-items:center;gap:6px;">${eqOptDragHandle}${optIcon}<input type="text" value="${o.replace(/"/g,'&quot;')}" placeholder="Lựa chọn ${oi+1}" style="flex:1;padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12.5px;background:#fff;outline:none;transition:border .15s" onfocus="this.style.borderColor=this.dataset.duplicate==='1'?'#ef4444':'#0250AD'" onblur="updateEditOptionDuplicateState(this,${qi},${oi},true);if(this.dataset.duplicate!=='1')this.style.borderColor='#e2e8f0'" oninput="editQSetOpt(${qi},${oi},this.value);updateEditOptionDuplicateState(this,${qi},${oi},false)">${imgBtn}${eqOptRemoveBtn}</div>${imgPreview}</div>`;
           }).join('')}
           <button onclick="editQAddOpt(${qi})"
-            style="padding:5px 14px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:12px;font-weight:600;transition:all .15s;margin-top:2px"
-            onmouseenter="this.style.background='#00008B';this.style.borderColor='#fff'"
-            onmouseleave="this.style.background='transparent';this.style.borderColor='#00008B'">+ Thêm lựa chọn</button>
+            style="padding:5px 14px;background:transparent;border:1.5px dashed #0250AD;border-radius:7px;cursor:pointer;color:#0250AD;font-size:12px;font-weight:600;transition:all .15s;margin-top:2px"
+            onmouseenter="this.style.background='#0250AD';this.style.borderColor='#fff'"
+            onmouseleave="this.style.background='transparent';this.style.borderColor='#0250AD'">+ Thêm lựa chọn</button>
           ${renderOtherOptionEditor(q, normalizedType, 'edit', qi)}
           `}
         </div>` : ''}
 
-        ${!needsOpts && !needsGrid ? renderTextAnswerBuilder(normalizedType) : ''}
+        ${!needsOpts && !needsGrid ? renderTextAnswerBuilder(q) : ''}
+        ${['short_text','paragraph','checkbox'].includes(normalizedType) && q.showValidation ? renderValidationConfigEditor(q, 'edit', qi) : ''}
 
         ${needsGrid ? `
         <div style="padding-left:30px;margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -7381,30 +8411,28 @@ function renderEditQuestions() {
             <button onclick="editQAddRow(${qi})" style="padding:4px 10px;background:transparent;border:1.5px dashed #c4b5fd;border-radius:7px;cursor:pointer;color:#7c3aed;font-size:11.5px;font-weight:600;transition:all .15s;margin-top:2px" onmouseenter="this.style.background='#f5f3ff'" onmouseleave="this.style.background='transparent'">+ Thêm hàng</button>
           </div>
           <div>
-            <div style="font-size:11px;font-weight:700;color:#00008B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Cột (lựa chọn)</div>
+            <div style="font-size:11px;font-weight:700;color:#0250AD;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Cột (lựa chọn)</div>
             ${cols.map((c,ci)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
-              <span style="width:14px;height:14px;border-radius:${normalizedType==='grid_radio'?'50%':'3px'};border:1.5px solid #00008B;flex-shrink:0;display:inline-block;background:#fff"></span>
+              <span style="width:14px;height:14px;border-radius:${normalizedType==='grid_radio'?'50%':'3px'};border:1.5px solid #0250AD;flex-shrink:0;display:inline-block;background:#fff"></span>
               <input type="text" value="${c.replace(/"/g,'&quot;')}" placeholder="Cột ${ci+1}"
                 style="flex:1;padding:5px 9px;border:1px solid #e2e8f0;border-radius:7px;font-size:12px;background:#fff;outline:none;transition:border .15s"
-                onfocus="this.style.borderColor='#00008B'" onblur="this.style.borderColor='#e2e8f0'"
+                onfocus="this.style.borderColor='#0250AD'" onblur="this.style.borderColor='#e2e8f0'"
                 oninput="editQSetCol(${qi},${ci},this.value)">
               ${cols.length>1?`<button onclick="editQRemoveCol(${qi},${ci})" style="width:20px;height:20px;background:none;border:none;cursor:pointer;color:#cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;line-height:1;flex-shrink:0;transition:color .15s" onmouseenter="this.style.color='#ef4444'" onmouseleave="this.style.color='#cbd5e1'">×</button>`:''}
             </div>`).join('')}
-            <button onclick="editQAddCol(${qi})" style="padding:4px 10px;background:transparent;border:1.5px dashed #00008B;border-radius:7px;cursor:pointer;color:#00008B;font-size:11.5px;font-weight:600;transition:all .15s;margin-top:2px" onmouseenter="this.style.background='#00008B'" onmouseleave="this.style.background='transparent'">+ Thêm cột</button>
+            <button onclick="editQAddCol(${qi})" style="padding:4px 10px;background:transparent;border:1.5px dashed #0250AD;border-radius:7px;cursor:pointer;color:#0250AD;font-size:11.5px;font-weight:600;transition:all .15s;margin-top:2px" onmouseenter="this.style.background='#0250AD'" onmouseleave="this.style.background='transparent'">+ Thêm cột</button>
           </div>
         </div>` : ''}
 
         <!-- Bottom: bắt buộc -->
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9;flex-wrap:wrap">
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none">
-            <div style="position:relative;width:34px;height:18px">
-              <input type="checkbox" ${editFormQuestions[qi].required ? 'checked' : ''} onchange="editFormQuestions[qi].required=this.checked;renderEditQuestions()"
-                style="opacity:0;width:0;height:0;position:absolute">
-              <span style="position:absolute;inset:0;background:${editFormQuestions[qi].required ? '#00008B' : '#cbd5e1'};border-radius:9px;transition:background .2s;cursor:pointer"></span>
+          <button type="button" onclick="editQSetRequired(${qi}, !editFormQuestions[${qi}].required)" aria-pressed="${editFormQuestions[qi].required ? 'true' : 'false'}" style="display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;background:transparent;border:0;padding:0;font-family:inherit">
+            <span style="position:relative;width:34px;height:18px;display:inline-block;flex-shrink:0">
+              <span style="position:absolute;inset:0;background:${editFormQuestions[qi].required ? '#0250AD' : '#cbd5e1'};border-radius:9px;transition:background .2s"></span>
               <span style="position:absolute;top:3px;left:${editFormQuestions[qi].required ? '18px' : '3px'};width:12px;height:12px;background:#fff;border-radius:50%;transition:left .2s;pointer-events:none"></span>
-            </div>
-            <span style="font-size:12px;font-weight:600;color:${editFormQuestions[qi].required ? '#00008B' : '#94a3b8'}">Bắt buộc</span>
-          </label>
+            </span>
+            <span style="font-size:12px;font-weight:600;color:${editFormQuestions[qi].required ? '#0250AD' : '#94a3b8'}">Bắt buộc</span>
+          </button>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto">
             ${renderLibrarySaveButton({ saved: isQuestionSavedInLibrary(editFormQuestions[qi]), onclick: `editQSaveToLibrary(${qi}, this)` })}
             <button onclick="editQRemove(${qi})"
@@ -7413,6 +8441,27 @@ function renderEditQuestions() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
               Xóa
             </button>
+            <div style="position:relative">
+              <button onclick="editFormQuestions[${qi}]._showMoreOptions=!editFormQuestions[${qi}]._showMoreOptions;renderEditQuestions()"
+                style="height:34px;width:34px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#64748b;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center"
+                onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='#fff'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+              </button>
+              ${q._showMoreOptions ? `
+              <div style="position:absolute;bottom:calc(100% + 4px);right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);padding:14px;width:220px;z-index:50">
+                <div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Hiển thị</div>
+                <label style="display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer">
+                  <input type="checkbox" ${q.showDesc ? 'checked' : ''} onchange="editFormQuestions[${qi}].showDesc=this.checked;editFormQuestions[${qi}].has_description=this.checked;if(!this.checked){editFormQuestions[${qi}].desc='';editFormQuestions[${qi}].mo_ta='';editFormQuestions[${qi}].mo_ta_cau_hoi='';}renderEditQuestions()" style="accent-color:#0250AD;width:16px;height:16px;cursor:pointer">
+                  <span style="font-size:13px;color:#334155;font-weight:500">Mô tả</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                  <input type="checkbox" ${q.showValidation ? 'checked' : ''} onchange="editFormQuestions[${qi}].showValidation=this.checked;editFormQuestions[${qi}].has_validation=this.checked;if(this.checked && !editFormQuestions[${qi}].validation)editFormQuestions[${qi}].validation=getDefaultValidationRuleForQuestion(editFormQuestions[${qi}]);if(!this.checked)delete editFormQuestions[${qi}].validation;renderEditQuestions()" style="accent-color:#0250AD;width:16px;height:16px;cursor:pointer">
+                  <span style="font-size:13px;color:#334155;font-weight:500">Xác thực phản hồi</span>
+                </label>
+              </div>
+              <div style="position:fixed;inset:0;z-index:40" onclick="editFormQuestions[${qi}]._showMoreOptions=false;renderEditQuestions()"></div>
+              ` : ''}
+            </div>
           </div>
         </div>
       </div>
@@ -7421,7 +8470,7 @@ function renderEditQuestions() {
       <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;border-left:1px solid #f1f5f9;min-width:40px">
         <button onclick="editQAddImage(${qi})" title="Thêm hình ảnh"
           style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.color='#00008B';this.style.background='#00008B'"
+          onmouseenter="this.style.color='#0250AD';this.style.background='#0250AD'"
           onmouseleave="this.style.color='#94a3b8';this.style.background='none'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
         </button>
@@ -7433,7 +8482,7 @@ function renderEditQuestions() {
         </button>
         <button onclick="editQAddSection(${qi})" title="Thêm phần bên dưới"
           style="width:32px;height:32px;border:none;background:none;cursor:pointer;color:#94a3b8;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:all .15s"
-          onmouseenter="this.style.color='#f59e0b';this.style.background='#fef3c7'"
+          onmouseenter="this.style.color='#FA7413';this.style.background='#FA7413'"
           onmouseleave="this.style.color='#94a3b8';this.style.background='none'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/></svg>
         </button>
@@ -7472,14 +8521,14 @@ function eqDragStart(event, qi) {
   event.dataTransfer.effectAllowed = 'move';
   setTimeout(() => {
     const el = document.getElementById('eqcard-' + qi);
-    if (el) { el.style.opacity = '0.4'; el.style.boxShadow = '0 0 0 2px #00008B'; }
+    if (el) { el.style.opacity = '0.4'; el.style.boxShadow = '0 0 0 2px #0250AD'; }
   }, 0);
 }
 function eqDragOver(event) {
   event.preventDefault();
   event.dataTransfer.dropEffect = 'move';
   const card = event.currentTarget;
-  if (card) card.style.borderColor = '#00008B';
+  if (card) card.style.borderColor = '#0250AD';
 }
 function eqDrop(event, toQi) {
   event.preventDefault();
@@ -7526,6 +8575,14 @@ function eqOptDragEnd() {
 // -------------------------------------------------------------------
 
 function editQSetText(qi, val) { editFormQuestions[qi].text = val; }
+
+function editQSetRequired(qi, val) {
+  const q = editFormQuestions[qi];
+  if (!q) return;
+  q.required = !!val;
+  q.bat_buoc = !!val;
+  renderEditQuestions();
+}
 
 function editQAddImage(qi) {
   if (!editFormQuestions[qi]) return;
@@ -7696,7 +8753,7 @@ function editQAdd(position = 'first-section') {
 document.getElementById('page-content').insertAdjacentHTML('beforeend', `
   <div class="modal-overlay" id="edit-form-modal">
     <div class="modal" onclick="event.stopPropagation()" style="max-width:920px;width:min(92vw,920px);border-radius:16px;display:flex;flex-direction:column">
-      <div class="modal-header" style="position:relative;align-items:flex-start;padding:18px 260px 14px 24px;background:#00008B;color:#fff;border-bottom:0;border-radius:16px 16px 0 0">
+      <div class="modal-header" style="flex-shrink:0;position:relative;align-items:flex-start;padding:18px 260px 14px 24px;background:#0250AD;color:#fff;border-bottom:0;border-radius:16px 16px 0 0">
         <div style="display:flex;align-items:flex-start;gap:10px;width:100%;min-width:0">
           <button id="collapse-edit-btn" class="btn btn-outline btn-sm" onclick="toggleEditFormFullscreen()" style="display:none;align-items:center;gap:6px;margin-top:2px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>
@@ -7735,22 +8792,22 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
           </div>
         </div>
         <div id="edit-form-header-actions" style="position:absolute;right:24px;top:22px;z-index:3;display:flex;align-items:center;gap:6px">
-          <button class="icon-btn" title="Giao diện" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button class="icon-btn" title="Giao diện" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 3C7 3 3 6.8 3 11.5S7.1 20 12.2 20h1.3c1.3 0 2.3-1.1 2.1-2.4-.1-.7-.4-1.3-.8-1.8-.7-.9-.1-2.3 1.1-2.3H18c1.7 0 3-1.4 3-3.1C21 6.3 17 3 12 3z"/></svg>
           </button>
-          <button id="edit-undo-btn" class="icon-btn" title="Hoàn tác" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button id="edit-undo-btn" class="icon-btn" title="Hoàn tác" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>
           </button>
-          <button id="edit-redo-btn" class="icon-btn" title="Làm lại" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button id="edit-redo-btn" class="icon-btn" title="Làm lại" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>
           </button>
-          <button class="icon-btn" title="Lấy liên kết" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button class="icon-btn" title="Lấy liên kết" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"/></svg>
           </button>
-          <button class="icon-btn" title="Thêm cộng tác viên" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-500)'">
+          <button class="icon-btn" title="Thêm cộng tác viên" onclick="alert('Chức năng đang phát triển')" style="color:var(--gray-500);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-500)'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
           </button>
-          <button id="expand-edit-btn" class="icon-btn" title="Phóng to" onclick="toggleEditFormFullscreen()" style="color:var(--gray-400);transition:all .15s" onmouseenter="this.style.color='#00008B'" onmouseleave="this.style.color='var(--gray-400)'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+          <button id="expand-edit-btn" class="icon-btn" title="Phóng to" onclick="toggleEditFormFullscreen()" style="color:var(--gray-400);transition:all .15s" onmouseenter="this.style.color='#0250AD'" onmouseleave="this.style.color='var(--gray-400)'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
           <button class="icon-btn close-btn" onclick="closeModal('edit-form-modal')">${IC.close}</button>
         </div>
       </div>
@@ -7786,7 +8843,7 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
               <input type="date" id="edit-form-close" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" onchange="syncEditCloseToDisplay(this.value); if(isPastInputDate(this.value)){showToast('Không được chọn ngày đóng trong quá khứ','error'); this.value=''; syncEditCloseToDisplay('');}">
               <input type="text" id="edit-form-close-display" class="input" placeholder="dd/mm/yyyy" readonly style="width:100%;background:#f8f9fb;height:38px;font-size:12.5px;cursor:pointer" onclick="openEditCloseDatePicker()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openEditCloseDatePicker()}">
               <label style="display:flex;align-items:center;gap:6px;margin-top:7px;cursor:pointer;font-size:12.5px;color:var(--gray-600)">
-                <input type="checkbox" id="edit-form-no-close" style="width:15px;height:15px;accent-color:var(--sidebar-active,#df2f0b);cursor:pointer" onchange="setEditNoCloseState(this.checked)">
+                <input type="checkbox" id="edit-form-no-close" style="width:15px;height:15px;accent-color:#FA7413;cursor:pointer" onchange="setEditNoCloseState(this.checked)">
                 Không đóng
               </label>
             </div>
@@ -7796,23 +8853,25 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
         <div style="padding:14px 0">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
             <span style="font-size:13.5px;font-weight:700;color:var(--gray-700)">
-              Tổng <span id="edit-q-count" style="color:#00008B">0</span> câu hỏi
+              Tổng <span id="edit-q-count" style="color:#0250AD">0</span> câu hỏi
             </span>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+              ${renderFormSettingsButton('edit')}
               <button onclick="toggleEditLibrary()" title="Chọn từ thư viện câu hỏi"
                 style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:12.5px;font-weight:700;color:#64748b;cursor:pointer;transition:all .15s;white-space:nowrap"
-                onmouseenter="this.style.borderColor='#00008B';this.style.color='#00008B'"
+                onmouseenter="this.style.borderColor='#0250AD';this.style.color='#0250AD'"
                 onmouseleave="this.style.borderColor='#e2e8f0';this.style.color='#64748b'">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4v15.5A2.5 2.5 0 006.5 22H20V6a2 2 0 00-2-2H6.5A2.5 2.5 0 004 6.5"/></svg>
                 Thư viện (<span id="edit-lib-total-count">0</span>)
               </button>
               <button onclick="editQAdd('first-section')" title="Thêm câu hỏi"
-                style="width:34px;height:34px;padding:0;background:var(--sky);color:#fff;border:none;border-radius:8px;cursor:pointer;transition:opacity .15s;box-shadow:0 2px 6px rgba(0,0,139,0.3);display:flex;align-items:center;justify-content:center"
+                style="width:34px;height:34px;padding:0;background:var(--sky);color:#fff;border:none;border-radius:8px;cursor:pointer;transition:opacity .15s;box-shadow:0 2px 6px rgba(2,80,173,0.3);display:flex;align-items:center;justify-content:center"
                 onmouseenter="this.style.opacity='.88'" onmouseleave="this.style.opacity='1'">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>
             </div>
           </div>
+          ${renderFormSettingsPanel('edit')}
           <div id="edit-library-panel" style="display:none;border:1px solid #cfe0ff;border-radius:14px;overflow:hidden;margin:0 0 14px;background:#fff;box-shadow:0 14px 34px rgba(15,23,42,.08)">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:linear-gradient(180deg,#f8fbff 0%,#eef5ff 100%);border-bottom:1px solid #dbe8ff">
               <div style="min-width:0">
@@ -7861,10 +8920,10 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
         <div style="display:flex;align-items:center;gap:10px">
           <div style="font-size:13px;color:var(--gray-500)">Đã chọn <strong id="edit-q-bottom-count" style="color:var(--sky)">0</strong> câu hỏi</div>
           <button type="button" onclick="openEditFormPreview()" title="Xem trước biểu mẫu"
-            style="height:38px;min-width:118px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 14px;border-radius:10px;border:1.5px solid #00008B;background:#fff;font-size:12.5px;font-weight:900;color:#00008B;cursor:pointer;transition:background .15s,border-color .15s,color .15s,box-shadow .15s;white-space:nowrap"
-            onmouseenter="this.style.background='#dbeafe';this.style.borderColor='#00008B';this.style.color='#00008B';this.style.boxShadow='0 6px 16px rgba(0,0,139,.16)'"
-            onmouseleave="this.style.background='#fff';this.style.borderColor='#00008B';this.style.color='#00008B';this.style.boxShadow='none'"
-            onmousedown="this.style.background='#bfdbfe';this.style.color='#00008B'">
+            style="height:38px;min-width:118px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 14px;border-radius:10px;border:1.5px solid #0250AD;background:#fff;font-size:12.5px;font-weight:900;color:#0250AD;cursor:pointer;transition:background .15s,border-color .15s,color .15s,box-shadow .15s;white-space:nowrap"
+            onmouseenter="this.style.background='#dbeafe';this.style.borderColor='#0250AD';this.style.color='#0250AD';this.style.boxShadow='0 6px 16px rgba(2,80,173,.16)'"
+            onmouseleave="this.style.background='#fff';this.style.borderColor='#0250AD';this.style.color='#0250AD';this.style.boxShadow='none'"
+            onmousedown="this.style.background='#bfdbfe';this.style.color='#0250AD'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             Xem trước
           </button>
@@ -7883,7 +8942,7 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
 // -- Charts (data-driven from FORMS list) ------------------------
 let fmLineChart = null;
 let fmDoughnutChart = null;
-const CAT_COLORS = {'Đăng ký':'#00008B','Khảo sát':'#8b5cf6','Đánh giá':'#f97316','Phản hồi':'#10b981','Khác':'#64748b'};
+const CAT_COLORS = {'Đăng ký':'#0250AD','Khảo sát':'#8b5cf6','Đánh giá':'#FA7413','Phản hồi':'#10b981','Khác':'#64748b'};
 // --- VIEW QUESTIONS MODAL ---------------------------------------
 
 let viewFormHistoryActive = false;
@@ -7941,9 +9000,9 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
         <div>
           <div class="modal-title" id="view-modal-title" style="font-size:22px;line-height:1.15;font-weight:800;color:#0f172a">Chi tiết biểu mẫu</div>
         </div>
-        <button class="icon-btn close-btn" onclick="closeViewFormModal()" style="width:36px;height:36px;border-radius:10px;background:#ffffff;border:1px solid #93c5fd;color:#00008B;box-shadow:0 6px 16px rgba(15,23,42,.08)">${IC.close}</button>
+        <button class="icon-btn close-btn" onclick="closeViewFormModal()" style="width:36px;height:36px;border-radius:10px;background:#ffffff;border:1px solid #93c5fd;color:#0250AD;box-shadow:0 6px 16px rgba(15,23,42,.08)">${IC.close}</button>
       </div>
-      <div id="view-modal-body" style="padding:0;overflow-y:auto;flex:1;background:radial-gradient(circle at top left,rgba(0,0,139,.12),transparent 28%),linear-gradient(180deg,#f7fbff 0%,#eef5ff 100%)"></div>
+      <div id="view-modal-body" style="padding:0;overflow-y:auto;flex:1;background:radial-gradient(circle at top left,rgba(2,80,173,.12),transparent 28%),linear-gradient(180deg,#f7fbff 0%,#eef5ff 100%)"></div>
     </div>
   </div>
 `);
@@ -7959,7 +9018,7 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
         <button class="icon-btn close-btn" onclick="closeModal('share-form-modal')">${IC.close}</button>
       </div>
       <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
-        <div style="padding:14px 16px;border:1px solid #00008B;background:#00008B;border-radius:12px">
+        <div style="padding:14px 16px;border:1px solid #0250AD;background:#0250AD;border-radius:12px">
           <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px" id="share-form-name">Biểu mẫu</div>
           <div style="font-size:12.5px;color:var(--gray-500)" id="share-form-desc">Link này sẽ mở một trang biểu mẫu công khai với phần thông tin người học ở đầu biểu mẫu.</div>
         </div>
@@ -7973,7 +9032,7 @@ document.getElementById('page-content').insertAdjacentHTML('beforeend', `
           </div>
           <div style="margin-top:10px">
             <button id="shorten-btn" class="btn btn-outline" onclick="shortenAndCopyLink()" style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#7c3aed;border-color:#c4b5fd">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 007.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
               Rất gọn
             </button>
             <div id="shortened-link-wrap" style="display:none;margin-top:8px">
@@ -8053,7 +9112,7 @@ async function shortenAndCopyLink() {
   const btn = document.getElementById('shorten-btn');
   if (btn) { btn.textContent = 'Đang rút gọn...'; btn.disabled = true; }
   const short = await _doShortenLink(url);
-  if (btn) { btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Rất gọn'; btn.disabled = false; }
+  if (btn) { btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 007.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Rất gọn'; btn.disabled = false; }
   if (!short) { showToast('Không rút gọn được link, kiểm tra kết nối!', 'error'); return; }
   const wrap = document.getElementById('shortened-link-wrap');
   const input = document.getElementById('shortened-link-input');
@@ -8079,159 +9138,9 @@ async function shortenLinkForForm(formId) {
 }
 
 async function openViewModal(id, manageHistory = true) {
-  const f = FORMS.find(f => f.id === id);
+  const f = FORMS.find(f => String(f.id) === String(id));
   if (!f) return;
-  if (manageHistory) pushViewFormHistory(id);
-
-  // Cập nhật tiêu đề
-  document.getElementById('view-modal-title').innerHTML = formatRichText(f.name);
-  document.getElementById('view-modal-body').innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:center;padding:40px 0;color:var(--gray-400)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-dasharray="28" stroke-dashoffset="10"/></svg>
-      <span style="margin-left:10px;font-size:14px">Đang tải câu hỏi...</span>
-    </div>`;
-  openModal('view-form-modal');
-
-  // Gọi API lấy câu hỏi
-  let questions = [];
-  let formDetail = null;
-  const localPreviewItems = normalizeLocalItemsForPreview(
-    (Array.isArray(f.questions) && f.questions.length) ? f.questions : getFormItemsCache(id)
-  );
-  try {
-    const tkn4 = localStorage.getItem('token') || '';
-    const res = await fetch(`${API_BASE}/forms/${id}`, {
-      headers: tkn4 ? { Authorization: `Bearer ${tkn4}` } : {}
-    });
-    if (res.ok) {
-      const data = await res.json();
-      formDetail = data;
-      questions = (Array.isArray(data.form_items) && data.form_items.length ? data.form_items : data.cau_hoi) || [];
-    }
-  } catch(e) {
-    console.warn('Không tải được chi tiết biểu mẫu, dùng dữ liệu tạm:', e);
-  }
-  questions = questions.length ? questions : localPreviewItems;
-  questions = mergeQuestionLocalFallback(questions, localPreviewItems);
-  questions = mergeQuestionMediaCache(id, questions);
-  const formDesc = (formDetail?.mo_ta || f.mo_ta || f.desc || '').trim();
-  const viewFormInfo = {
-    name: f.name,
-    desc: formDesc,
-    cat: f.cat || formDetail?.danh_muc || 'Khác',
-    target: formDetail?.doi_tuong || f.target || f.doi_tuong || '',
-    theme: {
-      ...DEFAULT_FORM_THEME,
-      headerImage: formDetail?.anh_bia || f.anh_bia || '',
-      background: formDetail?.mau_nen || f.mau_nen || DEFAULT_FORM_THEME.background,
-      headerFont: formDetail?.font_family || f.font_family || DEFAULT_FORM_THEME.headerFont,
-    },
-    anh_bia: formDetail?.anh_bia || f.anh_bia || '',
-  };
-
-  formPreviewPageState = { page: 0, formInfo: viewFormInfo, questions, containerId: 'view-modal-body' };
-
-  document.getElementById('view-modal-body').innerHTML = renderFormPreviewSurface(
-    { ...viewFormInfo, _previewPageIndex: 0 },
-    questions
-  );
-  return;
-
-  const renderViewAnswer = (question) => {
-    const normalizedType = normalizeQuestionType(question.loai);
-    const options = (question.lua_chon || []).map(o => o.noi_dung || o).filter(Boolean);
-    if (normalizedType === 'short_text') {
-      return `<div style="max-width:420px"><div style="font-size:12.5px;color:#64748b;margin-bottom:8px">Câu trả lời ngắn</div><div style="height:42px;border-bottom:2px solid #cbd5e1;background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,.95));border-radius:10px 10px 0 0"></div></div>`;
-    }
-    if (normalizedType === 'paragraph') {
-      return `<div><div style="font-size:12.5px;color:#64748b;margin-bottom:8px">Câu trả lời dài</div><div style="height:92px;border:1.5px solid #dbe4f0;background:rgba(255,255,255,.92);border-radius:14px;position:relative;overflow:hidden"><div style="position:absolute;left:18px;right:18px;top:20px;height:1px;background:#d7dee8"></div><div style="position:absolute;left:18px;right:18px;top:46px;height:1px;background:#d7dee8"></div><div style="position:absolute;left:18px;right:18px;top:72px;height:1px;background:#d7dee8"></div></div></div>`;
-    }
-    if (normalizedType === 'choice') {
-      return `<div style="display:flex;flex-direction:column;gap:10px">${options.map((option, index) => `<label style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #dbe4f0;border-radius:12px;background:rgba(255,255,255,.92)"><span style="width:18px;height:18px;border-radius:50%;border:2px solid #00008B;flex-shrink:0"></span><span style="font-size:14px;color:#334155">${option || `Lựa chọn ${index + 1}`}</span></label>`).join('')}</div>`;
-    }
-    if (normalizedType === 'checkbox') {
-      return `<div style="display:flex;flex-direction:column;gap:10px">${options.map((option, index) => `<label style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #dbe4f0;border-radius:12px;background:rgba(255,255,255,.92)"><span style="width:18px;height:18px;border-radius:5px;border:2px solid #f59e0b;flex-shrink:0"></span><span style="font-size:14px;color:#334155">${option || `Lựa chọn ${index + 1}`}</span></label>`).join('')}</div>`;
-    }
-    if (normalizedType === 'dropdown') {
-      return `<div style="max-width:360px"><div style="padding:12px 14px;border:1px solid #dbe4f0;border-radius:12px;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:space-between;color:#64748b"><span>Chọn một mục</span><span style="font-size:16px">?</span></div>${options.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${options.map(option => `<span style="padding:6px 10px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa;font-size:12.5px;color:#9a3412">${option}</span>`).join('')}</div>` : ''}</div>`;
-    }
-    if (normalizedType === 'rating') {
-      return renderRatingPreview(getQuestionRatingConfig(question));
-    }
-    if (normalizedType === 'scale') {
-      return renderScalePreview(getQuestionScaleConfig(question));
-    }
-    if (normalizedType === 'upload') {
-      return `<button disabled style="display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border:1.5px dashed #94a3b8;border-radius:12px;background:#f8fafc;color:#475569;font-size:13px;font-weight:800"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M20 16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3"/></svg>Tải tệp lên</button>`;
-    }
-    if (normalizedType === 'date' || normalizedType === 'time') {
-      return `<input disabled type="${normalizedType === 'date' ? 'date' : 'time'}" style="width:220px;max-width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #bbf7d0;border-radius:12px;background:#f8fffb;color:#64748b;font:inherit">`;
-    }
-    if (normalizedType === 'grid_radio' || normalizedType === 'grid_checkbox') {
-      const rows = getGridRows(question);
-      const cols = getGridCols(question);
-      if (!rows.length || !cols.length) {
-        return `<div style="padding:12px 14px;border:1px dashed #f59e0b;border-radius:12px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:700">Câu hỏi lưới chưa có dữ liệu hàng/cột.</div>`;
-      }
-      const control = normalizedType === 'grid_radio'
-        ? '<span style="width:16px;height:16px;border-radius:50%;border:2px solid #00008B;display:inline-block"></span>'
-        : '<span style="width:16px;height:16px;border-radius:4px;border:2px solid #f59e0b;display:inline-block"></span>';
-      return `<div style="overflow:auto"><table style="width:100%;min-width:520px;table-layout:fixed;border-collapse:separate;border-spacing:0 8px"><thead><tr><th style="text-align:left;padding:0 12px 6px;color:#64748b;font-size:12px;font-weight:700"></th>${cols.map(col => `<th style="text-align:center;padding:0 12px 6px;color:#00008B;font-size:12px;font-weight:700">${col}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr><td style="padding:14px 12px;background:rgba(255,255,255,.92);border:1px solid #dbe4f0;border-right:none;border-radius:12px 0 0 12px;font-size:14px;font-weight:600;color:#334155">${row}</td>${cols.map(() => `<td style="padding:14px 12px;background:rgba(255,255,255,.92);border-top:1px solid #dbe4f0;border-bottom:1px solid #dbe4f0;text-align:center">${control}</td>`).join('')}<td style="width:1px;padding:0;background:transparent;border:none"></td></tr>`).join('')}</tbody></table></div>`;
-    }
-    return `<div style="font-size:13px;color:#94a3b8">Không có dữ liệu xem trước.</div>`;
-  };
-
-  if (!questions.length) {
-    document.getElementById('view-modal-body').innerHTML = `
-      <div style="text-align:center;padding:40px 0;color:var(--gray-400)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="40" height="40" style="margin:0 auto 12px;display:block;opacity:.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <div style="font-size:14px">Biểu mẫu này chưa có câu hỏi nào</div>
-      </div>`;
-    return;
-  }
-
-  document.getElementById('view-modal-body').innerHTML = `
-    <div style="max-width:980px;margin:0 auto;color:#172554">
-      <div style="background:linear-gradient(135deg,#dbeafe 0%,#eff6ff 55%,#e0e7ff 100%);border:1px solid #bfdbfe;border-radius:26px;min-height:180px;position:relative;overflow:hidden;box-shadow:0 22px 42px rgba(30,64,175,.14)">
-        <div style="position:absolute;inset:0;background-image:url('${(f.img || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1400&h=700&fit=crop').replace(/'/g, '%27')}');background-size:cover;background-position:center;filter:saturate(1.05) contrast(1.02);transform:scale(1.03)"></div>
-        <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(239,246,255,.95) 0%,rgba(219,234,254,.88) 46%,rgba(224,231,255,.93) 100%)"></div>
-        <div style="position:relative;padding:28px 30px;color:#172554;display:flex;flex-direction:column;justify-content:flex-end;min-height:140px">
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-            <span style="padding:6px 12px;border-radius:999px;background:#ffffff;border:1px solid #bfdbfe;font-size:12px;font-weight:800;color:#00008B">${f.cat || 'Khác'}</span>
-            <span style="padding:6px 12px;border-radius:999px;background:#ffffff;border:1px solid #bfdbfe;font-size:12px;font-weight:800;color:#00008B">Tổng ${countRealQuestions(questions)} câu hỏi</span>
-          </div>
-          <div style="font-size:32px;line-height:1.2;font-weight:700;letter-spacing:-0.02em;color:#00008B">${formatRichText(f.name)}</div>
-          ${formDesc ? `<div style="font-size:16px;margin-top:12px;color:#334155;font-weight:600;line-height:1.55">${formatRichText(formDesc)}</div>` : ''}
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:16px;padding:12px 0 28px">
-      ${questions.map((q, i) => isSectionItem(q) ? `
-        <div style="border:1px solid #fbbf24;border-left:6px solid #f59e0b;border-radius:20px;padding:20px 22px;background:linear-gradient(180deg,#fffbeb 0%,#fff7ed 100%);box-shadow:0 12px 26px rgba(180,83,9,.08)">
-          <div style="font-size:12px;font-weight:900;color:#b45309;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Phần ${getSectionNumber(questions, i)}</div>
-          <div style="font-size:24px;font-weight:900;color:#78350f;line-height:1.3">${q.title || q.noi_dung || `Phần ${getSectionNumber(questions, i)}`}</div>
-          ${(q.desc || q.description || q.mo_ta_cau_hoi) ? `<div style="font-size:14px;color:#92400e;line-height:1.55;margin-top:8px">${q.desc || q.description || q.mo_ta_cau_hoi}</div>` : ''}
-        </div>
-      ` : `
-        <div style="border:1px solid #bfdbfe;border-radius:20px;padding:20px 20px 22px;background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);box-shadow:0 12px 26px rgba(30,64,175,.08)">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
-            <div style="display:flex;align-items:flex-start;gap:14px;flex:1;min-width:0">
-              <div style="width:36px;height:36px;border-radius:50%;background:#00008B;color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;box-shadow:0 8px 18px rgba(0,0,139,.18)">${getQuestionNumberInSection(questions, i)}</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:12px;line-height:1.5">
-                  ${formatRichText(q.noi_dung, q.bat_buoc)}
-                </div>
-                ${renderQuestionMedia(q)}
-                ${renderViewAnswer(q)}
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-              <span style="flex-shrink:0;padding:6px 12px;border-radius:999px;background:#00008B;color:#fff;font-size:12px;font-weight:800;white-space:nowrap">${TYPE_LABEL_MAP[normalizeQuestionType(q.loai)] || normalizeQuestionType(q.loai)}</span>
-            </div>
-          </div>
-        </div>
-      `).join('')}
-      </div>
-    </div>`;
+  window.open(buildPublicFormLink(id), '_blank');
 }
 
 async function saveEditForm() {
@@ -8247,6 +9156,7 @@ async function saveEditForm() {
   const editNoClose = document.getElementById('edit-form-no-close');
   const closeDate = editNoClose?.checked ? '' : (document.getElementById('edit-form-close')?.value || '');
   const loiKet = document.getElementById('edit-form-loi-ket')?.value?.trim() || '';
+  const formSettings = getFormSettingsFromControls('edit');
 
   if (!name) {
     showToast('Vui lòng nhập tên biểu mẫu!', 'error');
@@ -8318,6 +9228,7 @@ async function saveEditForm() {
       mo_ta: desc,
       ngay_dong: closeDate || null,
       loi_ket: loiKet,
+      settings: formSettings,
       cau_hoi: buildQuestionPayload(chosenQuestions),
     };
     assertFormPayloadWithinLimit(payload);
@@ -8362,6 +9273,8 @@ async function saveEditForm() {
       desc,
       so_cau_hoi: countRealQuestions(chosenQuestions),
       questionPreview: firstQuestionPreview,
+      settings: formSettings,
+      ...formSettings,
       questions: chosenQuestions
     };
     filtered = filtered.map(f => String(f.id) === String(id) ? FORMS[idx] : f);
@@ -8384,7 +9297,6 @@ async function saveEditForm() {
         throw new Error(resubmitData.message || 'Không gửi lại được yêu cầu phê duyệt');
       }
       syncResubmittedApprovalLocal(rejectedCtx.approvalId, id, name, cat, chosenQuestions);
-      if (typeof window.logActivity === 'function') window.logActivity('edit', id, name, 'Chỉnh sửa biểu mẫu');
       closeModal('edit-form-modal');
       showToast(`Đã cập nhật biểu mẫu "${name}" và gửi duyệt lại`, 'success');
       setTimeout(() => {
@@ -8408,7 +9320,6 @@ async function saveEditForm() {
         note: '',
         questions: chosenQuestions,
       });
-      if (typeof window.logActivity === 'function') window.logActivity('edit', id, name, 'Chỉnh sửa biểu mẫu');
       closeModal('edit-form-modal');
       showToast(`Đã cập nhật biểu mẫu "${name}" và gửi duyệt`, 'success');
       return;
@@ -8464,7 +9375,7 @@ if (window.location.pathname.includes('form-create')) (function initStandaloneCr
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
             Quay lại
           </button>
-          <span class="badge" style="background:#00008B;color:#fff">Trang tạo biểu mẫu</span>
+          <span class="badge" style="background:#0250AD;color:#fff">Trang tạo biểu mẫu</span>
         </div>
         <h2 class="page-title">Tạo biểu mẫu mới</h2>
         <p class="page-sub">Người dùng có thể tập trung thêm câu hỏi và cấu hình biểu mẫu trên một trang riêng thay vì popup.</p>
@@ -8780,7 +9691,7 @@ function openImageSourceModal(callback) {
             <button onclick="closeImageSourceModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b">&times;</button>
           </div>
           <div style="display:flex;border-bottom:1px solid #e2e8f0;padding:0 24px">
-            <button class="ism-tab-btn active" data-tab="ism-upload" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid #00008B;color:#00008B;font-weight:600;cursor:pointer;font-size:14px">Tải lên</button>
+            <button class="ism-tab-btn active" data-tab="ism-upload" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid #0250AD;color:#0250AD;font-weight:600;cursor:pointer;font-size:14px">Tải lên</button>
             <button class="ism-tab-btn" data-tab="ism-webcam" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#64748b;font-weight:600;cursor:pointer;font-size:14px">Webcam</button>
             <button class="ism-tab-btn" data-tab="ism-url" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#64748b;font-weight:600;cursor:pointer;font-size:14px">Theo URL</button>
           </div>
@@ -8790,7 +9701,7 @@ function openImageSourceModal(callback) {
             <div id="ism-upload" class="ism-tab-content" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;border:2px dashed #cbd5e1;border-radius:8px;background:#f8fafc">
               <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" width="48" height="48" style="margin-bottom:16px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
               <div style="color:#64748b;margin-bottom:16px;font-size:14px">Kéo tệp vào đây hoặc</div>
-              <button onclick="document.getElementById('ism-file-input').click()" style="padding:8px 16px;background:#00008B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">Duyệt qua máy tính</button>
+              <button onclick="document.getElementById('ism-file-input').click()" style="padding:8px 16px;background:#0250AD;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">Duyệt qua máy tính</button>
               <input type="file" id="ism-file-input" accept="image/*" style="display:none" onchange="handleIsmFileUpload(event)">
             </div>
             
@@ -8802,7 +9713,7 @@ function openImageSourceModal(callback) {
                 <canvas id="ism-canvas" style="display:none"></canvas>
                 <svg id="ism-webcam-placeholder" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" width="48" height="48"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
               </div>
-              <button id="ism-capture-btn" onclick="handleIsmCapture()" style="padding:10px 24px;background:#00008B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;display:none">Chụp ảnh</button>
+              <button id="ism-capture-btn" onclick="handleIsmCapture()" style="padding:10px 24px;background:#0250AD;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;display:none">Chụp ảnh</button>
             </div>
             
             <!-- Tab URL -->
@@ -8813,7 +9724,7 @@ function openImageSourceModal(callback) {
                 <img id="ism-url-preview" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid #e2e8f0;object-fit:contain">
               </div>
               <div style="margin-top:auto;display:flex;justify-content:flex-end">
-                <button onclick="handleIsmUrlSubmit()" style="padding:10px 24px;background:#00008B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;margin-top:16px">Chèn hình ảnh</button>
+                <button onclick="handleIsmUrlSubmit()" style="padding:10px 24px;background:#0250AD;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;margin-top:16px">Chèn hình ảnh</button>
               </div>
             </div>
 
@@ -8832,8 +9743,8 @@ function openImageSourceModal(callback) {
           b.style.color = '#64748b';
           b.classList.remove('active');
         });
-        e.target.style.borderBottomColor = '#00008B';
-        e.target.style.color = '#00008B';
+        e.target.style.borderBottomColor = '#0250AD';
+        e.target.style.color = '#0250AD';
         e.target.classList.add('active');
 
         document.querySelectorAll('.ism-tab-content').forEach(c => c.style.display = 'none');
@@ -8851,7 +9762,7 @@ function openImageSourceModal(callback) {
 
     // Drag drop logic
     const dropZone = document.getElementById('ism-upload');
-    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.background = '#eef2ff'; dropZone.style.borderColor = '#00008B'; });
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.background = '#eef2ff'; dropZone.style.borderColor = '#0250AD'; });
     dropZone.addEventListener('dragleave', e => { e.preventDefault(); dropZone.style.background = '#f8fafc'; dropZone.style.borderColor = '#cbd5e1'; });
     dropZone.addEventListener('drop', e => {
       e.preventDefault();
@@ -8995,11 +9906,8 @@ function initCreateFormFlatpickr() {
     });
 
     flatpickr("#new-form-close-display", {
-      enableTime: true,
-      dateFormat: "d/m/Y H:i",
-      time_24hr: true,
-      defaultHour: 23,
-      defaultMinute: 59,
+      enableTime: false,
+      dateFormat: "d/m/Y",
       locale: customVnLocale,
       minDate: "today",
       onChange: function(selectedDates, dateStr) {
@@ -9008,7 +9916,7 @@ function initCreateFormFlatpickr() {
           if (selectedDates.length > 0) {
             const d = selectedDates[0];
             const pad = n => String(n).padStart(2, '0');
-            hidden.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            hidden.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
           } else {
             hidden.value = '';
           }
@@ -9017,3 +9925,36 @@ function initCreateFormFlatpickr() {
     });
   }
 }
+document.addEventListener('click', () => document.querySelectorAll('.q-options-menu').forEach(m => m.style.display = 'none'));
+
+// Click-outside: deselect active question card when clicking outside any card
+document.addEventListener('click', function(e) {
+  // Reset deselect flag whenever user clicks a card directly
+  if (e.target.closest('[id^="dqcard-"]')) {
+    _dqUserDeselected = false;
+    return;
+  }
+  if (!activeDirectQuestionId) return;
+  // Only act inside the form modals
+  const modal = document.getElementById('create-form-modal') || document.getElementById('edit-form-modal');
+  if (!modal || modal.style.display === 'none') return;
+  // If click is inside the active card, do nothing
+  const activeCard = document.getElementById('dqcard-' + activeDirectQuestionId);
+  if (activeCard && activeCard.contains(e.target)) return;
+  // If click is inside a dropdown menu, library panel, or modal header/footer, do nothing
+  if (e.target.closest('.q-options-menu') ||
+      e.target.closest('#library-panel') ||
+      e.target.closest('#library-dialog') ||
+      e.target.closest('#edit-library-panel') ||
+      e.target.closest('.modal-header') ||
+      e.target.closest('.modal-footer') ||
+      e.target.closest('.image-dropdown-menu') ||
+      e.target.closest('#portal-fmenu') ||
+      e.target.closest('#create-theme-panel')) return;
+  // Deselect: set flag so renderDirectQList won't auto-pick first question
+  _dqUserDeselected = true;
+  activeDirectQuestionId = '';
+  renderDirectQList();
+}, true);
+
+

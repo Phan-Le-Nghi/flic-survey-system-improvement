@@ -120,31 +120,32 @@ function getActionBadge(type) {
   let color = '#374151';
   let borderColor = '#d1d5db';
   let label = type || 'Không xác định';
+  let badgeStyle = 'gap:4px; padding:4px 11px; border-radius:999px; font-size:12.5px; font-weight:600; width:120px; text-align:center;';
 
   const t = (type || '').toLowerCase();
 
   if (t === 'create' || t.includes('tạo')) {
-    bgColor = '#e0e7ff'; color = '#00008B'; borderColor = '#a5b4fc'; label = '+ Tạo mới';
+    bgColor = '#e0e7ff'; color = '#0250AD'; borderColor = '#a5b4fc'; label = '+ Tạo mới';
   } else if (t === 'edit' || t === 'update' || t.includes('sửa') || t.includes('trả lời')) {
-    bgColor = '#ffedd5'; color = '#c2410c'; borderColor = '#fdba74';
+    bgColor = '#fff7ed'; color = '#FA7413'; borderColor = '#fed7aa';
     if (t === 'edit' || t === 'update') label = '✎ Chỉnh sửa';
   } else if (t === 'delete' || t === 'hard_delete' || t.includes('xóa')) {
-    bgColor = '#fee2e2'; color = '#b91c1c'; borderColor = '#fca5a5';
+    bgColor = '#fef2f2'; color = '#dc2626'; borderColor = '#ef4444';
     label = '🗑 Xóa';
   } else if (t === 'restore' || t.includes('khôi phục')) {
     bgColor = '#eff6ff'; color = '#1e40af'; borderColor = '#93c5fd';
     label = '↺ Khôi phục';
-  } else if (t.includes('duyệt')) {
+  } else if (t === 'approve' || t.includes('duyệt')) {
     bgColor = '#dcfce7'; color = '#166534'; borderColor = '#86efac';
     label = '✓ Phê duyệt';
-  } else if (t.includes('từ chối')) {
-    bgColor = '#fef08a'; color = '#854d0e'; borderColor = '#fde047';
+  } else if (t === 'reject' || t.includes('từ chối')) {
+    bgColor = '#fef08a'; color = '#FA7413'; borderColor = '#fde047';
     label = '✗ Từ chối';
   } else if (t === 'login' || t.includes('đăng nhập')) {
     bgColor = '#e0f2fe'; color = '#0369a1'; borderColor = '#7dd3fc';
     label = 'Đăng nhập';
   } else if (t === 'export' || t.includes('xuất')) {
-    bgColor = '#fef08a'; color = '#854d0e'; borderColor = '#fde047';
+    bgColor = '#fef08a'; color = '#FA7413'; borderColor = '#fde047';
     label = '⬇ Xuất dữ liệu';
   } else if (t === 'close' || t.includes('đóng')) {
     bgColor = '#f1f5f9'; color = '#475569'; borderColor = '#cbd5e1';
@@ -153,11 +154,11 @@ function getActionBadge(type) {
     bgColor = '#f3e8ff'; color = '#7e22ce'; borderColor = '#d8b4fe';
   }
 
-  return `<span style="display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:3px 11px; border-radius:999px; background-color:${bgColor}; color:${color}; border:1px solid ${borderColor}; font-size:12.5px; font-weight:600; white-space:nowrap; width:115px; overflow:hidden; text-overflow:ellipsis;" title="${label.replace(/"/g, '&quot;')}">${label}</span>`;
+  return `<span style="display:inline-flex; align-items:center; justify-content:center; ${badgeStyle} background-color:${bgColor}; color:${color}; border:1px solid ${borderColor}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${label.replace(/"/g, '&quot;')}">${label}</span>`;
 }
 
 // Global click listener for view log form links to avoid inline onclick syntax errors
-document.addEventListener('click', function(e) {
+document.addEventListener('click', function (e) {
   const btn = e.target.closest('.view-log-form-btn');
   if (btn) {
     viewLogForm(btn.dataset.formid, btn.dataset.formname, btn.dataset.action, btn.dataset.detail);
@@ -231,37 +232,11 @@ function renderLogs(data) {
         let reason = reasonMatch ? reasonMatch[1].replace(/\)$/, '').trim() : '';
         displayDetail = `Chuyển từ trạng thái chờ duyệt sang trạng thái từ chối${reason ? ` (Lý do: ${reason})` : ''}`;
       }
-    } else if (tAct === 'create' || tAct.includes('tạo')) {
-      if ((log.formName || '').includes('(bản sao)')) {
-        let originalName = log.formName.replace(/\s*\(bản sao\)$/i, '');
-        displayDetail = `Tạo bản sao từ biểu mẫu "${originalName}"`;
-      } else {
-        displayDetail = 'Tạo biểu mẫu mới';
-      }
-    } else if (tAct === 'delete' || tAct === 'hard_delete' || tAct.includes('xóa')) {
-      let isHard = displayDetail.toLowerCase().includes('vĩnh viễn') || tAct === 'hard_delete';
-      let isFeedback = displayDetail.toLowerCase().includes('phản hồi');
-      let reasonMatch = displayDetail.match(/lý do:\s*(.*)/i);
-      let reason = reasonMatch ? reasonMatch[1].replace(/\)$/, '').trim() : '';
-      
-      if (isFeedback) {
-        if (displayDetail.toLowerCase().includes('tất cả')) {
-          displayDetail = isHard ? 'Xóa vĩnh viễn tất cả phản hồi' : 'Xóa tất cả các phản hồi của biểu mẫu';
-        } else {
-          displayDetail = isHard ? 'Xóa vĩnh viễn 1 phản hồi' : 'Xóa 1 phản hồi';
-        }
-      } else {
-        displayDetail = isHard ? 'Xóa vĩnh viễn' : 'Xóa biểu mẫu';
-      }
-      
-      if (reason && reason !== 'Không có lý do') {
-        displayDetail += ` (Lý do: ${reason})`;
-      }
     }
 
     const formNameSafe = (log.formName || '').replace(/"/g, '&quot;');
     const detailSafe = (log.detail || '').replace(/"/g, '&quot;');
-    const formLinkHtml = `<a href="javascript:void(0)" class="view-log-form-btn" data-formid="${log.formId || ''}" data-formname="${formNameSafe}" data-action="${log.actionType}" data-detail="${detailSafe}" style="color:#00008B; text-decoration:none; font-size:14.5px; font-weight:600;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${log.formName}</a>`;
+    const formLinkHtml = `<a href="javascript:void(0)" class="view-log-form-btn" data-formid="${log.formId || ''}" data-formname="${formNameSafe}" data-action="${log.actionType}" data-detail="${detailSafe}" style="color:#0250AD; text-decoration:none; font-size:14.5px; font-weight:600;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${log.formName}</a>`;
 
     return `
         <tr>

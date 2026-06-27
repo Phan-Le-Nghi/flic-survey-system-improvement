@@ -12,9 +12,20 @@ router.get("/", authMiddleware, authorize("view_notif"), async (req, res) => {
     const req2 = new sql.Request();
     let where = "WHERE 1=1";
 
-    if (status) { where += " AND trang_thai = @status"; req2.input("status", sql.NVarChar, status); }
-    if (type)   { where += " AND loai = @type";         req2.input("type",   sql.NVarChar, type); }
-    if (search) { where += " AND (tieu_de LIKE @search OR noi_dung LIKE @search)"; req2.input("search", sql.NVarChar, `%${search}%`); }
+    if (status) { where += " AND tb.trang_thai = @status"; req2.input("status", sql.NVarChar, status); }
+    if (type) { where += " AND tb.loai = @type"; req2.input("type", sql.NVarChar, type); }
+    if (search) { where += " AND (tb.tieu_de LIKE @search OR tb.noi_dung LIKE @search)"; req2.input("search", sql.NVarChar, `%${search}%`); }
+
+    if (req.user.vai_tro === 'nhan_vien') {
+      req2.input("userId", sql.Int, req.user.id);
+      const userRes = await req2.query(`SELECT email, ho_ten FROM NhanVien WHERE id = @userId`);
+      if (userRes.recordset[0]) {
+        const u = userRes.recordset[0];
+        req2.input("uEmail", sql.NVarChar, `%${u.email}%`);
+        req2.input("uName", sql.NVarChar, `%${u.ho_ten}%`);
+        where += " AND (tb.nguoi_nhan = N'Tất cả' OR tb.nguoi_nhan LIKE @uEmail OR tb.nguoi_nhan LIKE @uName)";
+      }
+    }
 
     const result = await req2.query(`
       SELECT tb.id, tb.tieu_de, tb.noi_dung, tb.loai, tb.trang_thai,
@@ -35,7 +46,20 @@ router.get("/", authMiddleware, authorize("view_notif"), async (req, res) => {
 // GET /api/notifications/stats
 router.get("/stats", authMiddleware, authorize("view_notif"), async (req, res) => {
   try {
-    const result = await sql.query`
+    const req2 = new sql.Request();
+    let where = "";
+    if (req.user.vai_tro === 'nhan_vien') {
+      req2.input("userId", sql.Int, req.user.id);
+      const userRes = await req2.query(`SELECT email, ho_ten FROM NhanVien WHERE id = @userId`);
+      if (userRes.recordset[0]) {
+        const u = userRes.recordset[0];
+        req2.input("uEmail", sql.NVarChar, `%${u.email}%`);
+        req2.input("uName", sql.NVarChar, `%${u.ho_ten}%`);
+        where = "WHERE nguoi_nhan = N'Tất cả' OR nguoi_nhan LIKE @uEmail OR nguoi_nhan LIKE @uName";
+      }
+    }
+
+    const result = await req2.query(`
       SELECT
         COUNT(*) AS tong,
         SUM(CASE WHEN trang_thai='sent'      THEN 1 ELSE 0 END) AS da_gui,
@@ -43,7 +67,8 @@ router.get("/stats", authMiddleware, authorize("view_notif"), async (req, res) =
         SUM(CASE WHEN trang_thai='draft'     THEN 1 ELSE 0 END) AS nhap,
         SUM(luot_da_doc) AS tong_luot_doc
       FROM ThongBao
-    `;
+      ${where}
+    `);
     res.json(result.recordset[0]);
   } catch (err) {
     err500(res, err);
@@ -51,17 +76,31 @@ router.get("/stats", authMiddleware, authorize("view_notif"), async (req, res) =
 });
 
 // GET /api/notifications/unread - Thông báo chưa đọc (dùng cho badge)
-router.get("/unread", async (req, res) => {
+router.get("/unread", authMiddleware, async (req, res) => {
   try {
-    const result = await sql.query`
+    const req2 = new sql.Request();
+    req2.input("userId", sql.Int, req.user.id);
+    const userRes = await req2.query(`SELECT email, ho_ten FROM NhanVien WHERE id = @userId`);
+    
+    let condition = "trang_thai = 'sent' AND id NOT IN (SELECT thong_bao_id FROM ThongBao_DaDoc WHERE nhan_vien_id = @userId)";
+    if (userRes.recordset[0]) {
+      const u = userRes.recordset[0];
+      req2.input("uEmail", sql.NVarChar, `%${u.email}%`);
+      req2.input("uName", sql.NVarChar, `%${u.ho_ten}%`);
+      condition += " AND (nguoi_nhan = N'Tất cả' OR nguoi_nhan LIKE @uEmail OR nguoi_nhan LIKE @uName)";
+    }
+
+    const result = await req2.query(`
       SELECT TOP 4 id, tieu_de, loai, ngay_tao
       FROM ThongBao
-      WHERE trang_thai = 'sent'
+      WHERE ${condition}
       ORDER BY ngay_tao DESC
-    `;
-    const count = await sql.query`
-      SELECT COUNT(*) AS so_chua_doc FROM ThongBao WHERE trang_thai='sent'
-    `;
+    `);
+    const count = await req2.query(`
+      SELECT COUNT(*) AS so_chua_doc 
+      FROM ThongBao 
+      WHERE ${condition}
+    `);
     res.json({ so_chua_doc: count.recordset[0].so_chua_doc, danh_sach: result.recordset });
   } catch (err) {
     err500(res, err);
@@ -80,6 +119,33 @@ router.get("/:id", authMiddleware, authorize("view_notif"), async (req, res) => 
     if (!result.recordset[0])
       return res.status(404).json({ message: "Không tìm thấy thông báo" });
     res.json(result.recordset[0]);
+  } catch (err) {
+    err500(res, err);
+  }
+});
+
+// POST /api/notifications/:id/read - Đánh dấu thông báo đã đọc
+router.post("/:id/read", authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const nhan_vien_id = req.user.id;
+  try {
+    const notifRes = await sql.query`SELECT trang_thai, ngay_gui FROM ThongBao WHERE id = ${id}`;
+    if (!notifRes.recordset[0]) {
+      return res.status(404).json({ message: "Không tìm thấy thông báo" });
+    }
+    const t = notifRes.recordset[0];
+    if (t.trang_thai === 'draft' || (t.trang_thai === 'scheduled' && new Date(t.ngay_gui) > new Date())) {
+      return res.status(400).json({ message: "Thông báo chưa được gửi" });
+    }
+
+    const result = await sql.query`
+      IF NOT EXISTS (SELECT 1 FROM ThongBao_DaDoc WHERE thong_bao_id = ${id} AND nhan_vien_id = ${nhan_vien_id})
+      BEGIN
+        INSERT INTO ThongBao_DaDoc (thong_bao_id, nhan_vien_id) VALUES (${id}, ${nhan_vien_id});
+        UPDATE ThongBao SET luot_da_doc = luot_da_doc + 1 WHERE id = ${id};
+      END
+    `;
+    res.json({ message: "Đã đánh dấu đọc" });
   } catch (err) {
     err500(res, err);
   }

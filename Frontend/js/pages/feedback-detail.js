@@ -18,7 +18,7 @@ function authHeaders() {
 function getAvatarColor(str) {
   const colors = [
     { bg: '#ffffff', color: '#3b0a99' }, // Trắng
-    { bg: '#ffedd5', color: '#ea580c' }, // Cam nhạt
+    { bg: '#FA7413', color: '#FA7413' }, // Cam nhạt
     { bg: '#ede9fe', color: '#3b0a99' }, // Xanh logo nhạt
     { bg: '#dcfce7', color: '#16a34a' }, // Xanh lá
     { bg: '#e0f2fe', color: '#0284c7' }, // Xanh lam
@@ -265,7 +265,7 @@ function renderTable() {
           <div style="display:flex; align-items:center; gap:12px;">
             ${hasAvatarOrEmail ? `
               <img src="${avatarSrc}" alt="Avatar" style="width:36px; height:36px; border-radius:50%; border:2px solid #3b0a99; object-fit:cover; flex-shrink:0;" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:36px; height:36px; border-radius:50%; background:${avatarColor.bg}; color:${avatarColor.color}; border:2px solid #3b0a99; -webkit-print-color-adjust: exact; print-color-adjust: exact; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; flex-shrink:0; box-sizing:border-box;\\'>${initial}</div>'">
-            ` : `
+             ` : `
               <div style="width:36px; height:36px; border-radius:50%; background:${avatarColor.bg}; color:${avatarColor.color}; border:2px solid #3b0a99; -webkit-print-color-adjust: exact; print-color-adjust: exact; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; flex-shrink:0; box-sizing:border-box;">
                 ${initial}
               </div>
@@ -430,12 +430,12 @@ function viewDetail(id) {
                 <div style="font-weight:700; color:var(--gray-900); font-size:15px; margin-bottom:12px; line-height:1.5;">${item.ten_cau_hoi || ''}</div>
                 ${isRating ? `
                   <div style="display:flex; align-items:center; gap:8px;">
-                    <div style="display:flex; gap:4px; color:#fbbf24;">
+                    <div style="display:flex; gap:4px; color:#FA7413;">
                       ${Array.from({length: 5}, (_, i) => `<svg width="20" height="20" fill="${i < item.diem_danh_gia ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`).join('')}
                     </div>
                     <span style="font-weight:700; font-size:16px; color:var(--gray-900); margin-left:8px;">${ans}</span>
                   </div>
-                ` : `
+                 ` : `
                   <div style="background:#f8fafc; padding:16px; border-radius:8px; font-size:14px; color:var(--gray-700); line-height:1.6; border:1px solid #e2e8f0;">
                     ${ans || '<span style="color:var(--gray-400);font-style:italic;">Không trả lời</span>'}
                   </div>
@@ -491,7 +491,7 @@ function viewDetail(id) {
                 <h3 style="font-size:18px; font-weight:700; color:var(--gray-900); margin:0;">Thông tin người gửi</h3>
                 ${hasAvatarOrEmail ? `
                   <img src="${avatarSrc}" alt="Avatar" style="width:40px; height:40px; border-radius:50%; border:2px solid #3b0a99; object-fit:cover; flex-shrink:0;" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:40px; height:40px; border-radius:50%; background:${avatarColors.bg}; color:${avatarColors.color}; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; border:2px solid #3b0a99; -webkit-print-color-adjust:exact; print-color-adjust:exact;\\'>${initials}</div>'">
-                ` : `
+                 ` : `
                   <div style="width:40px; height:40px; border-radius:50%; background:${avatarColors.bg}; color:${avatarColors.color}; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; border:2px solid #3b0a99; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
                     ${initials}
                   </div>
@@ -565,7 +565,6 @@ window.openDeleteFeedbackEntryModal = function(idsToDelete, deleteText) {
             </div>
             <div>
               <div style="font-size:16px;font-weight:700;color:var(--gray-800);">Xóa phản hồi</div>
-              <div style="font-size:13px;color:#64748b;margin-top:2px;">Chuyển phản hồi vào thùng rác</div>
             </div>
           </div>
           <button onclick="closeDeleteFeedbackEntryModal()" style="width:32px;height:32px;border-radius:50%;background:#f1f5f9;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;" onmouseenter="this.style.background='#e2e8f0'" onmouseleave="this.style.background='#f1f5f9'">
@@ -575,8 +574,9 @@ window.openDeleteFeedbackEntryModal = function(idsToDelete, deleteText) {
         <div style="padding:24px;">
           <div id="fb-entry-del-text" style="font-size:14px;color:var(--gray-700);margin-bottom:16px;line-height:1.5;"></div>
           <div>
-            <label style="display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:8px;">Lý do xóa (không bắt buộc)</label>
-            <input type="text" id="fb-entry-del-reason" placeholder="Nhập lý do chuyển vào thùng rác..." style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14.5px;color:var(--gray-800);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#ef4444'" onblur="this.style.borderColor='#cbd5e1'">
+            <label style="display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:8px;">Lý do xóa <span style="color:#ef4444">*</span></label>
+            <input type="text" id="fb-entry-del-reason" placeholder="Nhập lý do chuyển vào thùng rác..." style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14.5px;color:var(--gray-800);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#94a3b8'; document.getElementById('fb-entry-del-error').style.display='none';" onblur="this.style.borderColor='#cbd5e1'">
+            <div id="fb-entry-del-error" style="color:#ef4444; font-size:12px; margin-top:4px; display:none;">Vui lòng nhập lý do xóa</div>
           </div>
         </div>
         <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;gap:12px;">
@@ -592,6 +592,12 @@ window.openDeleteFeedbackEntryModal = function(idsToDelete, deleteText) {
   document.getElementById('fb-entry-del-reason').value = '';
 
   document.getElementById('fb-entry-confirm-del-btn').onclick = function () {
+    const reason = document.getElementById('fb-entry-del-reason').value.trim();
+    if (!reason) {
+      document.getElementById('fb-entry-del-error').style.display = 'block';
+      document.getElementById('fb-entry-del-reason').style.borderColor = '#ef4444';
+      return;
+    }
     executeDeleteFeedbackEntries(idsToDelete);
   };
 
@@ -614,7 +620,6 @@ window.closeDeleteFeedbackEntryModal = function () {
 
 window.executeDeleteFeedbackEntries = function (ids) {
   let reason = document.getElementById('fb-entry-del-reason').value.trim();
-  if (!reason) reason = 'Không có lý do';
 
   closeDeleteFeedbackEntryModal();
 

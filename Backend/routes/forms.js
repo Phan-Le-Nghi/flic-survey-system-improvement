@@ -292,6 +292,24 @@ async function ensureQuestionMediaColumns() {
   return columns;
 }
 
+async function ensureFormSettingsColumns() {
+  const columns = await getTableColumns("Form");
+  const addBit = async (name, defaultValue) => {
+    if (columns.has(name)) return;
+    await sql.query(`ALTER TABLE Form ADD ${name} BIT NOT NULL CONSTRAINT DF_Form_${name} DEFAULT ${defaultValue}`);
+    columns.add(name);
+  };
+
+  await addBit("collect_email", 0);
+  await addBit("require_login", 0);
+  await addBit("limit_one_response", 0);
+  await addBit("allow_edit_after_submit", 0);
+  await addBit("show_submit_another_link", 1);
+  await addBit("show_progress_bar", 0);
+  await addBit("shuffle_questions", 0);
+  return columns;
+}
+
 async function ensureFormSectionColumns() {
   const columns = await getTableColumns("FormSection");
   if (!columns.size) return columns;
@@ -454,7 +472,7 @@ async function getFormWithQuestions(formId, publicOnly = false) {
   const id = Number(formId);
   const reqForm = new sql.Request();
   reqForm.input("id", sql.Int, id);
-  const formColumns = await getTableColumns("Form");
+  const formColumns = await ensureFormSettingsColumns();
   const hasLoaiKhaoSat = formColumns.has("loai_khao_sat_id");
   const formCategorySelect = hasLoaiKhaoSat ? "lk.danh_muc" : (formColumns.has("danh_muc") ? "f.danh_muc" : "NULL");
   const formSurveyTypeSelect = hasLoaiKhaoSat ? "lk.ten_loai" : "NULL";
@@ -464,7 +482,7 @@ async function getFormWithQuestions(formId, publicOnly = false) {
     FROM Form f
     ${hasLoaiKhaoSat ? "LEFT JOIN LoaiKhaoSat lk ON lk.id = f.loai_khao_sat_id" : ""}
     LEFT JOIN NhanVien n ON n.id = f.nhan_vien_id
-    WHERE f.id = @id ${publicOnly ? "AND f.trang_thai IN ('active','pending') AND (f.ngay_dong IS NULL OR f.ngay_dong >= CAST(GETDATE() AS date))" : ""}
+    WHERE f.id = @id AND f.trang_thai != 'deleted'
   `);
   const formRow = formResult.recordset[0];
   if (!formRow) return null;
@@ -550,7 +568,7 @@ async function getFormWithQuestions(formId, publicOnly = false) {
 router.get("/", authMiddleware, authorize("view_form"), async (req, res) => {
   try {
     const { status, cat, search } = req.query;
-    const formColumns = await getTableColumns("Form");
+    const formColumns = await ensureFormSettingsColumns();
     const hasLoaiKhaoSat = formColumns.has("loai_khao_sat_id");
     const { select: categorySelect, join: categoryJoin } = await getFormCategorySql(formColumns);
     const surveyTypeSelect = hasLoaiKhaoSat ? "lk.ten_loai" : "NULL";
@@ -565,10 +583,12 @@ router.get("/", authMiddleware, authorize("view_form"), async (req, res) => {
              ${formColumns.has("mau_nen") ? "f.mau_nen" : "NULL"} AS mau_nen,
              ${formColumns.has("font_family") ? "f.font_family" : "NULL"} AS font_family,
              n.ho_ten AS nguoi_tao, n.vai_tro,
-             (SELECT COUNT(*) FROM PhanHoi p WHERE p.form_id = f.id AND p.trang_thai != 'deleted') AS so_phan_hoi,
+             (SELECT COUNT(*) FROM PhanHoi p WHERE p.form_id = f.id) AS so_phan_hoi,
              (SELECT COUNT(*) FROM CauHoi q WHERE q.form_id = f.id) AS so_cau_hoi,
              (SELECT TOP 1 q.noi_dung FROM CauHoi q WHERE q.form_id = f.id ORDER BY q.thu_tu) AS cau_hoi_dau,
              f.luot_xem, f.loi_ket,
+             f.collect_email, f.require_login, f.limit_one_response, f.allow_edit_after_submit,
+             f.show_submit_another_link, f.show_progress_bar, f.shuffle_questions,
              pa.do_uu_tien AS approval_priority,
              pa.han_chot_duyet AS approval_deadline
       FROM Form f
@@ -588,7 +608,7 @@ router.get("/", authMiddleware, authorize("view_form"), async (req, res) => {
     if (cat) { query += ` AND ${categorySelect} = @cat`; params.cat = cat; }
     if (search) { query += ` AND f.ten_form LIKE @search`; params.search = `%${search}%`; }
 
-    query += ` ORDER BY CASE WHEN f.trang_thai = 'pending' AND pa.do_uu_tien = 'urgent' THEN 0 ELSE 1 END, COALESCE(f.ngay_cap_nhat, f.ngay_tao) DESC, f.id DESC`;
+    query += ` ORDER BY COALESCE(f.ngay_cap_nhat, f.ngay_tao) DESC, f.id DESC`;
 
     const req2 = new sql.Request();
     if (params.status) req2.input("status", sql.NVarChar, params.status);
@@ -614,7 +634,7 @@ router.get("/stats", authMiddleware, authorize("view_form"), async (req, res) =>
         SUM(luot_xem) AS tong_luot_xem
       FROM Form
     `;
-    const ph = await sql.query`SELECT COUNT(*) AS tong_phan_hoi FROM PhanHoi WHERE trang_thai != 'deleted'`;
+    const ph = await sql.query`SELECT COUNT(*) AS tong_phan_hoi FROM PhanHoi`;
     res.json({ ...result.recordset[0], tong_phan_hoi: ph.recordset[0].tong_phan_hoi });
   } catch (err) {
     err500(res, err);
@@ -670,7 +690,7 @@ router.get("/:id", authMiddleware, authorize("view_form"), async (req, res) => {
 
 // POST /api/forms - Tạo biểu mẫu mới
 router.post("/", authMiddleware, authorize("add_form"), async (req, res) => {
-  const { ten_form, danh_muc, loai_khao_sat, doi_tuong, trang_thai, nhan_vien_id, cau_hoi, loi_ket, mo_ta, ngay_dong, anh_bia, mau_nen, font_family, cong_tac } = req.body;
+  const { ten_form, danh_muc, loai_khao_sat, trang_thai, nhan_vien_id, cau_hoi, loi_ket, mo_ta, ngay_dong, anh_bia, mau_nen, font_family, cong_tac, settings = {} } = req.body;
   if (!ten_form) return res.status(400).json({ message: "Tên biểu mẫu là bắt buộc" });
 
   try {
@@ -686,7 +706,7 @@ router.post("/", authMiddleware, authorize("add_form"), async (req, res) => {
       }
     }
 
-    const formColumns = await getTableColumns("Form");
+    const formColumns = await ensureFormSettingsColumns();
     const hasLoaiKhaoSat = formColumns.has("loai_khao_sat_id");
     const formReq = new sql.Request();
     const fields = ["ten_form"];
@@ -710,12 +730,6 @@ router.post("/", authMiddleware, authorize("add_form"), async (req, res) => {
       fields.push("ma_rut_gon");
       values.push("@ma_rut_gon");
       formReq.input("ma_rut_gon", sql.VarChar, await generateUniqueFormShortCode());
-    }
-
-    if (formColumns.has("doi_tuong")) {
-      fields.push("doi_tuong");
-      values.push("@doi_tuong");
-      formReq.input("doi_tuong", sql.NVarChar, normalizeFormTarget(doi_tuong));
     }
 
     if (formColumns.has("loi_ket")) {
@@ -776,6 +790,19 @@ router.post("/", authMiddleware, authorize("add_form"), async (req, res) => {
       formReq.input("font_family", sql.NVarChar, font_family || "Roboto");
     }
 
+    const addSetting = (column, defaultValue) => {
+      fields.push(column);
+      values.push(`@${column}`);
+      formReq.input(column, sql.Bit, settings[column] === undefined ? defaultValue : (settings[column] ? 1 : 0));
+    };
+    addSetting("collect_email", 0);
+    addSetting("require_login", 0);
+    addSetting("limit_one_response", 0);
+    addSetting("allow_edit_after_submit", 0);
+    addSetting("show_submit_another_link", 1);
+    addSetting("show_progress_bar", 0);
+    addSetting("shuffle_questions", 0);
+
     const insertForm = await formReq.query(`
       INSERT INTO Form (${fields.join(", ")})
       OUTPUT INSERTED.id
@@ -789,6 +816,13 @@ router.post("/", authMiddleware, authorize("add_form"), async (req, res) => {
 
     await saveFormCollaborators(formId, cong_tac);
 
+    try {
+      await sql.query`
+        INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
+        VALUES (${req.user ? req.user.id : null}, 'create', 'form', ${formId}, N'Tạo biểu mẫu mới')
+      `;
+    } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
+
     res.status(201).json({ message: "Tạo biểu mẫu thành công", id: formId });
   } catch (err) {
     err500(res, err);
@@ -797,7 +831,7 @@ router.post("/", authMiddleware, authorize("add_form"), async (req, res) => {
 
 // PUT /api/forms/:id - Cập nhật biểu mẫu (bao gồm câu hỏi)
 router.put("/:id", authMiddleware, authorize("edit_form"), async (req, res) => {
-  const { ten_form, danh_muc, loai_khao_sat, doi_tuong, trang_thai, cau_hoi, mo_ta, ngay_dong, anh_bia, mau_nen, font_family, cong_tac } = req.body;
+  const { ten_form, danh_muc, loai_khao_sat, trang_thai, cau_hoi, mo_ta, ngay_dong, anh_bia, mau_nen, font_family, cong_tac, settings = {} } = req.body;
   const formId = req.params.id;
   try {
     const currentStatus = await getFormStatus(formId);
@@ -817,7 +851,7 @@ router.put("/:id", authMiddleware, authorize("edit_form"), async (req, res) => {
       }
     }
     const { loi_ket: loi_ket_update } = req.body;
-    const formColumns = await getTableColumns("Form");
+    const formColumns = await ensureFormSettingsColumns();
     const hasLoaiKhaoSat = formColumns.has("loai_khao_sat_id");
     const updateReq = new sql.Request();
     const updates = [];
@@ -834,10 +868,6 @@ router.put("/:id", authMiddleware, authorize("edit_form"), async (req, res) => {
     if (hasLoaiKhaoSat) {
       updates.push("loai_khao_sat_id = @loai_khao_sat_id");
       updateReq.input("loai_khao_sat_id", sql.Int, await getLoaiKhaoSatId(danh_muc, loai_khao_sat));
-    }
-    if (formColumns.has("doi_tuong")) {
-      updates.push("doi_tuong = @doi_tuong");
-      updateReq.input("doi_tuong", sql.NVarChar, normalizeFormTarget(doi_tuong));
     }
     if (formColumns.has("trang_thai")) {
       updates.push("trang_thai = @trang_thai");
@@ -867,6 +897,18 @@ router.put("/:id", authMiddleware, authorize("edit_form"), async (req, res) => {
       updates.push("font_family = @font_family");
       updateReq.input("font_family", sql.NVarChar, font_family || "Roboto");
     }
+    const addSettingUpdate = (column) => {
+      if (!Object.prototype.hasOwnProperty.call(settings, column)) return;
+      updates.push(`${column} = @${column}`);
+      updateReq.input(column, sql.Bit, settings[column] ? 1 : 0);
+    };
+    addSettingUpdate("collect_email");
+    addSettingUpdate("require_login");
+    addSettingUpdate("limit_one_response");
+    addSettingUpdate("allow_edit_after_submit");
+    addSettingUpdate("show_submit_another_link");
+    addSettingUpdate("show_progress_bar");
+    addSettingUpdate("shuffle_questions");
     if (formColumns.has("ngay_cap_nhat")) {
       updates.push("ngay_cap_nhat = GETDATE()");
     }
@@ -887,6 +929,13 @@ router.put("/:id", authMiddleware, authorize("edit_form"), async (req, res) => {
       }
       await saveFormCollaborators(Number(formId), cong_tac);
     }
+
+    try {
+      await sql.query`
+        INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
+        VALUES (${req.user ? req.user.id : null}, 'edit', 'form', ${formId}, N'Cập nhật biểu mẫu')
+      `;
+    } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
 
     res.json({ message: "Cập nhật biểu mẫu thành công" });
   } catch (err) {
@@ -921,6 +970,20 @@ router.patch("/:id/status", authMiddleware, authorize("edit_form"), async (req, 
         WHERE id = ${req.params.id}
       `;
     }
+
+    try {
+      let actionType = 'edit';
+      let chiTiet = `Cập nhật trạng thái biểu mẫu thành ${nextStatus}`;
+      if (nextStatus === 'active') actionType = 'approve';
+      if (nextStatus === 'rejected') actionType = 'reject';
+      if (nextStatus === 'closed') actionType = 'close';
+      
+      await sql.query`
+        INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
+        VALUES (${req.user ? req.user.id : null}, ${actionType}, 'form', ${req.params.id}, ${chiTiet})
+      `;
+    } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
+
     res.json({ message: "Đổi trạng thái thành công" });
   } catch (err) {
     err500(res, err);

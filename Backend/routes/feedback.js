@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
     const formRequest = new sql.Request();
     formRequest.input('form_id', sql.Int, formId);
     const formResult = await formRequest.query(`
-      SELECT TOP 1 id, trang_thai, ngay_dong, nhan_vien_id, ten_form
+      SELECT TOP 1 id, trang_thai, ngay_dong, nhan_vien_id, ten_form, limit_one_response
       FROM Form
       WHERE id = @form_id
     `);
@@ -131,6 +131,118 @@ router.post('/:id/chitiet', async (req, res) => {
 });
 
 // ── GET /api/feedback?form_id=&trang_thai=&cam_xuc= ──────────────
+// PUT /api/feedback/:id/public - cap nhat phan hoi cong khai khi form cho phep chinh sua
+router.put('/:id/public', async (req, res) => {
+  const feedbackId = Number(req.params.id);
+  if (!validId(feedbackId)) return res.status(400).json({ message: 'ID khong hop le' });
+
+  const { form_id, ho_ten, email, danh_gia, cam_xuc, noi_dung, lop, khoa, giao_vien, chi_tiet } = req.body;
+  if (!form_id) return res.status(400).json({ message: 'Thieu form_id' });
+  if (!noi_dung) return res.status(400).json({ message: 'Thieu noi_dung' });
+
+  try {
+    const formId = Number(form_id);
+    if (!Number.isInteger(formId) || formId <= 0) {
+      return res.status(400).json({ message: 'form_id khong hop le' });
+    }
+
+    const checkReq = new sql.Request();
+    checkReq.input('id', sql.Int, feedbackId);
+    checkReq.input('form_id', sql.Int, formId);
+    const checkResult = await checkReq.query(`
+      SELECT TOP 1 ph.id, f.allow_edit_after_submit, f.trang_thai, f.ngay_dong
+      FROM PhanHoi ph
+      JOIN Form f ON f.id = ph.form_id
+      WHERE ph.id = @id AND ph.form_id = @form_id
+    `);
+    const current = checkResult.recordset[0];
+    if (!current) return res.status(404).json({ message: 'Khong tim thay phan hoi' });
+    if (!current.allow_edit_after_submit) return res.status(403).json({ message: 'Bieu mau khong cho phep chinh sua sau khi gui' });
+
+    const closeDate = current.ngay_dong ? new Date(current.ngay_dong) : null;
+    if (current.trang_thai !== 'active' || (closeDate && closeDate < new Date())) {
+      return res.status(400).json({ message: 'Bieu mau da dong, khong the chinh sua phan hoi' });
+    }
+
+    const columns = await getPhanHoiColumns(sql);
+    if (form.limit_one_response && !email) {
+      return res.status(400).json({ message: 'Email la bat buoc voi bieu mau gioi han 1 lan tra loi' });
+    }
+    if (form.limit_one_response && email) {
+      const duplicateReq = new sql.Request();
+      duplicateReq.input('form_id', sql.Int, formId);
+      duplicateReq.input('email', sql.NVarChar(150), email);
+      const emailChecks = [];
+      if (columns.has('email')) emailChecks.push('LOWER(email) = LOWER(@email)');
+      if (columns.has('email_nguoi_gui')) emailChecks.push('LOWER(email_nguoi_gui) = LOWER(@email)');
+      if (emailChecks.length) {
+        const duplicateResult = await duplicateReq.query(`
+          SELECT TOP 1 id
+          FROM PhanHoi
+          WHERE form_id = @form_id
+            AND trang_thai != 'deleted'
+            AND (${emailChecks.join(' OR ')})
+        `);
+        if (duplicateResult.recordset[0]) {
+          return res.status(409).json({ message: 'Email nay da gui phan hoi cho bieu mau nay' });
+        }
+      }
+    }
+    const updateReq = new sql.Request();
+    updateReq.input('id', sql.Int, feedbackId);
+    const updates = [];
+    const addUpdate = (column, param, type, value) => {
+      if (!columns.has(column)) return;
+      updates.push(`${column} = @${param}`);
+      updateReq.input(param, type, value);
+    };
+
+    let mappedCamXuc = 'KhÃ´ng rÃµ';
+    if (cam_xuc === 'positive' || cam_xuc === 'Tich cuc' || cam_xuc === 'TÃ­ch cá»±c') mappedCamXuc = 'TÃ­ch cá»±c';
+    else if (cam_xuc === 'negative' || cam_xuc === 'Tieu cuc' || cam_xuc === 'TiÃªu cá»±c') mappedCamXuc = 'TiÃªu cá»±c';
+    else if (cam_xuc === 'neutral' || cam_xuc === 'Trung lap' || cam_xuc === 'Trung láº­p') mappedCamXuc = 'Trung láº­p';
+    else if (cam_xuc) mappedCamXuc = cam_xuc;
+
+    addUpdate('ho_ten', 'ho_ten', sql.NVarChar(100), ho_ten || null);
+    addUpdate('ho_ten_nguoi_gui', 'ho_ten_nguoi_gui', sql.NVarChar(100), ho_ten || null);
+    addUpdate('email', 'email', sql.NVarChar(150), email || null);
+    addUpdate('email_nguoi_gui', 'email_nguoi_gui', sql.NVarChar(150), email || null);
+    addUpdate('danh_gia', 'danh_gia', sql.Int, danh_gia || null);
+    addUpdate('cam_xuc', 'cam_xuc', sql.NVarChar(20), mappedCamXuc);
+    addUpdate('noi_dung', 'noi_dung', sql.NVarChar(1000), noi_dung);
+    addUpdate('lop', 'lop', sql.NVarChar(50), lop || null);
+    addUpdate('khoa', 'khoa', sql.NVarChar(100), khoa || null);
+    addUpdate('giao_vien', 'giao_vien', sql.NVarChar(100), giao_vien || null);
+    if (columns.has('ngay_cap_nhat')) updates.push('ngay_cap_nhat = GETDATE()');
+
+    if (updates.length) {
+      await updateReq.query(`UPDATE PhanHoi SET ${updates.join(', ')} WHERE id = @id`);
+    }
+
+    if (Array.isArray(chi_tiet)) {
+      await sql.query`DELETE FROM ChiTietPhanHoi WHERE phan_hoi_id = ${feedbackId}`;
+      await ensureFeedbackRatingConstraint();
+      for (const detail of chi_tiet) {
+        const hasRating = detail.diem_danh_gia !== undefined && detail.diem_danh_gia !== null && detail.diem_danh_gia !== '';
+        const detailReq = new sql.Request();
+        detailReq.input('phan_hoi_id', sql.Int, feedbackId);
+        detailReq.input('cau_hoi_id', sql.Int, Number(detail.cau_hoi_id));
+        detailReq.input('lua_chon_id', sql.Int, detail.lua_chon_id ? Number(detail.lua_chon_id) : null);
+        detailReq.input('diem_danh_gia', sql.Int, hasRating ? Number(detail.diem_danh_gia) : null);
+        detailReq.input('noi_dung', sql.NVarChar(1000), detail.noi_dung || null);
+        await detailReq.query(`
+          INSERT INTO ChiTietPhanHoi (phan_hoi_id, cau_hoi_id, lua_chon_id, diem_danh_gia, cau_tra_loi)
+          VALUES (@phan_hoi_id, @cau_hoi_id, @lua_chon_id, @diem_danh_gia, @noi_dung)
+        `);
+      }
+    }
+
+    res.json({ id: feedbackId, message: 'Da cap nhat phan hoi' });
+  } catch (err) {
+    err500(res, err, 'Loi khi cap nhat phan hoi');
+  }
+});
+
 router.get('/', authMiddleware, authorize('view_feedback'), async (req, res) => {
   try {
     const { form_id, trang_thai, cam_xuc } = req.query;
@@ -307,13 +419,13 @@ router.get('/trash/list', authMiddleware, authorize('view_feedback'), async (req
              MAX(ph.ngay_xoa) AS ngay_xoa_gannhat,
              MAX(nx.ho_ten) AS nguoi_xoa_ten,
              MAX(ph.ly_do_xoa) AS ly_do_xoa,
-             CONVERT(varchar(19), ph.ngay_xoa, 120) AS dateKey
+             CONVERT(varchar(10), ph.ngay_xoa, 120) AS dateKey
       FROM PhanHoi ph
       JOIN Form f ON f.id = ph.form_id
       LEFT JOIN LoaiKhaoSat lks ON f.loai_khao_sat_id = lks.id
       LEFT JOIN NhanVien nx ON ph.nguoi_xoa_id = nx.id
       WHERE ph.trang_thai = 'deleted'
-      GROUP BY f.id, f.ten_form, lks.danh_muc, CONVERT(varchar(19), ph.ngay_xoa, 120)
+      GROUP BY f.id, f.ten_form, lks.danh_muc, CONVERT(varchar(10), ph.ngay_xoa, 120)
       ORDER BY MAX(ph.ngay_xoa) DESC
     `;
     res.json(result.recordset);
@@ -356,6 +468,9 @@ router.delete('/:id/permanent', authMiddleware, authorize('delete_feedback'), as
   const { ly_do_xoa } = req.body || {};
   if (!validId(id)) return res.status(400).json({ message: 'ID không hợp lệ' });
   try {
+    const fbRes = await sql.query`SELECT form_id FROM PhanHoi WHERE id=${id}`;
+    const form_id = fbRes.recordset[0] ? fbRes.recordset[0].form_id : null;
+
     await sql.query`DELETE FROM PhanHoi WHERE id=${id} AND trang_thai='deleted'`;
     try {
       const logDetail = ly_do_xoa && ly_do_xoa !== 'Không có lý do'
@@ -363,7 +478,7 @@ router.delete('/:id/permanent', authMiddleware, authorize('delete_feedback'), as
         : 'Xóa vĩnh viễn phản hồi khỏi hệ thống';
       await sql.query`
         INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-        VALUES (${nhan_vien_id}, 'hard_delete', 'feedback', ${id}, ${logDetail})
+        VALUES (${nhan_vien_id}, 'hard_delete', 'form', ${form_id}, ${logDetail})
       `;
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
     res.json({ message: 'Đã xóa vĩnh viễn phản hồi' });
@@ -384,7 +499,7 @@ router.patch('/form/:form_id/restore', authMiddleware, authorize('delete_feedbac
     let whereSql = `form_id = @form_id AND trang_thai = 'deleted'`;
     if (dateKey) {
       request.input('dateKey', sql.VarChar, dateKey);
-      whereSql += ` AND CONVERT(varchar(19), ngay_xoa, 120) = @dateKey`;
+      whereSql +=  ` AND CONVERT(varchar(10), ngay_xoa, 120) = @dateKey`;
     }
 
     const result = await request.query(`
@@ -400,7 +515,7 @@ router.patch('/form/:form_id/restore', authMiddleware, authorize('delete_feedbac
           : `Khôi phục ${count} phản hồi của biểu mẫu`;
         await sql.query`
           INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-          VALUES (${nhan_vien_id}, 'restore', 'feedback', ${form_id}, ${logDetail})
+          VALUES (${nhan_vien_id}, 'restore', 'form', ${form_id}, ${logDetail})
         `;
       }
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }
@@ -422,7 +537,7 @@ router.delete('/form/:form_id/permanent', authMiddleware, authorize('delete_feed
     let whereSql = `form_id = @form_id AND trang_thai = 'deleted'`;
     if (dateKey) {
       request.input('dateKey', sql.VarChar, dateKey);
-      whereSql += ` AND CONVERT(varchar(19), ngay_xoa, 120) = @dateKey`;
+      whereSql +=  ` AND CONVERT(varchar(10), ngay_xoa, 120) = @dateKey`;
     }
 
     const result = await request.query(`DELETE FROM PhanHoi WHERE ${whereSql}`);
@@ -434,7 +549,7 @@ router.delete('/form/:form_id/permanent', authMiddleware, authorize('delete_feed
           : `Xóa vĩnh viễn ${count} phản hồi của biểu mẫu khỏi hệ thống`;
         await sql.query`
           INSERT INTO NhatKyHoatDong (nhan_vien_id, hanh_dong, doi_tuong, doi_tuong_id, chi_tiet)
-          VALUES (${nhan_vien_id}, 'hard_delete', 'feedback', ${form_id}, ${logDetail})
+          VALUES (${nhan_vien_id}, 'hard_delete', 'form', ${form_id}, ${logDetail})
         `;
       }
     } catch (e) { console.error('Lỗi khi lưu nhật ký:', e); }

@@ -9,7 +9,7 @@ let isSubmitting = false;
 let notifCurrentPage = 1;
 
 const typeStyle = {
-  info: { bg: '#eff6ff', color: '#00008B', border: '#00008B' },
+  info: { bg: '#eff6ff', color: '#0250AD', border: '#0250AD' },
   success: { bg: '#f0fdf4', color: '#16a34a', border: '#22c55e' },
   error: { bg: '#fef2f2', color: '#dc2626', border: '#ef4444' },
 };
@@ -193,7 +193,7 @@ async function loadNotificationsData() {
 
   renderNotifStats();
   renderNotifList();
-  
+
   const params = new URLSearchParams(window.location.search);
   const viewId = params.get('view');
   if (viewId) {
@@ -240,13 +240,26 @@ function formatRelativeTime(dbDateStr) {
 }
 
 // ── Render helpers ────────────────────────────────────────────────
+function notifStatCard(label, value, color, bg, iconPath) {
+  return `
+    <div style="background:#fff;border-radius:12px;padding:24px;display:flex;align-items:center;gap:16px;border:1px solid var(--gray-200);box-shadow:var(--shadow-sm);border-left:4px solid ${color};">
+      <div style="width:52px;height:52px;border-radius:12px;background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">${iconPath}</svg>
+      </div>
+      <div>
+        <div style="font-size:13px;color:var(--gray-600);font-weight:700;margin-bottom:6px">${label}</div>
+        <div style="font-size:26px;font-weight:800;color:var(--gray-800);line-height:1">${value}</div>
+      </div>
+    </div>`;
+}
+
 function renderNotifStats() {
   const t = notifStats;
   document.getElementById('notif-stats').innerHTML = [
-    statCard("Tổng thông báo", `<span style="color:#00008B">${t.tong || 0}</span>`, "#00008B", "#eff6ff", '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>'),
-    statCard("Đã gửi", `<span style="color:#0284c7">${t.da_gui || 0}</span>`, "#0284c7", "#e0f2fe", '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'),
-    statCard("Lên lịch", `<span style="color:#2563eb">${t.len_lich || 0}</span>`, "#2563eb", "#dbeafe", '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
-    statCard("Nháp", `<span style="color:#64748b">${t.nhap || 0}</span>`, "#64748b", "#f1f5f9", '<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>')
+    notifStatCard("Tổng thông báo", `<span style="color:#0250AD">${t.tong || 0}</span>`, "#0250AD", "#eff6ff", '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>'),
+    notifStatCard("Đã gửi", `<span style="color:#0284c7">${t.da_gui || 0}</span>`, "#0284c7", "#e0f2fe", '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'),
+    notifStatCard("Lên lịch", `<span style="color:#2563eb">${t.len_lich || 0}</span>`, "#2563eb", "#dbeafe", '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
+    notifStatCard("Nháp", `<span style="color:#64748b">${t.nhap || 0}</span>`, "#64748b", "#f1f5f9", '<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>')
   ].join('');
 }
 
@@ -293,7 +306,6 @@ function renderNotifList(resetPage = false) {
       background:#fff;
       border:1px solid var(--gray-200);
       border-radius:14px;
-      border-left:4px solid ${ts.border};
       box-shadow:0 1px 4px rgba(0,0,0,0.05);
       cursor:pointer;
       transition:box-shadow 0.18s, transform 0.18s;
@@ -334,7 +346,7 @@ function renderNotifList(resetPage = false) {
             ${n.status === 'sent' && n.total > 0 ? `
               <span style="display:inline-flex;align-items:center;gap:8px">
                 <div style="width:80px;height:5px;background:var(--gray-100);border-radius:999px;overflow:hidden">
-                  <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#00008B,#0284c7);border-radius:999px;transition:width 0.4s"></div>
+                  <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0250AD,#0284c7);border-radius:999px;transition:width 0.4s"></div>
                 </div>
                 <span style="font-size:12px;color:var(--gray-500)">${n.read}/${n.total} đã đọc (${pct}%)</span>
               </span>
@@ -418,7 +430,7 @@ function openNotifDetail(id) {
       <div style="border:1px solid var(--gray-200);border-radius:12px;padding:14px;background:#fff">
         <div style="font-size:12px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Trạng thái đọc</div>
         <div style="font-size:14px;color:var(--gray-800);margin-bottom:8px">${n.read}/${n.total} đã đọc (${pct}%)</div>
-        <div class="progress" style="width:100%"><div class="progress-bar" style="width:${pct}%;background:#00008B"></div></div>
+        <div class="progress" style="width:100%"><div class="progress-bar" style="width:${pct}%;background:#0250AD"></div></div>
       </div>
     </div>
   `;
@@ -554,9 +566,9 @@ function renderEmailTags() {
   const wrap = document.getElementById('notif-email-tags');
   if (!wrap) return;
   wrap.innerHTML = emailTags.map(e => `
-    <span style="display:inline-flex;align-items:center;gap:5px;background:#00008B;color:#fff;border-radius:999px;padding:3px 10px 3px 12px;font-size:12px;font-weight:500">
+    <span style="display:inline-flex;align-items:center;gap:5px;background:#0250AD;color:#fff;border-radius:999px;padding:3px 10px 3px 12px;font-size:12px;font-weight:500">
       ${e}
-      <button onclick="removeEmailTag('${e}')" style="background:none;border:none;cursor:pointer;color:#00008B;padding:0;display:flex;line-height:1" title="Xóa">
+      <button onclick="removeEmailTag('${e}')" style="background:none;border:none;cursor:pointer;color:#0250AD;padding:0;display:flex;line-height:1" title="Xóa">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </span>`).join('');
@@ -638,17 +650,11 @@ async function saveCurrentAsDraft() {
         method: 'PUT', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (typeof window.logActivity === 'function') {
-        window.logActivity('edit', null, 'Hệ thống', `Cập nhật bản nháp thông báo: "${title}"`, 'notification');
-      }
     } else {
       await fetch(`${API_BASE}/notifications`, {
         method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (typeof window.logActivity === 'function') {
-        window.logActivity('create', null, 'Hệ thống', `Lưu nháp thông báo: "${title}"`, 'notification');
-      }
     }
   } catch (err) {
     console.error(err);
@@ -765,11 +771,6 @@ async function saveNotifAction(status) {
   await loadNotificationsData();
   showToast(finalStatus === 'sent' ? 'Đã gửi thông báo ngay bây giờ!' : 'Đã lên lịch gửi thông báo!', 'success');
 
-  // Lưu nhật ký hoạt động
-  if (typeof window.logActivity === 'function') {
-    const actionLabel = finalStatus === 'sent' ? 'Gửi thông báo' : (finalStatus === 'scheduled' ? 'Lên lịch thông báo' : 'Lưu nháp thông báo');
-    window.logActivity('create', null, 'Hệ thống', `${actionLabel}: "${title}"`, 'notification');
-  }
 }
 
 let notifToDelete = null;
@@ -828,13 +829,9 @@ async function confirmDeleteNotif() {
       method: 'DELETE',
       headers: authHeaders()
     });
-    
-    // Lưu nhật ký hoạt động
-    if (typeof window.logActivity === 'function') {
-      window.logActivity('delete', null, 'Hệ thống', `Xóa thông báo: "${title}"`, 'notification');
-    }
-  } catch(e) {}
-  
+
+  } catch (e) { }
+
   closeDeleteNotifModal();
   await loadNotificationsData();
   showToast('Đã xóa thông báo!', 'success');

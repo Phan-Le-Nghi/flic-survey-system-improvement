@@ -135,7 +135,7 @@ html[data-theme="dark"] {
 }
 
 html[data-theme="dark"] .page-body {
-  background: radial-gradient(circle at top right, rgba(2,80,173, .08), transparent 24%), linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+  background: radial-gradient(circle at top right, rgba(2, 80, 173, .08), transparent 24%), linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
 }
 
 .sidebar {
@@ -821,7 +821,7 @@ html[data-theme="dark"] .help-fab {
 
 .input:focus {
   border-color: var(--sky);
-  box-shadow: 0 0 0 3px rgba(2,80,173, 0.15);
+  box-shadow: 0 0 0 3px rgba(2, 80, 173, 0.15);
 }
 
 .input-wrap {
@@ -1008,7 +1008,46 @@ tbody tr:hover {
   background: var(--gray-50);
 }
 
-/* -- MODALS -- */
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--gray-100);
+  padding: 4px;
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-500);
+  transition: all 0.15s;
+}
+
+.tab-btn.active {
+  background: #fff;
+  color: var(--gray-800);
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-btn:hover:not(.active) {
+  color: var(--gray-700);
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1178,8 +1217,10 @@ tbody tr:hover {
   align-items: stretch;
 }
 
-@media (max-width: 1024px) {
-  .grid-4 {
+@media (max-width: 1100px) {
+
+  .grid-4,
+  .grid-3 {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -2040,7 +2081,7 @@ body.login-body {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 14px rgba(2,80,173, .4);
+  box-shadow: 0 4px 14px rgba(2, 80, 173, .4);
   cursor: pointer;
   z-index: 50;
   transition: all .2s;
@@ -2208,7 +2249,7 @@ body.login-body {
 
 .q-type-rating {
   background: #FA7413;
-  color:#fff;
+  color: #fff;
 }
 
 /* -- STAFF CARD -- */
@@ -2332,50 +2373,4 @@ body.login-body {
 [onmouseenter*="#0250AD"]:hover textarea,
 [onmouseenter*="#0250AD"]:hover select {
   color: var(--gray-800) !important;
-}
-
-.tabs {
-  display: flex;
-  gap: 2px;
-  background: var(--gray-100);
-  padding: 4px;
-  border-radius: var(--radius);
-  margin-bottom: 20px;
-}
-
-.tab-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--gray-500);
-  transition: all 0.15s;
-}
-
-.tab-btn.active {
-  background: #fff;
-  color: var(--gray-800);
-  box-shadow: var(--shadow-sm);
-}
-
-#tab-forms.active {
-  background: #0250AD !important;
-  color: #fff !important;
-}
-
-#tab-feedbacks.active {
-  background: #FA7413 !important;
-  color: #fff !important;
-}
-
-.tab-btn:hover:not(.active) {
-  color: var(--gray-700);
-}
-
-.tab-content {
-  display: none;
-}
-
-.tab-content.active {
-  display: block;
 }
